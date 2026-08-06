@@ -1,0 +1,1207 @@
+# Especificação Técnica — Claro Flow Engine (CFE)
+
+**Projeto:** Claro Flow Engine (CFE) — Protótipo Funcional
+**Time:** Horizon (FIAP 4SI / Challenge Claro 2026)
+**Versão:** 1.1
+**Público-alvo:** desenvolvedor(a) e/ou agente de IA responsável pela codificação
+**Complementa:** Especificação Funcional (spec-funcional.md)
+**Complementado por:** Especificação do Modo Explicação (spec-modo-explicacao.md), que detalha o backend do Explainer, o Painel de Orquestração e a integração com os canais
+
+---
+
+## 1. Stack tecnológico
+
+A tabela abaixo consolida a stack, com componente, tecnologia e justificativa (formato solicitado nos feedbacks).
+
+| Componente | Tecnologia | Justificativa |
+|---|---|---|
+| Linguagem backend | C# 12 | Domínio da equipe; forte tipagem; ecossistema maduro para APIs corporativas |
+| Runtime backend | .NET 8 (LTS) | Versão LTS mais recente; suporte estendido; ganhos de performance em relação ao .NET 6 |
+| Framework Web | ASP.NET Core Web API | Padrão de mercado para APIs REST em .NET; integração nativa com DI, middleware, Swagger |
+| ORM | Entity Framework Core 8 | Produtividade no MVP; migrations versionadas; querying tipado |
+| Banco de dados | PostgreSQL 16 | Open-source, suporte robusto a JSONB (útil para payload de jornada), amplamente adotado |
+| Driver Postgres | Npgsql 8 | Driver oficial para .NET; alinhado com EF Core 8 |
+| Documentação de API | Swagger / Swashbuckle | Nativo em ASP.NET Core; documentação e teste manual em uma interface só |
+| Logging | Serilog | Logs estruturados em JSON; integração com sinks (console, arquivo, seq) |
+| Front dos canais simulados | HTML5 + CSS3 + JavaScript (vanilla) | Sem build step; menor complexidade para o MVP; equivalência funcional ao React para o escopo |
+| Servidor estático para front | Live Server (VS Code) ou `dotnet serve` ou `http-server` (npm) | Qualquer servidor estático simples; sem preferência forte |
+| Containerização de dependência | Docker Compose | Sobe o PostgreSQL em um comando, sem instalar Postgres local |
+| Controle de versão | Git + GitHub | Padrão da equipe |
+| IDE | Visual Studio 2022 ou VS Code + C# Dev Kit | Ambos suportados |
+
+---
+
+## 2. Arquitetura de componentes
+
+Recapitulando a arquitetura definida no Sprint 2, agora com foco na materialização técnica.
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                              CHANNELS (browsers)                          │
+│   ┌──────────────────┐  ┌────────────────┐  ┌─────────────────────────┐  │
+│   │  whatsapp-sim/   │  │  minha-claro-  │  │  attendant-panel/       │  │
+│   │  (HTML/CSS/JS)   │  │  app/          │  │  (HTML/CSS/JS + polling)│  │
+│   └────────┬─────────┘  └────────┬───────┘  └────────────┬────────────┘  │
+│            │                     │                        │               │
+└────────────┼─────────────────────┼────────────────────────┼───────────────┘
+             │                     │                        │
+             │            HTTPS / REST / JSON (X-Channel-Token header)
+             │                     │                        │
+             ▼                     ▼                        ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                     ClaroFlowEngine.Api (ASP.NET Core)                    │
+│  ┌───────────────────────────────────────────────────────────────────┐   │
+│  │  Middleware: Serilog · CorrelationId · ExceptionHandler · Auth    │   │
+│  └───────────────────────────────────────────────────────────────────┘   │
+│                                                                           │
+│  ┌────────────────┐  ┌────────────────┐  ┌────────────────┐             │
+│  │ Identity       │  │  Context       │  │  Handoff       │             │
+│  │ Controller +   │  │  Controller +  │  │  Controller +  │             │
+│  │ Service        │  │  Service       │  │  Service       │             │
+│  └───────┬────────┘  └────────┬───────┘  └────────┬───────┘             │
+│          │                    │                    │                     │
+│          └────────────────────┼────────────────────┘                     │
+│                               │                                          │
+│                    ┌──────────▼──────────┐                               │
+│                    │   CfeDbContext      │  (EF Core)                    │
+│                    └──────────┬──────────┘                               │
+└───────────────────────────────┼──────────────────────────────────────────┘
+                                │
+                                ▼
+                    ┌─────────────────────┐
+                    │   PostgreSQL 16     │
+                    │   (Docker Compose)  │
+                    └─────────────────────┘
+```
+
+**Observações importantes:**
+
+- Os três módulos (Identity, Context, Handoff) coexistem no **mesmo processo .NET** (monolito modular). Não há chamadas HTTP entre eles. Serviços de um módulo podem chamar serviços de outro via injeção de dependência.
+- O `CfeDbContext` é único, mas cada módulo tem seus próprios repositórios/services e opera nas suas entidades de responsabilidade.
+- Cada canal se comunica com a API por REST/JSON. Nenhum canal fala com outro canal diretamente.
+- A partir da versão 1.1 desta spec, existe um **quarto módulo lógico: Explain** — responsável pelo modo explicação didático. Ele é ortogonal aos demais (não é chamado no fluxo de negócio; ao contrário, ele intercepta pontos-chave dos outros módulos via chamadas explícitas `PauseAsync`). Detalhes técnicos completos em `spec-modo-explicacao.md`, incluindo: modelo de dados adicional (`explain_sessions`, `explain_steps`), contratos de API (`/explain/*`), mecanismo de pausa com `TaskCompletionSource<bool>`, Server-Sent Events para atualização em tempo real, e integração com os canais existentes via header `X-Explain-Session-Id`.
+- **Um quarto canal também surge:** o Painel de Orquestração, em `channels/orchestration-panel/`. Ele consome os endpoints do módulo Explain e não interage com Identity/Context/Handoff diretamente.
+
+---
+
+## 3. Estrutura do projeto
+
+Estrutura recomendada de pastas e arquivos:
+
+```
+ClaroFlowEngine/
+├── docker-compose.yml
+├── .gitignore
+├── README.md
+├── docs/
+│   ├── spec-funcional.md
+│   └── spec-tecnica.md
+├── src/
+│   └── ClaroFlowEngine.Api/
+│       ├── ClaroFlowEngine.Api.csproj
+│       ├── Program.cs
+│       ├── appsettings.json
+│       ├── appsettings.Development.json           # gitignored
+│       ├── Modules/
+│       │   ├── Identity/
+│       │   │   ├── Controllers/IdentityController.cs
+│       │   │   ├── Services/IIdentityService.cs
+│       │   │   ├── Services/IdentityService.cs
+│       │   │   └── Dtos/
+│       │   │       ├── ResolveIdentityRequest.cs
+│       │   │       └── ResolveIdentityResponse.cs
+│       │   ├── Context/
+│       │   │   ├── Controllers/ContextController.cs
+│       │   │   ├── Services/IContextService.cs
+│       │   │   ├── Services/ContextService.cs
+│       │   │   └── Dtos/
+│       │   ├── Handoff/
+│       │   │   ├── Controllers/HandoffController.cs
+│       │   │   ├── Services/IHandoffService.cs
+│       │   │   ├── Services/HandoffService.cs
+│       │   │   └── Dtos/
+│       │   └── Explain/                                # módulo do modo explicação
+│       │       ├── Controllers/ExplainController.cs
+│       │       ├── Services/IExplainService.cs
+│       │       ├── Services/ExplainService.cs         # Singleton, mantém TCS em ConcurrentDictionary
+│       │       ├── Services/ISnapshotBroadcaster.cs
+│       │       ├── Services/SseSnapshotBroadcaster.cs # Server-Sent Events
+│       │       └── Dtos/
+│       ├── Data/
+│       │   ├── CfeDbContext.cs
+│       │   ├── Entities/
+│       │   │   ├── Customer.cs
+│       │   │   ├── IdentityLink.cs
+│       │   │   ├── Plan.cs
+│       │   │   ├── CustomerPlan.cs
+│       │   │   ├── JourneyContext.cs
+│       │   │   ├── JourneyTransition.cs
+│       │   │   └── HandoffToken.cs
+│       │   ├── Configurations/                     # IEntityTypeConfiguration<T>
+│       │   ├── Migrations/                         # geradas pelo EF
+│       │   └── Seed/
+│       │       └── DatabaseSeeder.cs
+│       ├── Common/
+│       │   ├── Middleware/
+│       │   │   ├── CorrelationIdMiddleware.cs
+│       │   │   ├── ChannelAuthMiddleware.cs
+│       │   │   └── ExceptionHandlingMiddleware.cs
+│       │   ├── Errors/
+│       │   │   ├── ApiError.cs
+│       │   │   └── ErrorCodes.cs
+│       │   └── Extensions/
+│       │       └── DateTimeExtensions.cs
+│       └── Configuration/
+│           ├── SwaggerConfig.cs
+│           └── SerilogConfig.cs
+└── channels/
+    ├── whatsapp-sim/
+    │   ├── index.html
+    │   ├── styles.css
+    │   ├── app.js                                  # máquina de estados + chamadas à API
+    │   └── config.js                               # base URL da API, etc.
+    ├── minha-claro-app/
+    │   ├── index.html                              # rota /?token=xxx
+    │   ├── styles.css
+    │   └── app.js
+    ├── attendant-panel/
+    │   ├── index.html
+    │   ├── styles.css
+    │   └── app.js                                  # busca + polling
+    └── orchestration-panel/                        # Painel do Modo Explicação
+        ├── index.html
+        ├── styles.css
+        ├── app.js                                  # SSE + timeline + controle
+        ├── diagram.js                              # renderização SVG do CFE
+        └── config.js
+```
+
+**Notas sobre a estrutura:**
+
+- Um único projeto .NET (`ClaroFlowEngine.Api`) contém tudo. Isso simplifica migrations, referências e execução. Separação em projetos `Core`/`Infrastructure` fica como refactor futuro.
+- Cada módulo é uma pasta com Controllers, Services e DTOs. Isso preserva as fronteiras arquiteturais definidas no Sprint 2 sem exigir múltiplos projetos.
+- A pasta `channels/` fica **fora** de `src/` porque não é código .NET; é servida separadamente (com qualquer servidor estático).
+
+---
+
+## 4. Modelagem de dados
+
+### 4.1. Diagrama lógico (ER textual)
+
+```
+customers (1) ─── (N) identity_links
+customers (1) ─── (N) customer_plans (N) ─── (1) plans
+customers (1) ─── (N) journey_contexts
+journey_contexts (1) ─── (N) journey_transitions
+journey_contexts (1) ─── (N) handoff_tokens
+```
+
+### 4.2. DDL PostgreSQL
+
+O SQL abaixo é o resultado esperado da migration inicial. O EF Core deve gerar algo equivalente.
+
+```sql
+-- Habilita função de UUID (execute uma vez no banco)
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+CREATE TABLE customers (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    cpf VARCHAR(11) UNIQUE NOT NULL,
+    full_name VARCHAR(200) NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE identity_links (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    customer_id UUID NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+    channel VARCHAR(20) NOT NULL,         -- 'whatsapp', 'app', 'cpf', 'call'
+    identifier VARCHAR(100) NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT ux_identity_links_channel_identifier UNIQUE (channel, identifier)
+);
+
+CREATE INDEX ix_identity_links_customer ON identity_links(customer_id);
+
+CREATE TABLE plans (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    code VARCHAR(50) UNIQUE NOT NULL,     -- 'claro_15gb', 'claro_60gb'
+    name VARCHAR(100) NOT NULL,           -- 'Claro 15GB'
+    data_gb INT NOT NULL,
+    monthly_price_cents INT NOT NULL,     -- guardar em centavos, evita float
+    active BOOLEAN NOT NULL DEFAULT TRUE
+);
+
+CREATE TABLE customer_plans (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    customer_id UUID NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+    plan_id UUID NOT NULL REFERENCES plans(id),
+    active BOOLEAN NOT NULL DEFAULT TRUE,
+    started_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX ix_customer_plans_customer ON customer_plans(customer_id, active);
+
+CREATE TABLE journey_contexts (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    customer_id UUID NOT NULL REFERENCES customers(id),
+    origin_channel VARCHAR(20) NOT NULL,
+    intent VARCHAR(50) NOT NULL,          -- 'change_plan'
+    current_step VARCHAR(50) NOT NULL,    -- 'identity_resolved', 'plan_selected', etc.
+    payload JSONB NOT NULL DEFAULT '{}',
+    status VARCHAR(20) NOT NULL,          -- 'open', 'concluded', 'expired', 'abandoned'
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    closed_at TIMESTAMPTZ
+);
+
+CREATE INDEX ix_journey_customer_status ON journey_contexts(customer_id, status);
+CREATE INDEX ix_journey_open_updated ON journey_contexts(updated_at) WHERE status = 'open';
+
+CREATE TABLE journey_transitions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    journey_context_id UUID NOT NULL REFERENCES journey_contexts(id) ON DELETE CASCADE,
+    channel VARCHAR(20) NOT NULL,
+    event_type VARCHAR(50) NOT NULL,      -- 'journey_started', 'identity_resolved',
+                                          -- 'step_updated', 'deep_link_generated',
+                                          -- 'journey_resumed', 'journey_closed',
+                                          -- 'journey_expired', 'panel_accessed'
+    description TEXT,
+    metadata JSONB DEFAULT '{}',
+    occurred_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX ix_transitions_journey_occurred ON journey_transitions(journey_context_id, occurred_at DESC);
+
+CREATE TABLE handoff_tokens (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    journey_context_id UUID NOT NULL REFERENCES journey_contexts(id) ON DELETE CASCADE,
+    token VARCHAR(100) UNIQUE NOT NULL,
+    target_channel VARCHAR(20) NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    used_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX ix_handoff_tokens_token ON handoff_tokens(token);
+```
+
+### 4.3. Seed obrigatório
+
+```sql
+-- planos
+INSERT INTO plans (code, name, data_gb, monthly_price_cents) VALUES
+    ('claro_15gb', 'Claro 15GB',  15,  4990),
+    ('claro_30gb', 'Claro 30GB',  30,  5990),
+    ('claro_60gb', 'Claro 60GB',  60,  8990),
+    ('claro_100gb','Claro 100GB',100, 11990);
+
+-- clientes de teste
+INSERT INTO customers (cpf, full_name) VALUES
+    ('12345678900', 'Ana Silva'),
+    ('98765432100', 'Carlos Mendes'),
+    ('45678912300', 'Mariana Souza');
+
+-- links de identidade (associar telefones aos clientes do seed)
+-- (usar subqueries para pegar os IDs)
+
+-- planos ativos por cliente (Ana e Carlos têm plano; Mariana também)
+```
+
+O seeder em C# fará isso via EF Core (ver seção 8).
+
+---
+
+## 5. Contratos de API
+
+Todos os endpoints são REST/JSON. Base URL local: `http://localhost:5000` (ou porta configurada).
+
+### 5.1. Convenções gerais
+
+- Content-Type: `application/json`
+- Encoding: UTF-8
+- Datas em ISO 8601 UTC (`"2026-07-29T14:30:00Z"`)
+- IDs em UUID string
+- Todo endpoint exceto `/health` e `/swagger` exige o header `X-Channel-Token`
+- Respostas de erro seguem o padrão:
+
+```json
+{
+  "error_code": "invalid_cpf",
+  "message": "CPF deve conter 11 dígitos numéricos.",
+  "details": { "field": "identifier" }
+}
+```
+
+### 5.2. Módulo Identity
+
+#### `POST /identity/resolve`
+
+Resolve ou cria a identidade unificada para um par (canal, identificador).
+
+**Request:**
+```json
+{
+  "channel": "whatsapp",
+  "identifier": "5511999998888",
+  "cpf_hint": "12345678900",
+  "full_name_hint": null
+}
+```
+
+- `channel`: obrigatório. Valores: `whatsapp`, `app`, `cpf`, `call`.
+- `identifier`: obrigatório. Formato depende do canal (ver Spec Funcional §6.2).
+- `cpf_hint`: opcional. Usado quando o canal não é `cpf` mas o cliente informou o CPF na conversa. Se fornecido, o sistema tenta encontrar o cliente por CPF e vincular o canal atual a ele.
+- `full_name_hint`: opcional. Necessário para criar novo cliente quando o CPF não está cadastrado.
+
+**Response 200:**
+```json
+{
+  "unified_customer_id": "3f2504e0-4f89-11d3-9a0c-0305e82c3301",
+  "customer": {
+    "id": "3f2504e0-4f89-11d3-9a0c-0305e82c3301",
+    "full_name": "Ana Silva",
+    "cpf": "12345678900"
+  },
+  "was_created": false,
+  "resolved_link": { "channel": "whatsapp", "identifier": "5511999998888" }
+}
+```
+
+**Response 400:** identificador em formato inválido.
+**Response 404:** CPF não encontrado E `full_name_hint` não fornecido (não dá para criar).
+
+#### `GET /identity/resolve?channel={c}&identifier={i}`
+
+Versão idempotente somente para consulta (sem criação).
+
+**Response 200:** igual acima.
+**Response 404:** identidade não encontrada.
+
+---
+
+### 5.3. Módulo Context
+
+#### `POST /context/open`
+
+Abre uma nova jornada.
+
+**Request:**
+```json
+{
+  "customer_id": "3f2504e0-4f89-11d3-9a0c-0305e82c3301",
+  "origin_channel": "whatsapp",
+  "intent": "change_plan",
+  "initial_step": "identity_resolved",
+  "payload": {}
+}
+```
+
+**Response 201:**
+```json
+{
+  "id": "aaaa1111-...",
+  "customer_id": "3f2504e0-...",
+  "origin_channel": "whatsapp",
+  "intent": "change_plan",
+  "current_step": "identity_resolved",
+  "payload": {},
+  "status": "open",
+  "created_at": "2026-07-29T14:30:00Z",
+  "updated_at": "2026-07-29T14:30:00Z"
+}
+```
+
+**Response 200 (idempotente):** se já existe jornada `open` para esse cliente com mesma intent, retorna a existente sem duplicar. Registrar transição `journey_reopen_attempted`.
+
+#### `PATCH /context/{id}`
+
+Atualiza etapa e/ou payload.
+
+**Request:**
+```json
+{
+  "current_step": "plan_selected",
+  "payload_merge": {
+    "selected_plan_code": "claro_60gb"
+  }
+}
+```
+
+- `payload_merge` é aplicado como merge no JSONB existente (não substitui o objeto inteiro).
+
+**Response 200:** jornada atualizada.
+**Response 404:** jornada não existe.
+**Response 409:** jornada não está `open` (retorna estado atual).
+**Response 410:** jornada expirou (verificação reativa) — antes de responder, marca como `expired`.
+
+#### `GET /context/{id}`
+
+Retorna estado atual da jornada.
+
+**Response 200:**
+```json
+{
+  "id": "aaaa1111-...",
+  "customer_id": "3f2504e0-...",
+  "customer": { "full_name": "Ana Silva", "cpf": "12345678900" },
+  "origin_channel": "whatsapp",
+  "intent": "change_plan",
+  "current_step": "plan_selected",
+  "payload": {
+    "selected_plan_code": "claro_60gb",
+    "current_plan_code": "claro_15gb"
+  },
+  "status": "open",
+  "created_at": "...",
+  "updated_at": "..."
+}
+```
+
+#### `GET /context/customer/{customerId}`
+
+Retorna a jornada **aberta** do cliente (ou 404 se não houver).
+
+Query params opcionais: `include_history=true` — se `true`, retorna também as últimas N jornadas fechadas.
+
+#### `GET /context/{id}/transitions`
+
+Retorna o histórico de transições da jornada, ordenado do mais recente para o mais antigo.
+
+**Response 200:**
+```json
+{
+  "journey_context_id": "aaaa1111-...",
+  "transitions": [
+    {
+      "id": "...",
+      "channel": "app",
+      "event_type": "journey_resumed",
+      "description": "Cliente abriu o deep link. App carregou tela de confirmação.",
+      "metadata": {},
+      "occurred_at": "2026-07-29T14:35:12Z"
+    },
+    {
+      "id": "...",
+      "channel": "whatsapp",
+      "event_type": "deep_link_generated",
+      "description": "Deep link gerado com validade de 30 min.",
+      "metadata": { "token_expires_at": "2026-07-29T15:04:12Z" },
+      "occurred_at": "2026-07-29T14:34:12Z"
+    }
+  ]
+}
+```
+
+#### `POST /context/{id}/close`
+
+Encerra uma jornada.
+
+**Request:**
+```json
+{
+  "outcome": "concluded",
+  "channel": "app",
+  "reason": null
+}
+```
+
+- `outcome`: obrigatório. Valores: `concluded`, `abandoned`.
+- `channel`: canal onde o encerramento aconteceu.
+- `reason`: opcional, texto livre.
+
+**Response 200:** jornada fechada.
+**Response 409:** jornada já estava fechada.
+
+---
+
+### 5.4. Módulo Handoff
+
+#### `POST /handoff/generate`
+
+Gera um deep link com token.
+
+**Request:**
+```json
+{
+  "journey_context_id": "aaaa1111-...",
+  "target_channel": "app"
+}
+```
+
+**Response 201:**
+```json
+{
+  "token": "b0c5f4e2-a1b3-4d7e-8f2a-9c1d3e5f7a90",
+  "target_channel": "app",
+  "deep_link_url": "http://localhost:5173/?token=b0c5f4e2-a1b3-4d7e-8f2a-9c1d3e5f7a90",
+  "expires_at": "2026-07-29T15:04:12Z"
+}
+```
+
+O `deep_link_url` é montado a partir de uma configuração `AppSimBaseUrl` do `appsettings`.
+
+#### `GET /context/resolve?token={token}`
+
+Endpoint usado pelo canal de destino (App simulado) para recuperar contexto via token.
+
+**Response 200:**
+```json
+{
+  "unified_customer_id": "3f2504e0-...",
+  "journey_context": {
+    "id": "aaaa1111-...",
+    "intent": "change_plan",
+    "current_step": "plan_selected",
+    "payload": { "selected_plan_code": "claro_60gb", "current_plan_code": "claro_15gb" },
+    "status": "open"
+  },
+  "customer": { "full_name": "Ana Silva", "cpf": "12345678900" },
+  "plan_details": {
+    "current_plan": { "code": "claro_15gb", "name": "Claro 15GB", "monthly_price_cents": 4990 },
+    "selected_plan": { "code": "claro_60gb", "name": "Claro 60GB", "monthly_price_cents": 8990 }
+  }
+}
+```
+
+**Response 404:** token não existe.
+**Response 410:** token expirado, já usado, ou jornada expirada/fechada. Nesse caso o Body deve indicar qual foi o motivo:
+```json
+{ "error_code": "token_expired", "message": "..." }
+{ "error_code": "token_already_used", "message": "..." }
+{ "error_code": "journey_expired", "message": "..." }
+{ "error_code": "journey_closed", "message": "..." }
+```
+
+Ao resolver com sucesso, o sistema:
+- Marca `used_at = NOW()`.
+- Cria `identity_link` para o canal `app` (se ainda não existir).
+- Registra transição `journey_resumed`.
+
+---
+
+### 5.5. Endpoints auxiliares
+
+#### `GET /health`
+
+Health check. Retorna 200 com:
+```json
+{ "status": "healthy", "checks": { "db": "up" } }
+```
+
+#### `GET /plans`
+
+Lista os planos ativos (útil para o chat mostrar as opções).
+
+**Response 200:**
+```json
+{
+  "plans": [
+    { "code": "claro_15gb", "name": "Claro 15GB", "data_gb": 15, "monthly_price_cents": 4990 },
+    { "code": "claro_30gb", "name": "Claro 30GB", "data_gb": 30, "monthly_price_cents": 5990 },
+    { "code": "claro_60gb", "name": "Claro 60GB", "data_gb": 60, "monthly_price_cents": 8990 },
+    { "code": "claro_100gb","name": "Claro 100GB","data_gb":100,"monthly_price_cents":11990 }
+  ]
+}
+```
+
+---
+
+## 6. Máquinas de estado — implementação
+
+### 6.1. Journey Status (no banco)
+
+Enum modelado como string:
+```csharp
+public static class JourneyStatus
+{
+    public const string Open       = "open";
+    public const string Concluded  = "concluded";
+    public const string Expired    = "expired";
+    public const string Abandoned  = "abandoned";
+}
+```
+
+Transições permitidas (validadas no `ContextService`):
+- `open → concluded/abandoned` via `POST /context/{id}/close`.
+- `open → expired` automaticamente na regra reativa.
+
+Qualquer outra transição resulta em 409.
+
+### 6.2. Bot Conversation State (chat simulado)
+
+Como o chat simulado é HTML/JS, o estado da conversa pode ser mantido em memória do navegador (localStorage ou objeto JS). Não é necessário persistir estado do bot no servidor — o estado da **jornada** já está persistido no CFE, e essa é a única coisa que importa.
+
+Estados no cliente (JS):
+
+```js
+const BOT_STATES = {
+  GREETING: 'greeting',
+  AWAITING_INTENT: 'awaiting_intent',
+  AWAITING_CPF: 'awaiting_cpf',
+  AWAITING_NAME: 'awaiting_name',           // se cliente novo
+  IDENTITY_RESOLVED: 'identity_resolved',
+  AWAITING_PLAN_CHOICE: 'awaiting_plan_choice',
+  LINK_GENERATED: 'link_generated',
+  COMPLETED: 'completed',
+  ERROR: 'error'
+};
+```
+
+Regras:
+- Cada input do usuário é despachado para uma função `handleMessage(state, message)` que retorna `{ nextState, botReply, apiCalls }`.
+- `apiCalls` é uma lista de chamadas a executar (ex: `/identity/resolve`, `/context/open`, `/handoff/generate`).
+- As chamadas são executadas em ordem, e falhas devem levar o bot ao estado `ERROR` com mensagem apropriada.
+
+---
+
+## 7. Frontends simulados
+
+Todos os três canais são páginas HTML autônomas.
+
+### 7.1. Servindo os canais
+
+Recomendação: cada canal servido em uma porta separada para simular canais distintos.
+
+Opções:
+- **Live Server (VS Code):** clique-direito → "Open with Live Server" em cada `index.html`.
+- **`http-server` (npm):**
+  ```
+  npx http-server channels/whatsapp-sim -p 5171
+  npx http-server channels/minha-claro-app -p 5173
+  npx http-server channels/attendant-panel -p 5175
+  ```
+- **`dotnet serve`:** alternativa em .NET.
+
+O `appsettings.json` do backend deve conter as URLs:
+```json
+"Channels": {
+  "WhatsappSimBaseUrl": "http://localhost:5171",
+  "AppSimBaseUrl": "http://localhost:5173",
+  "AttendantPanelBaseUrl": "http://localhost:5175"
+}
+```
+
+E o backend usa `AppSimBaseUrl` para montar `deep_link_url`.
+
+### 7.2. Comunicação com a API
+
+Todos os canais fazem `fetch` para `http://localhost:5000` (URL da API, configurável em `channels/*/config.js`).
+
+Cada canal envia um header `X-Channel-Token` mockado:
+- `whatsapp-sim` → `X-Channel-Token: fake-whatsapp-token`
+- `minha-claro-app` → `X-Channel-Token: fake-app-token`
+- `attendant-panel` → `X-Channel-Token: fake-panel-token`
+
+O middleware do backend valida que o header existe e está em uma allowlist configurada. **Não valida assinatura, expiração, nada** — é mock explícito para documentar a intenção arquitetural.
+
+### 7.3. CORS
+
+A API deve permitir CORS das três origens locais dos canais:
+
+```csharp
+builder.Services.AddCors(opt => opt.AddDefaultPolicy(p => p
+    .WithOrigins("http://localhost:5171", "http://localhost:5173", "http://localhost:5175")
+    .AllowAnyHeader()
+    .AllowAnyMethod()));
+```
+
+### 7.4. Polling no painel
+
+O painel implementa polling simples com `setInterval`:
+
+```js
+async function refreshPanel() {
+  const contextRes = await fetch(`${API}/context/${journeyId}`, { headers: { 'X-Channel-Token': 'fake-panel-token' } });
+  const transitionsRes = await fetch(`${API}/context/${journeyId}/transitions`, { headers: { 'X-Channel-Token': 'fake-panel-token' } });
+  // rerender UI
+}
+
+setInterval(refreshPanel, 4000); // a cada 4 segundos
+```
+
+Cuidados:
+- Cancelar o interval quando o usuário sair da página ou trocar de cliente.
+- Se a jornada mudar para status final, parar o polling e exibir status final.
+
+---
+
+## 8. Padrões de código
+
+### 8.1. Nomenclatura
+
+- **Código, classes, métodos, variáveis, colunas de banco, endpoints:** **inglês**.
+- **Comentários no código, mensagens de erro visíveis ao usuário, documentação:** **português**.
+- **Nomes de branches Git:** inglês (`feat/identity-resolve`, `fix/token-expiration`).
+- **Mensagens de commit:** inglês, convenção Conventional Commits (`feat:`, `fix:`, `chore:`, `docs:`, `refactor:`).
+
+### 8.2. Camadas
+
+Cada módulo segue o padrão:
+
+```
+Controller ── (injeta) ──> Service ── (usa) ──> DbContext (EF Core)
+```
+
+- **Controller:** só recebe requisição, valida shape via DTO, chama Service, monta HTTP response. Nenhuma regra de negócio.
+- **Service:** contém regras de negócio, validações, orquestração entre repositórios/DbContext.
+- **DbContext:** acesso a dados. Sem repositório dedicado nesta versão (EF é o repositório). Se o time preferir, extrair um repository por módulo é aceitável — mas não obrigatório para o MVP.
+
+### 8.3. DTOs vs Entities
+
+- **Entities** ficam em `Data/Entities/` e refletem exatamente o schema do banco.
+- **DTOs** ficam em cada módulo (`Modules/X/Dtos/`) e servem para request/response da API.
+- **Nunca retorne Entity direto no JSON.** Sempre mapeie para DTO. Isso evita vazamento de campos internos e loops de serialização.
+
+Mapeamento manual é aceitável para o MVP. AutoMapper é overkill nesta escala.
+
+### 8.4. Tratamento de erros
+
+Middleware global (`ExceptionHandlingMiddleware`) captura exceções e converte para JSON padronizado. Definir exceções de domínio:
+
+```csharp
+public class NotFoundException : Exception { public string ErrorCode { get; } }
+public class ConflictException : Exception { ... }
+public class GoneException : Exception { ... }
+public class ValidationException : Exception { ... }
+```
+
+O middleware mapeia:
+- `NotFoundException` → 404 + `error_code`
+- `ConflictException` → 409
+- `GoneException` → 410
+- `ValidationException` → 400
+- Qualquer outra → 500 (log completo, resposta genérica ao cliente)
+
+### 8.5. Logging estruturado
+
+Serilog configurado em `Program.cs` com sinks para console (JSON estruturado) e arquivo (`logs/cfe-YYYYMMDD.log`).
+
+Contexto obrigatório em todo log dentro de uma operação:
+- `correlation_id` — GUID gerado por request pelo middleware.
+- `journey_context_id` — quando aplicável.
+- `channel` — canal que originou a requisição.
+
+Exemplo:
+```csharp
+_logger.LogInformation(
+    "Journey opened for customer {CustomerId} on {Channel} with intent {Intent}",
+    customerId, channel, intent);
+```
+
+### 8.6. Convenções de request/response
+
+- Camel_case ou snake_case? **snake_case no JSON** (mais legível, e alinhado com o que APIs REST costumam usar). Configurar Newtonsoft.Json ou System.Text.Json com `SnakeCaseNamingPolicy`.
+- Timestamps sempre em ISO 8601 UTC.
+- UUIDs sempre como string.
+
+---
+
+## 9. Configuração do ambiente
+
+### 9.1. Pré-requisitos
+
+- .NET 8 SDK
+- Docker + Docker Compose
+- Git
+- Editor à escolha (VS Code recomendado + C# Dev Kit)
+- Um servidor estático leve (Live Server, http-server, dotnet serve)
+
+### 9.2. docker-compose.yml
+
+```yaml
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: cfe-postgres
+    environment:
+      POSTGRES_USER: cfe
+      POSTGRES_PASSWORD: cfe_local_pwd
+      POSTGRES_DB: cfe
+    ports:
+      - "5432:5432"
+    volumes:
+      - cfe_pgdata:/var/lib/postgresql/data
+volumes:
+  cfe_pgdata:
+```
+
+### 9.3. appsettings.Development.json
+
+```json
+{
+  "ConnectionStrings": {
+    "Postgres": "Host=localhost;Port=5432;Database=cfe;Username=cfe;Password=cfe_local_pwd"
+  },
+  "Channels": {
+    "WhatsappSimBaseUrl": "http://localhost:5171",
+    "AppSimBaseUrl": "http://localhost:5173",
+    "AttendantPanelBaseUrl": "http://localhost:5175"
+  },
+  "Cfe": {
+    "HandoffTokenTtlMinutes": 30,
+    "JourneyInactivityTtlHours": 24,
+    "AllowedChannelTokens": [
+      "fake-whatsapp-token",
+      "fake-app-token",
+      "fake-panel-token"
+    ]
+  },
+  "Serilog": {
+    "MinimumLevel": { "Default": "Information" }
+  }
+}
+```
+
+Este arquivo vai no `.gitignore`. O `appsettings.json` (versionado) tem valores placeholder.
+
+### 9.4. Comandos essenciais
+
+```bash
+# Subir postgres
+docker compose up -d
+
+# Criar migration inicial
+cd src/ClaroFlowEngine.Api
+dotnet ef migrations add InitialCreate
+
+# Aplicar migrations (automatiza no Program.cs também)
+dotnet ef database update
+
+# Rodar API
+dotnet run
+
+# Rodar canais (em três terminais separados)
+npx http-server ../../channels/whatsapp-sim -p 5171 -c-1
+npx http-server ../../channels/minha-claro-app -p 5173 -c-1
+npx http-server ../../channels/attendant-panel -p 5175 -c-1
+```
+
+### 9.5. Seed automático na inicialização
+
+No `Program.cs`, após `app.Build()`:
+
+```csharp
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<CfeDbContext>();
+    db.Database.Migrate();
+    await DatabaseSeeder.SeedAsync(db);
+}
+```
+
+O seeder cria planos e clientes de teste se ainda não existirem (idempotente).
+
+---
+
+## 10. Observabilidade
+
+### 10.1. Serilog
+
+Configuração em `Program.cs`:
+
+```csharp
+builder.Host.UseSerilog((ctx, cfg) => cfg
+    .ReadFrom.Configuration(ctx.Configuration)
+    .Enrich.FromLogContext()
+    .WriteTo.Console(new Serilog.Formatting.Json.JsonFormatter())
+    .WriteTo.File(
+        formatter: new Serilog.Formatting.Json.JsonFormatter(),
+        path: "logs/cfe-.log",
+        rollingInterval: RollingInterval.Day));
+```
+
+### 10.2. Correlation ID
+
+Middleware que gera um GUID por request e injeta no `LogContext`:
+
+```csharp
+public class CorrelationIdMiddleware
+{
+    public async Task InvokeAsync(HttpContext ctx, RequestDelegate next)
+    {
+        var correlationId = ctx.Request.Headers["X-Correlation-Id"].FirstOrDefault()
+            ?? Guid.NewGuid().ToString();
+        ctx.Response.Headers["X-Correlation-Id"] = correlationId;
+        using (LogContext.PushProperty("CorrelationId", correlationId))
+        {
+            await next(ctx);
+        }
+    }
+}
+```
+
+### 10.3. Health checks
+
+`Program.cs`:
+```csharp
+builder.Services.AddHealthChecks()
+    .AddNpgSql(builder.Configuration.GetConnectionString("Postgres")!);
+
+app.MapHealthChecks("/health", new HealthCheckOptions {
+    ResponseWriter = async (ctx, report) => {
+        ctx.Response.ContentType = "application/json";
+        var payload = new {
+            status = report.Status.ToString().ToLowerInvariant(),
+            checks = report.Entries.ToDictionary(
+                e => e.Key,
+                e => e.Value.Status.ToString().ToLowerInvariant())
+        };
+        await ctx.Response.WriteAsync(JsonSerializer.Serialize(payload));
+    }
+});
+```
+
+---
+
+## 11. Segurança (mock explícito)
+
+### 11.1. Autenticação de canal (`X-Channel-Token`)
+
+Middleware simples:
+
+```csharp
+public class ChannelAuthMiddleware
+{
+    private readonly HashSet<string> _allowedTokens;
+
+    public async Task InvokeAsync(HttpContext ctx, RequestDelegate next)
+    {
+        if (IsPublicRoute(ctx.Request.Path)) { await next(ctx); return; }
+
+        var token = ctx.Request.Headers["X-Channel-Token"].FirstOrDefault();
+        if (string.IsNullOrEmpty(token) || !_allowedTokens.Contains(token))
+        {
+            ctx.Response.StatusCode = 401;
+            await ctx.Response.WriteAsync(
+                JsonSerializer.Serialize(new {
+                    error_code = "invalid_channel_token",
+                    message = "Token de canal ausente ou não autorizado."
+                }));
+            return;
+        }
+        await next(ctx);
+    }
+
+    private static bool IsPublicRoute(PathString path) =>
+        path.StartsWithSegments("/health") ||
+        path.StartsWithSegments("/swagger") ||
+        path.StartsWithSegments("/plans");
+}
+```
+
+**Deixar comentário no código:**
+```csharp
+// MOCK — em produção, cada canal teria um JWT/serviço de identidade próprio.
+// Este middleware simula a intenção arquitetural sem custo de setup de auth real.
+```
+
+### 11.2. CORS
+
+Configurar apenas para as origens locais dos canais (§7.3).
+
+### 11.3. HTTPS
+
+Para o local, HTTP está ok. Em produção real seria HTTPS obrigatório — deixar comentário/nota no README.
+
+---
+
+## 12. Boas práticas técnicas
+
+### 12.1. Migrations sempre versionadas
+
+Toda mudança de schema é uma migration. Nunca alterar banco na mão em produção. No MVP, se precisar fazer ajuste rápido no desenvolvimento, é aceitável dropar e recriar, mas registrar depois em migration.
+
+### 12.2. Sem segredos versionados
+
+`.gitignore` deve incluir:
+- `appsettings.Development.json`
+- `appsettings.Production.json`
+- `logs/`
+- `bin/`, `obj/`
+
+### 12.3. Idempotência em endpoints de criação
+
+- `POST /identity/resolve` — se o link já existe, retorna; não duplica.
+- `POST /context/open` — se já existe jornada `open` para o mesmo cliente + intent, retorna a existente.
+- `POST /handoff/generate` — pode duplicar (é aceitável ter múltiplos tokens ativos para a mesma jornada); mas todos expiram em 30 min.
+
+### 12.4. Verificação de expiração no ponto de leitura
+
+Em vez de agendar um job para expirar jornadas, todo endpoint que lê uma jornada `open` executa antes:
+
+```csharp
+if (journey.Status == JourneyStatus.Open &&
+    DateTime.UtcNow - journey.UpdatedAt > TimeSpan.FromHours(_cfeOptions.JourneyInactivityTtlHours))
+{
+    journey.Status = JourneyStatus.Expired;
+    journey.ClosedAt = DateTime.UtcNow;
+    await _transitionService.RecordAsync(journey.Id, "system", "journey_expired", "Jornada expirada por inatividade.");
+    await _db.SaveChangesAsync();
+}
+```
+
+Isso é executado dentro de uma transação para evitar corridas.
+
+### 12.5. Transações onde importam
+
+Operações que mudam múltiplas tabelas devem estar em `IDbContextTransaction`:
+- Abertura de jornada + registro de transição.
+- Fechamento de jornada + registro de transição.
+- Resolução de token: marcar `used_at` + criar identity_link + registrar transição.
+
+### 12.6. Registro de transição centralizado
+
+Criar `ITransitionRecorder` injetado nos services:
+
+```csharp
+public interface ITransitionRecorder
+{
+    Task RecordAsync(Guid journeyId, string channel, string eventType,
+                     string? description = null, object? metadata = null);
+}
+```
+
+Toda mudança de estado passa por ele. Isso garante consistência do histórico e simplifica auditoria.
+
+### 12.7. Nunca deixe hardcoded
+
+TTLs, base URLs, tokens permitidos, tudo em `appsettings`. Injeção via `IOptions<CfeOptions>`.
+
+### 12.8. Teste manual estruturado
+
+Antes de considerar um endpoint "pronto":
+- Testar caminho feliz via Swagger.
+- Testar 3 caminhos de erro (payload inválido, id inexistente, estado inválido).
+- Verificar no banco que os dados ficaram como esperado.
+- Verificar no log que as mensagens fazem sentido.
+
+### 12.9. Refactor no momento certo
+
+Nos primeiros 3 dias, priorize funcionar. No dia 5, faça uma passada rápida de refactor onde tiver visto acumular dívida técnica. Não refatore no meio de implementar uma feature nova.
+
+### 12.10. Commits ao final de cada bloco funcional
+
+Modelo:
+- `chore(setup): initial solution and docker-compose`
+- `feat(db): initial migration with seven tables`
+- `feat(identity): resolve endpoint with auto-create`
+- `feat(context): open, update, get, close endpoints`
+- `feat(handoff): token generation and resolution`
+- `feat(channels): whatsapp-sim page with state machine`
+- `feat(channels): app-sim with token resolution`
+- `feat(channels): attendant panel with polling`
+- `feat(observability): serilog structured logs`
+- `chore(docs): readme with demo script`
+
+---
+
+## 13. Roteiro de setup passo a passo
+
+### Passo 1 — Repositório
+
+```bash
+mkdir ClaroFlowEngine && cd ClaroFlowEngine
+git init
+```
+
+Criar `.gitignore` (usar template padrão do .NET + os itens do §12.2).
+
+### Passo 2 — Docker Compose
+
+Criar `docker-compose.yml` (ver §9.2) e:
+```bash
+docker compose up -d
+docker exec -it cfe-postgres psql -U cfe -d cfe -c 'CREATE EXTENSION IF NOT EXISTS pgcrypto;'
+```
+
+### Passo 3 — Projeto .NET
+
+```bash
+mkdir -p src && cd src
+dotnet new webapi -n ClaroFlowEngine.Api --use-controllers
+cd ClaroFlowEngine.Api
+
+# Instalar pacotes
+dotnet add package Microsoft.EntityFrameworkCore.Design
+dotnet add package Npgsql.EntityFrameworkCore.PostgreSQL
+dotnet add package Serilog.AspNetCore
+dotnet add package Serilog.Sinks.File
+dotnet add package Serilog.Formatting.Compact
+dotnet add package AspNetCore.HealthChecks.NpgSql
+dotnet add package Swashbuckle.AspNetCore
+```
+
+Instalar tool global:
+```bash
+dotnet tool install --global dotnet-ef
+```
+
+### Passo 4 — Estrutura de pastas
+
+Criar `Modules/`, `Data/`, `Common/`, `Configuration/` (ver §3).
+
+### Passo 5 — DbContext e Entities
+
+Criar entidades e `CfeDbContext`. Rodar:
+```bash
+dotnet ef migrations add InitialCreate
+dotnet ef database update
+```
+
+Verificar no banco que as tabelas foram criadas.
+
+### Passo 6 — Seed
+
+Implementar `DatabaseSeeder.SeedAsync` e chamar no `Program.cs`. Rodar e verificar no banco que planos e clientes existem.
+
+### Passo 7 — Identity Module
+
+Implementar `IdentityService`, `IdentityController`, DTOs. Testar via Swagger.
+
+### Passo 8 — Context Module
+
+Idem. Testar via Swagger (fluxo open → patch → get → close).
+
+### Passo 9 — Handoff Module
+
+Idem. Testar via Swagger o fluxo generate → resolve.
+
+### Passo 10 — Canais
+
+Criar `channels/whatsapp-sim/`, `channels/minha-claro-app/`, `channels/attendant-panel/`. Servir cada um em uma porta.
+
+### Passo 11 — Observabilidade
+
+Configurar Serilog, correlation id, health check.
+
+### Passo 12 — README
+
+Documentar como rodar. Registrar comandos, URLs, roteiro sugerido de demo.
+
+---
+
+## 14. Definition of Done técnica
+
+O protótipo está tecnicamente pronto quando:
+
+- [ ] `docker compose up -d` sobe o postgres corretamente.
+- [ ] `dotnet run` na API inicia sem erros, aplica migrations, executa seed.
+- [ ] Swagger acessível em `http://localhost:5000/swagger` com todos os endpoints documentados.
+- [ ] `/health` retorna 200 com `db: up`.
+- [ ] Todos os endpoints da §5 respondem conforme os contratos, incluindo os códigos de erro.
+- [ ] Todo endpoint de escrita bem-sucedido cria uma linha em `journey_transitions`.
+- [ ] Header `X-Channel-Token` é validado; ausência ou valor inválido resulta em 401.
+- [ ] CORS liberado apenas para as origens configuradas dos canais.
+- [ ] Chat simulado, App simulado e Painel do atendente funcionam nas suas respectivas portas.
+- [ ] Fluxo ponta a ponta do chat até a confirmação no App funciona sem erros no console do navegador.
+- [ ] Polling do painel atualiza automaticamente sem recarregar a página.
+- [ ] Token expira em 30 min (testável ajustando `HandoffTokenTtlMinutes` para 1 min temporariamente).
+- [ ] Jornada expira em 24h de inatividade (testável via `UPDATE journey_contexts SET updated_at = NOW() - INTERVAL '25 hours' WHERE id = ...`).
+- [ ] Logs no console saem em JSON estruturado com `correlation_id`.
+- [ ] README explica setup do zero em <10 minutos.
+- [ ] Nenhum segredo ou string de conexão está versionado.
+- [ ] Repositório organizado, commits atômicos, mensagens claras.
+
+---
+
+**Fim da Especificação Técnica.**
