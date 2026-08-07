@@ -1,0 +1,26 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+
+# Secrets / environment-specific config
+appsettings.Development.json
+appsettings.Production.json
+.env
+.env.*
+
+# Logs
+logs/
+
+# IDE
+.vs/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node (front-ends simulados, se algum dia usarem node_modules)
+node_modules/

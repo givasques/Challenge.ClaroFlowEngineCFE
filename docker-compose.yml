@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: cfe-postgres
+    environment:
+      POSTGRES_USER: cfe
+      POSTGRES_PASSWORD: cfe_local_pwd
+      POSTGRES_DB: cfe
+    ports:
+      # 5433 no host — a porta 5432 padrão já está em uso por uma instância
+      # nativa do PostgreSQL no Windows (fora do escopo deste projeto).
+      - "5433:5432"
+    volumes:
+      - cfe_pgdata:/var/lib/postgresql/data
+volumes:
+  cfe_pgdata:
