@@ -1,7 +1,9 @@
 using ClaroFlowEngine.Api.Common.Middleware;
+using ClaroFlowEngine.Api.Common.Services;
 using ClaroFlowEngine.Api.Configuration;
 using ClaroFlowEngine.Api.Data;
 using ClaroFlowEngine.Api.Data.Seed;
+using ClaroFlowEngine.Api.Modules.Context;
 using ClaroFlowEngine.Api.Modules.Identity;
 using HealthChecks.NpgSql;
 using Microsoft.EntityFrameworkCore;
@@ -45,10 +47,17 @@ builder.Services.AddControllers()
     });
 
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(options =>
+{
+    // DTOs de mesmo nome existem em módulos diferentes (ex: CustomerSummaryDto em Identity e em Context),
+    // por design — evita acoplar um módulo a DTOs de outro. Usar o nome completo evita colisão de schemaId.
+    options.CustomSchemaIds(type => type.FullName);
+});
 
-// Registro de dependências por módulo (feature folders).
+// Registro de dependências por módulo (feature folders) e serviços compartilhados.
+builder.Services.AddCommonServices();
 builder.Services.AddIdentityModule();
+builder.Services.AddContextModule();
 
 builder.Services.AddHealthChecks()
     .AddNpgSql(builder.Configuration.GetConnectionString("Postgres")!, name: "db");

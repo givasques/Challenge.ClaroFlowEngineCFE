@@ -1,0 +1,286 @@
+using ClaroFlowEngine.Api.Common.Contracts;
+using ClaroFlowEngine.Api.Common.Errors;
+using ClaroFlowEngine.Api.Common.Services;
+using ClaroFlowEngine.Api.Configuration;
+using ClaroFlowEngine.Api.Data;
+using ClaroFlowEngine.Api.Data.Entities;
+using ClaroFlowEngine.Api.Modules.Context.Dtos;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+
+namespace ClaroFlowEngine.Api.Modules.Context.Services;
+
+public class ContextService : IContextService
+{
+    // Canais válidos para origem/encerramento de jornada. "cpf" é só um identificador de UC02,
+    // não um canal de interação; "system" é reservado para eventos automáticos (expiração).
+    private static readonly string[] JourneyChannels = [Channels.Whatsapp, Channels.App, Channels.Call];
+
+    private readonly CfeDbContext _db;
+    private readonly ITransitionRecorder _transitionRecorder;
+    private readonly CfeOptions _cfeOptions;
+    private readonly ILogger<ContextService> _logger;
+
+    public ContextService(
+        CfeDbContext db, ITransitionRecorder transitionRecorder, IOptions<CfeOptions> cfeOptions, ILogger<ContextService> logger)
+    {
+        _db = db;
+        _transitionRecorder = transitionRecorder;
+        _cfeOptions = cfeOptions.Value;
+        _logger = logger;
+    }
+
+    public async Task<(JourneySummaryResponse Response, bool WasCreated)> OpenAsync(
+        OpenJourneyRequest request, CancellationToken cancellationToken)
+    {
+        ValidateOpenRequest(request);
+
+        var customerExists = await _db.Customers.AsNoTracking().AnyAsync(c => c.Id == request.CustomerId, cancellationToken);
+        if (!customerExists)
+            throw new NotFoundException("customer_not_found", $"Cliente {request.CustomerId} não encontrado.");
+
+        // Idempotência (spec-funcional §6.6 / spec-tecnica §5.3): só uma jornada open por cliente+intent.
+        var existing = await _db.JourneyContexts
+            .FirstOrDefaultAsync(j => j.CustomerId == request.CustomerId
+                && j.Intent == request.Intent && j.Status == JourneyStatus.Open, cancellationToken);
+
+        if (existing is not null)
+        {
+            var justExpired = TryExpireIfInactive(existing);
+            if (!justExpired)
+            {
+                _transitionRecorder.Record(existing.Id, request.OriginChannel, TransitionEventTypes.JourneyReopenAttempted,
+                    "Tentativa de abrir nova jornada com uma já ativa para o mesmo cliente e intenção.",
+                    new { attempted_origin_channel = request.OriginChannel });
+                await _db.SaveChangesAsync(cancellationToken);
+
+                _logger.LogInformation("Journey reopen attempted for customer {CustomerId}, returning existing journey", request.CustomerId);
+                return (ToSummary(existing), false);
+            }
+
+            // A jornada anterior acabou de expirar por inatividade — persiste isso antes de abrir uma nova.
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+
+        await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
+
+        var journey = new JourneyContext
+        {
+            CustomerId = request.CustomerId,
+            OriginChannel = request.OriginChannel,
+            Intent = request.Intent,
+            CurrentStep = request.InitialStep,
+            Payload = request.Payload ?? new(),
+            Status = JourneyStatus.Open,
+        };
+        _db.JourneyContexts.Add(journey);
+        await _db.SaveChangesAsync(cancellationToken); // precisa do Id gerado para registrar a transição
+
+        _transitionRecorder.Record(journey.Id, request.OriginChannel, TransitionEventTypes.JourneyStarted,
+            "Jornada iniciada.", new { intent = request.Intent, initial_step = request.InitialStep });
+        await _db.SaveChangesAsync(cancellationToken);
+
+        await transaction.CommitAsync(cancellationToken);
+
+        _logger.LogInformation(
+            "Journey opened for customer {CustomerId} on {Channel} with intent {Intent}",
+            request.CustomerId, request.OriginChannel, request.Intent);
+
+        return (ToSummary(journey), true);
+    }
+
+    public async Task<JourneySummaryResponse> UpdateAsync(
+        Guid journeyId, PatchContextRequest request, CancellationToken cancellationToken)
+    {
+        if (request.CurrentStep is null && request.PayloadMerge is null)
+            throw new ValidationException("empty_patch", "Informe current_step e/ou payload_merge.");
+
+        if (request.CurrentStep is { Length: > 50 })
+            throw new ValidationException("invalid_current_step", "current_step deve ter até 50 caracteres.");
+
+        var journey = await _db.JourneyContexts.FirstOrDefaultAsync(j => j.Id == journeyId, cancellationToken)
+            ?? throw new NotFoundException("journey_not_found", $"Jornada {journeyId} não encontrada.");
+
+        await EnsureOpenOrThrowAsync(journey, cancellationToken);
+
+        var previousStep = journey.CurrentStep;
+
+        if (!string.IsNullOrWhiteSpace(request.CurrentStep))
+            journey.CurrentStep = request.CurrentStep;
+
+        if (request.PayloadMerge is not null)
+        {
+            foreach (var (key, value) in request.PayloadMerge)
+                journey.Payload[key] = value;
+        }
+
+        journey.UpdatedAt = DateTime.UtcNow;
+
+        // Enquanto não existe autenticação por canal (Fase 5), usa-se o canal de origem da jornada
+        // como responsável pelo evento. Impreciso se o PATCH vier de um canal diferente do de origem.
+        _transitionRecorder.Record(journey.Id, journey.OriginChannel, TransitionEventTypes.StepUpdated,
+            "Etapa e/ou dados da jornada atualizados.",
+            new { previous_step = previousStep, current_step = journey.CurrentStep, updated_keys = request.PayloadMerge?.Keys.ToArray() ?? [] });
+
+        await _db.SaveChangesAsync(cancellationToken);
+
+        return ToSummary(journey);
+    }
+
+    public async Task<JourneyDetailResponse> GetByIdAsync(Guid journeyId, CancellationToken cancellationToken)
+    {
+        var journey = await _db.JourneyContexts
+            .Include(j => j.Customer)
+            .FirstOrDefaultAsync(j => j.Id == journeyId, cancellationToken)
+            ?? throw new NotFoundException("journey_not_found", $"Jornada {journeyId} não encontrada.");
+
+        if (TryExpireIfInactive(journey))
+            await _db.SaveChangesAsync(cancellationToken);
+
+        return ToDetail(journey);
+    }
+
+    public async Task<ActiveJourneyResponse> GetActiveByCustomerAsync(
+        Guid customerId, bool includeHistory, CancellationToken cancellationToken)
+    {
+        var customerExists = await _db.Customers.AsNoTracking().AnyAsync(c => c.Id == customerId, cancellationToken);
+        if (!customerExists)
+            throw new NotFoundException("customer_not_found", $"Cliente {customerId} não encontrado.");
+
+        var active = await _db.JourneyContexts
+            .Include(j => j.Customer)
+            .FirstOrDefaultAsync(j => j.CustomerId == customerId && j.Status == JourneyStatus.Open, cancellationToken);
+
+        if (active is not null && TryExpireIfInactive(active))
+        {
+            await _db.SaveChangesAsync(cancellationToken);
+            active = null; // acabou de expirar — não conta mais como ativa
+        }
+
+        List<JourneySummaryResponse>? recentJourneys = null;
+        if (includeHistory)
+        {
+            var excludedId = active?.Id ?? Guid.Empty;
+            recentJourneys = await _db.JourneyContexts
+                .AsNoTracking()
+                .Where(j => j.CustomerId == customerId && j.Status != JourneyStatus.Open && j.Id != excludedId)
+                .OrderByDescending(j => j.CreatedAt)
+                .Take(5)
+                .Select(j => new JourneySummaryResponse(
+                    j.Id, j.CustomerId, j.OriginChannel, j.Intent, j.CurrentStep, j.Payload, j.Status, j.CreatedAt, j.UpdatedAt, j.ClosedAt))
+                .ToListAsync(cancellationToken);
+        }
+
+        // Sem jornada ativa e sem pedido de histórico: não há nada relevante a mostrar (UC09 A2 cobre o caso com histórico).
+        if (active is null && !includeHistory)
+            throw new NotFoundException("active_journey_not_found", "Não há jornada ativa para este cliente.");
+
+        return new ActiveJourneyResponse(active is null ? null : ToDetail(active), recentJourneys);
+    }
+
+    public async Task<TransitionsResponse> GetTransitionsAsync(Guid journeyId, CancellationToken cancellationToken)
+    {
+        var exists = await _db.JourneyContexts.AsNoTracking().AnyAsync(j => j.Id == journeyId, cancellationToken);
+        if (!exists)
+            throw new NotFoundException("journey_not_found", $"Jornada {journeyId} não encontrada.");
+
+        var transitions = await _db.JourneyTransitions
+            .AsNoTracking()
+            .Where(t => t.JourneyContextId == journeyId)
+            .OrderByDescending(t => t.OccurredAt)
+            .Select(t => new TransitionDto(t.Id, t.Channel, t.EventType, t.Description, t.Metadata, t.OccurredAt))
+            .ToListAsync(cancellationToken);
+
+        return new TransitionsResponse(journeyId, transitions);
+    }
+
+    public async Task<JourneySummaryResponse> CloseAsync(
+        Guid journeyId, CloseJourneyRequest request, CancellationToken cancellationToken)
+    {
+        if (request.Outcome is not (JourneyStatus.Concluded or JourneyStatus.Abandoned))
+            throw new ValidationException("invalid_outcome", "outcome deve ser 'concluded' ou 'abandoned'.");
+
+        if (!JourneyChannels.Contains(request.Channel))
+            throw new ValidationException("invalid_channel", $"Canal '{request.Channel}' não é suportado.");
+
+        var journey = await _db.JourneyContexts.FirstOrDefaultAsync(j => j.Id == journeyId, cancellationToken)
+            ?? throw new NotFoundException("journey_not_found", $"Jornada {journeyId} não encontrada.");
+
+        await EnsureOpenOrThrowAsync(journey, cancellationToken, notOpenErrorCode: "journey_already_closed");
+
+        journey.Status = request.Outcome;
+        journey.ClosedAt = DateTime.UtcNow;
+        journey.UpdatedAt = DateTime.UtcNow;
+
+        _transitionRecorder.Record(journey.Id, request.Channel, TransitionEventTypes.JourneyClosed,
+            $"Jornada encerrada como '{request.Outcome}'.",
+            new { outcome = request.Outcome, reason = request.Reason });
+
+        await _db.SaveChangesAsync(cancellationToken);
+
+        _logger.LogInformation("Journey {JourneyId} closed with outcome {Outcome}", journey.Id, request.Outcome);
+
+        return ToSummary(journey);
+    }
+
+    /// <summary>
+    /// UC08 — regra de expiração reativa: se a jornada está aberta e passou do TTL de inatividade,
+    /// marca como expired e registra a transição. Retorna true se a jornada foi mutada (chamador deve dar SaveChanges).
+    /// </summary>
+    private bool TryExpireIfInactive(JourneyContext journey)
+    {
+        if (journey.Status != JourneyStatus.Open) return false;
+
+        var inactivity = DateTime.UtcNow - journey.UpdatedAt;
+        var ttl = TimeSpan.FromHours(_cfeOptions.JourneyInactivityTtlHours);
+        if (inactivity <= ttl) return false;
+
+        journey.Status = JourneyStatus.Expired;
+        journey.ClosedAt = DateTime.UtcNow;
+
+        _transitionRecorder.Record(journey.Id, Channels.System, TransitionEventTypes.JourneyExpired,
+            "Jornada expirada por inatividade.",
+            new { hours_inactive = Math.Round(inactivity.TotalHours, 1) });
+
+        _logger.LogInformation("Journey {JourneyId} expired due to inactivity", journey.Id);
+
+        return true;
+    }
+
+    /// <summary>Aplica a checagem de expiração e garante que a jornada ainda está open; senão, lança 409.</summary>
+    private async Task EnsureOpenOrThrowAsync(JourneyContext journey, CancellationToken cancellationToken, string notOpenErrorCode = "journey_not_open")
+    {
+        if (TryExpireIfInactive(journey))
+        {
+            await _db.SaveChangesAsync(cancellationToken);
+            throw new ConflictException(notOpenErrorCode, "A jornada expirou por inatividade.", new { status = journey.Status });
+        }
+
+        if (journey.Status != JourneyStatus.Open)
+            throw new ConflictException(notOpenErrorCode, $"Jornada está no estado '{journey.Status}'.", new { status = journey.Status });
+    }
+
+    private static void ValidateOpenRequest(OpenJourneyRequest request)
+    {
+        if (request.CustomerId == Guid.Empty)
+            throw new ValidationException("invalid_customer_id", "customer_id é obrigatório.");
+
+        if (!JourneyChannels.Contains(request.OriginChannel))
+            throw new ValidationException("invalid_origin_channel", $"Canal de origem '{request.OriginChannel}' não é suportado.");
+
+        // Intent não é restrito a "change_plan" aqui: o CFE é desenhado para ser genérico (spec-funcional §1);
+        // a restrição "só troca de plano disponível" é uma regra de conversa do bot (Fase 6), não do backend.
+        if (string.IsNullOrWhiteSpace(request.Intent) || request.Intent.Length > 50)
+            throw new ValidationException("invalid_intent", "intent é obrigatório e deve ter até 50 caracteres.");
+
+        if (string.IsNullOrWhiteSpace(request.InitialStep) || request.InitialStep.Length > 50)
+            throw new ValidationException("invalid_initial_step", "initial_step é obrigatório e deve ter até 50 caracteres.");
+    }
+
+    private static JourneySummaryResponse ToSummary(JourneyContext j) => new(
+        j.Id, j.CustomerId, j.OriginChannel, j.Intent, j.CurrentStep, j.Payload, j.Status, j.CreatedAt, j.UpdatedAt, j.ClosedAt);
+
+    private static JourneyDetailResponse ToDetail(JourneyContext j) => new(
+        j.Id, j.CustomerId, new CustomerSummaryDto(j.Customer.Id, j.Customer.FullName, j.Customer.Cpf),
+        j.OriginChannel, j.Intent, j.CurrentStep, j.Payload, j.Status, j.CreatedAt, j.UpdatedAt, j.ClosedAt);
+}
