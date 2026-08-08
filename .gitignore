@@ -5,22 +5,32 @@ obj/
 *.suo
 
 # Secrets / environment-specific config
-appsettings.Development.json
-appsettings.Production.json
+appsettings.*.json
+!appsettings.json
 .env
 .env.*
 
 # Logs
 logs/
+*.log
 
 # IDE
 .vs/
 .vscode/
+.idea/
 *.swp
 
 # OS
 .DS_Store
 Thumbs.db
+Desktop.ini
+
+# Testes (para quando forem introduzidos)
+TestResults/
+*.trx
 
 # Node (front-ends simulados, se algum dia usarem node_modules)
 node_modules/
+
+# Relatórios de fase — uso interno, não sobem para o repositório remoto
+specs/relatorios/
