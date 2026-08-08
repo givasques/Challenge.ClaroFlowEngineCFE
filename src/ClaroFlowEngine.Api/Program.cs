@@ -1,6 +1,8 @@
+using ClaroFlowEngine.Api.Common.Middleware;
 using ClaroFlowEngine.Api.Configuration;
 using ClaroFlowEngine.Api.Data;
 using ClaroFlowEngine.Api.Data.Seed;
+using ClaroFlowEngine.Api.Modules.Identity;
 using HealthChecks.NpgSql;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
@@ -45,6 +47,9 @@ builder.Services.AddControllers()
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+// Registro de dependências por módulo (feature folders).
+builder.Services.AddIdentityModule();
+
 builder.Services.AddHealthChecks()
     .AddNpgSql(builder.Configuration.GetConnectionString("Postgres")!, name: "db");
 
@@ -74,6 +79,9 @@ using (var scope = app.Services.CreateScope())
         await DatabaseSeeder.SeedAsync(db);
     }
 }
+
+// Middleware de exceções primeiro no pipeline: captura qualquer erro dos middlewares/controllers seguintes.
+app.UseExceptionHandling();
 
 if (app.Environment.IsDevelopment())
 {
