@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Claro Atendimento — Chat (simulado)</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="chat-window">
+    <header class="chat-header">
+      <div class="chat-header-info">
+        <div class="chat-avatar">C</div>
+        <div>
+          <div class="chat-title">Claro Atendimento</div>
+          <div class="chat-subtitle">Canal simulado — WhatsApp</div>
+        </div>
+      </div>
+      <button id="reset-button" class="reset-button" title="Reiniciar conversa">↺ Reiniciar</button>
+    </header>
+
+    <div id="degraded-banner" class="degraded-banner hidden">
+      ⚠️ Modo degradado — CFE indisponível
+    </div>
+
+    <div id="messages" class="messages"></div>
+
+    <div id="typing-indicator" class="typing-indicator hidden">
+      <span></span><span></span><span></span>
+    </div>
+
+    <form id="chat-form" class="chat-form">
+      <input
+        id="message-input"
+        class="message-input"
+        type="text"
+        placeholder="Digite uma mensagem..."
+        autocomplete="off"
+      />
+      <button id="send-button" class="send-button" type="submit">Enviar</button>
+    </form>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
