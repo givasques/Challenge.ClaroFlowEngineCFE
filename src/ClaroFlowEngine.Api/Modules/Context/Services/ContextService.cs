@@ -13,14 +13,20 @@ public class ContextService : IContextService
     private readonly CfeDbContext _db;
     private readonly ITransitionRecorder _transitionRecorder;
     private readonly IJourneyExpirationService _expirationService;
+    private readonly ICurrentChannelAccessor _currentChannel;
     private readonly ILogger<ContextService> _logger;
 
     public ContextService(
-        CfeDbContext db, ITransitionRecorder transitionRecorder, IJourneyExpirationService expirationService, ILogger<ContextService> logger)
+        CfeDbContext db,
+        ITransitionRecorder transitionRecorder,
+        IJourneyExpirationService expirationService,
+        ICurrentChannelAccessor currentChannel,
+        ILogger<ContextService> logger)
     {
         _db = db;
         _transitionRecorder = transitionRecorder;
         _expirationService = expirationService;
+        _currentChannel = currentChannel;
         _logger = logger;
     }
 
@@ -110,9 +116,10 @@ public class ContextService : IContextService
 
         journey.UpdatedAt = DateTime.UtcNow;
 
-        // Enquanto não existe autenticação por canal (Fase 5), usa-se o canal de origem da jornada
-        // como responsável pelo evento. Impreciso se o PATCH vier de um canal diferente do de origem.
-        _transitionRecorder.Record(journey.Id, journey.OriginChannel, TransitionEventTypes.StepUpdated,
+        // Canal real resolvido pelo ChannelAuthMiddleware a partir do X-Channel-Token (Fase 5).
+        // Fallback para OriginChannel só em cenário anômalo (ex: chamada de teste sem passar pelo middleware).
+        var actingChannel = _currentChannel.Channel ?? journey.OriginChannel;
+        _transitionRecorder.Record(journey.Id, actingChannel, TransitionEventTypes.StepUpdated,
             "Etapa e/ou dados da jornada atualizados.",
             new { previous_step = previousStep, current_step = journey.CurrentStep, updated_keys = request.PayloadMerge?.Keys.ToArray() ?? [] });
 

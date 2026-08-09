@@ -91,7 +91,9 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
-// Middleware de exceções primeiro no pipeline: captura qualquer erro dos middlewares/controllers seguintes.
+// Ordem do pipeline conforme padroes-e-boas-praticas.md §13:
+// correlationId -> exceptionHandling -> logging -> cors -> channelAuth -> authorization -> controllers.
+app.UseCorrelationId();
 app.UseExceptionHandling();
 
 if (app.Environment.IsDevelopment())
@@ -102,6 +104,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseSerilogRequestLogging();
 app.UseCors();
+app.UseChannelAuth();
 app.UseAuthorization();
 
 app.MapControllers();
