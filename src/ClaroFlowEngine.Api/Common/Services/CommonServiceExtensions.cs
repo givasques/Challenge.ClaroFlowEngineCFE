@@ -5,6 +5,7 @@ public static class CommonServiceExtensions
     public static IServiceCollection AddCommonServices(this IServiceCollection services)
     {
         services.AddScoped<ITransitionRecorder, TransitionRecorder>();
+        services.AddScoped<IJourneyExpirationService, JourneyExpirationService>();
         return services;
     }
 }

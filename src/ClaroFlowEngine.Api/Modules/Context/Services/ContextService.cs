@@ -1,32 +1,26 @@
 using ClaroFlowEngine.Api.Common.Contracts;
 using ClaroFlowEngine.Api.Common.Errors;
 using ClaroFlowEngine.Api.Common.Services;
-using ClaroFlowEngine.Api.Configuration;
 using ClaroFlowEngine.Api.Data;
 using ClaroFlowEngine.Api.Data.Entities;
 using ClaroFlowEngine.Api.Modules.Context.Dtos;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
 
 namespace ClaroFlowEngine.Api.Modules.Context.Services;
 
 public class ContextService : IContextService
 {
-    // Canais válidos para origem/encerramento de jornada. "cpf" é só um identificador de UC02,
-    // não um canal de interação; "system" é reservado para eventos automáticos (expiração).
-    private static readonly string[] JourneyChannels = [Channels.Whatsapp, Channels.App, Channels.Call];
-
     private readonly CfeDbContext _db;
     private readonly ITransitionRecorder _transitionRecorder;
-    private readonly CfeOptions _cfeOptions;
+    private readonly IJourneyExpirationService _expirationService;
     private readonly ILogger<ContextService> _logger;
 
     public ContextService(
-        CfeDbContext db, ITransitionRecorder transitionRecorder, IOptions<CfeOptions> cfeOptions, ILogger<ContextService> logger)
+        CfeDbContext db, ITransitionRecorder transitionRecorder, IJourneyExpirationService expirationService, ILogger<ContextService> logger)
     {
         _db = db;
         _transitionRecorder = transitionRecorder;
-        _cfeOptions = cfeOptions.Value;
+        _expirationService = expirationService;
         _logger = logger;
     }
 
@@ -46,7 +40,7 @@ public class ContextService : IContextService
 
         if (existing is not null)
         {
-            var justExpired = TryExpireIfInactive(existing);
+            var justExpired = _expirationService.TryExpireIfInactive(existing);
             if (!justExpired)
             {
                 _transitionRecorder.Record(existing.Id, request.OriginChannel, TransitionEventTypes.JourneyReopenAttempted,
@@ -134,7 +128,7 @@ public class ContextService : IContextService
             .FirstOrDefaultAsync(j => j.Id == journeyId, cancellationToken)
             ?? throw new NotFoundException("journey_not_found", $"Jornada {journeyId} não encontrada.");
 
-        if (TryExpireIfInactive(journey))
+        if (_expirationService.TryExpireIfInactive(journey))
             await _db.SaveChangesAsync(cancellationToken);
 
         return ToDetail(journey);
@@ -151,7 +145,7 @@ public class ContextService : IContextService
             .Include(j => j.Customer)
             .FirstOrDefaultAsync(j => j.CustomerId == customerId && j.Status == JourneyStatus.Open, cancellationToken);
 
-        if (active is not null && TryExpireIfInactive(active))
+        if (active is not null && _expirationService.TryExpireIfInactive(active))
         {
             await _db.SaveChangesAsync(cancellationToken);
             active = null; // acabou de expirar — não conta mais como ativa
@@ -200,7 +194,7 @@ public class ContextService : IContextService
         if (request.Outcome is not (JourneyStatus.Concluded or JourneyStatus.Abandoned))
             throw new ValidationException("invalid_outcome", "outcome deve ser 'concluded' ou 'abandoned'.");
 
-        if (!JourneyChannels.Contains(request.Channel))
+        if (!Channels.JourneyChannels.Contains(request.Channel))
             throw new ValidationException("invalid_channel", $"Canal '{request.Channel}' não é suportado.");
 
         var journey = await _db.JourneyContexts.FirstOrDefaultAsync(j => j.Id == journeyId, cancellationToken)
@@ -223,34 +217,10 @@ public class ContextService : IContextService
         return ToSummary(journey);
     }
 
-    /// <summary>
-    /// UC08 — regra de expiração reativa: se a jornada está aberta e passou do TTL de inatividade,
-    /// marca como expired e registra a transição. Retorna true se a jornada foi mutada (chamador deve dar SaveChanges).
-    /// </summary>
-    private bool TryExpireIfInactive(JourneyContext journey)
-    {
-        if (journey.Status != JourneyStatus.Open) return false;
-
-        var inactivity = DateTime.UtcNow - journey.UpdatedAt;
-        var ttl = TimeSpan.FromHours(_cfeOptions.JourneyInactivityTtlHours);
-        if (inactivity <= ttl) return false;
-
-        journey.Status = JourneyStatus.Expired;
-        journey.ClosedAt = DateTime.UtcNow;
-
-        _transitionRecorder.Record(journey.Id, Channels.System, TransitionEventTypes.JourneyExpired,
-            "Jornada expirada por inatividade.",
-            new { hours_inactive = Math.Round(inactivity.TotalHours, 1) });
-
-        _logger.LogInformation("Journey {JourneyId} expired due to inactivity", journey.Id);
-
-        return true;
-    }
-
-    /// <summary>Aplica a checagem de expiração e garante que a jornada ainda está open; senão, lança 409.</summary>
+    /// <summary>Aplica a checagem de expiração (UC08, via serviço compartilhado) e garante que a jornada ainda está open; senão, lança 409.</summary>
     private async Task EnsureOpenOrThrowAsync(JourneyContext journey, CancellationToken cancellationToken, string notOpenErrorCode = "journey_not_open")
     {
-        if (TryExpireIfInactive(journey))
+        if (_expirationService.TryExpireIfInactive(journey))
         {
             await _db.SaveChangesAsync(cancellationToken);
             throw new ConflictException(notOpenErrorCode, "A jornada expirou por inatividade.", new { status = journey.Status });
@@ -265,7 +235,7 @@ public class ContextService : IContextService
         if (request.CustomerId == Guid.Empty)
             throw new ValidationException("invalid_customer_id", "customer_id é obrigatório.");
 
-        if (!JourneyChannels.Contains(request.OriginChannel))
+        if (!Channels.JourneyChannels.Contains(request.OriginChannel))
             throw new ValidationException("invalid_origin_channel", $"Canal de origem '{request.OriginChannel}' não é suportado.");
 
         // Intent não é restrito a "change_plan" aqui: o CFE é desenhado para ser genérico (spec-funcional §1);

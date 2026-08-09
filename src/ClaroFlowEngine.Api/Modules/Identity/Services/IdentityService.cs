@@ -1,4 +1,5 @@
 using ClaroFlowEngine.Api.Common.Errors;
+using ClaroFlowEngine.Api.Common.Extensions;
 using ClaroFlowEngine.Api.Data;
 using ClaroFlowEngine.Api.Data.Entities;
 using ClaroFlowEngine.Api.Modules.Identity.Dtos;

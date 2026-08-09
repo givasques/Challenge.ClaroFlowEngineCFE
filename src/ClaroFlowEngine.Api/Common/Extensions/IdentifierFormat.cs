@@ -1,11 +1,12 @@
 using ClaroFlowEngine.Api.Common.Contracts;
 using System.Text.RegularExpressions;
 
-namespace ClaroFlowEngine.Api.Modules.Identity.Services;
+namespace ClaroFlowEngine.Api.Common.Extensions;
 
 /// <summary>
 /// Validação de formato dos identificadores por canal, conforme spec-funcional §6.1 e §6.2.
 /// Não valida dígito verificador de CPF — os CPFs do seed são fictícios, só o formato importa.
+/// Vive em Common porque é usada por mais de um módulo (Identity e Handoff).
 /// </summary>
 public static partial class IdentifierFormat
 {
