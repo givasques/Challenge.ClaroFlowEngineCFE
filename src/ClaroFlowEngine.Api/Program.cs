@@ -4,6 +4,7 @@ using ClaroFlowEngine.Api.Configuration;
 using ClaroFlowEngine.Api.Data;
 using ClaroFlowEngine.Api.Data.Seed;
 using ClaroFlowEngine.Api.Modules.Context;
+using ClaroFlowEngine.Api.Modules.Handoff;
 using ClaroFlowEngine.Api.Modules.Identity;
 using HealthChecks.NpgSql;
 using Microsoft.EntityFrameworkCore;
@@ -58,6 +59,7 @@ builder.Services.AddSwaggerGen(options =>
 builder.Services.AddCommonServices();
 builder.Services.AddIdentityModule();
 builder.Services.AddContextModule();
+builder.Services.AddHandoffModule();
 
 builder.Services.AddHealthChecks()
     .AddNpgSql(builder.Configuration.GetConnectionString("Postgres")!, name: "db");
