@@ -26,7 +26,7 @@ body {
 }
 
 .chat-header {
-  background: #c1121f;
+  background: #075e54;
   color: white;
   padding: 12px 16px;
   display: flex;
@@ -45,7 +45,7 @@ body {
   height: 40px;
   border-radius: 50%;
   background: white;
-  color: #c1121f;
+  color: #075e54;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -164,8 +164,8 @@ body {
 
 .link-card-button {
   display: inline-block;
-  background: #c1121f;
-  color: white;
+  background: #25d366;
+  color: #08331e;
   text-decoration: none;
   padding: 8px 14px;
   border-radius: 6px;
@@ -174,7 +174,7 @@ body {
 }
 
 .link-card-button:hover {
-  background: #a10e19;
+  background: #1ebe5a;
 }
 
 .typing-indicator {
@@ -217,12 +217,12 @@ body {
 }
 
 .message-input:focus {
-  border-color: #c1121f;
+  border-color: #075e54;
 }
 
 .send-button {
-  background: #c1121f;
-  color: white;
+  background: #25d366;
+  color: #08331e;
   border: none;
   padding: 0 18px;
   border-radius: 20px;
@@ -232,7 +232,7 @@ body {
 }
 
 .send-button:hover {
-  background: #a10e19;
+  background: #1ebe5a;
 }
 
 .send-button:disabled,
