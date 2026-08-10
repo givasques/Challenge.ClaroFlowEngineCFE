@@ -439,6 +439,25 @@ O bot precisa **guardar em memória de sessão** (server-side) qual estado a con
 - **Polling:** a cada 3-5 segundos, refaz as chamadas `GET /context/{id}` e `GET /context/{id}/transitions` para manter o painel atualizado em tempo real. Se detectar mudança, atualiza a UI sem recarregar a página.
 - Aviso visível: "Este painel exibe o contexto de jornada em modo somente leitura. Nenhuma alteração pode ser feita aqui. Para atualizar dados do cliente, utilize o sistema CRM."
 
+### 8.4. Comportamento em caso de indisponibilidade do CFE
+
+Este comportamento materializa o requisito **RNF003** ("em caso de indisponibilidade momentânea, os canais devem manter operação em modo degradado") do Sprint 1.
+
+Todos os canais devem tratar falhas de comunicação com o CFE (timeout, 5xx, indisponibilidade de rede) de forma explícita, **sem travar a interface**:
+
+- **Chat simulado:** ao detectar falha na chamada ao CFE, o bot envia uma mensagem visível para o usuário: "Estou com uma instabilidade temporária no sistema. Vou continuar te atendendo, mas algumas informações podem levar mais tempo para serem processadas. Você pode tentar novamente em instantes." O input do usuário continua habilitado. Uma badge visual de degradação aparece no topo do chat: "⚠️ Modo degradado — CFE indisponível".
+- **App simulado:** ao falhar em resolver o token do deep link, exibe tela explicativa: "Não conseguimos recuperar sua sessão neste momento. Você pode continuar acessando o App normalmente, mas os dados da sua conversa anterior não estão disponíveis. Tente novamente em alguns instantes." Botão para retentar a resolução.
+- **Painel do atendente:** ao falhar no polling, exibe faixa de aviso: "⚠️ Sistema de contexto indisponível — os dados exibidos podem estar defasados. Última atualização: {timestamp}." Os dados últimos carregados permanecem visíveis para não deixar o atendente sem informação.
+
+**Implementação técnica:**
+
+- Timeout de HTTP em cada canal: 10 segundos por chamada (ou 6 minutos quando em modo explicação).
+- Retry automático apenas em GETs: 1 retentativa após 2 segundos.
+- POSTs/PATCHes não retentam automaticamente (evita duplicação); usuário reenvia manualmente.
+- Todos os erros de comunicação são exibidos em UI, nunca escondidos no console.
+
+**Como testar:** parar o container do backend (`docker compose stop` do serviço da API) e verificar que os três canais reagem conforme descrito.
+
 ---
 
 ## 9. Priorização (MoSCoW)
@@ -676,11 +695,64 @@ O protótipo será considerado pronto quando **todos** os critérios abaixo fore
 - [ ] Toda operação do CFE gera entrada em `journey_transitions`.
 - [ ] `/health` responde 200 com status OK.
 - [ ] README explica como rodar tudo do zero em <10 minutos.
-- [ ] Os 3 cenários do Sprint 2 (Ana, Carlos, Mariana) são testáveis manualmente e funcionam.
+- [ ] Os 3 cenários principais do Sprint 2 (Ana, Carlos, Mariana) são testáveis manualmente e funcionam.
+- [ ] O cenário 4 (degradação) foi validado ao menos uma vez: parar o backend e verificar que os canais não travam e exibem mensagens apropriadas.
 
 ---
 
-## 13. Cenários de validação (usar como roteiros de teste)
+## 13. Métricas de sucesso do MVP
+
+Esta seção materializa o feedback recebido nos dois sprints anteriores sobre a necessidade de estabelecer **métricas mensuráveis do próprio protótipo**, em vez de apenas citar números de estudos de mercado.
+
+As métricas abaixo são todas verificáveis pela própria arquitetura do CFE — não dependem de usuários reais, apenas de que o sistema funcione conforme especificado. Elas devem ser reportadas na apresentação final como evidências objetivas de que o protótipo cumpre o que a proposta prometeu.
+
+### 13.1. Métricas primárias (o CFE está atacando o problema)
+
+| Métrica | Meta | Como medir |
+|---|---|---|
+| **Taxa de zero-repetição na retomada de jornada** | 100% | Comparar campos preservados no `payload` da jornada entre chat e App. Nenhum campo já informado deve precisar ser reintroduzido. |
+| **Taxa de sucesso do handoff com token válido** | 100% | Toda vez que um deep link válido (não expirado, não usado) for aberto no App, o contexto deve ser resolvido corretamente. |
+| **Taxa de rastreabilidade das operações** | 100% | Toda operação sobre uma jornada deve gerar entrada em `journey_transitions`. Verificável por contagem: nº de operações de mutação = nº de linhas em `journey_transitions` para aquela jornada. |
+| **Taxa de identidade unificada em canais distintos** | 100% | Após um cliente ser atendido no chat (canal `whatsapp`) e retomar no App (canal `app`), ambos os identificadores devem estar vinculados ao mesmo `unified_customer_id` na tabela `identity_links`. |
+
+### 13.2. Métricas de comportamento correto (o CFE está tratando exceções)
+
+| Métrica | Meta | Como medir |
+|---|---|---|
+| **Taxa de rejeição de token expirado** | 100% | Um token com `expires_at < NOW()` deve retornar 410 sempre. |
+| **Taxa de rejeição de token já usado** | 100% | Um token com `used_at != NULL` deve retornar 410 sempre. |
+| **Taxa de expiração correta de jornadas inativas** | 100% | Uma jornada com `updated_at > 24h` deve mudar para `status=expired` na próxima leitura. |
+| **Rejeição de operação em jornada não-aberta** | 100% | `PATCH` ou `close` em jornada com status final deve retornar 409. |
+
+### 13.3. Métricas de qualidade técnica
+
+| Métrica | Meta | Como medir |
+|---|---|---|
+| **Cobertura dos 3 cenários do Sprint 2** | 3/3 | Ana, Carlos e Mariana devem ser reprodutíveis manualmente conforme roteiros da §14. |
+| **Latência média das chamadas ao CFE** | < 200ms em ambiente local | Log estruturado registra `elapsed_ms` de cada request. |
+| **Disponibilidade do endpoint de health** | 100% durante a demo | `/health` deve responder 200 em toda checagem. |
+| **Ausência de erros não tratados** | 0 exceções 500 em fluxos previstos | Todo erro deve ter tratamento e retornar código apropriado (4xx/410). |
+
+### 13.4. Métricas específicas do modo explicação
+
+| Métrica | Meta | Como medir |
+|---|---|---|
+| **Cobertura dos pontos de pausa didáticos** | ≥ 25 pontos (granularidade `high`) | Contar chamadas a `PauseAsync` disparadas em uma execução completa do cenário 1. |
+| **Sincronização em tempo real do painel** | < 500ms entre pausa e aparição no painel | Diferença entre `waiting_since` do step e recebimento do evento SSE no cliente. |
+
+### 13.5. Métricas que ficariam em uma versão em produção (não medidas no protótipo)
+
+Para deixar claro na apresentação que o time pensou na evolução, listamos aqui métricas que **exigem base real de usuários** e portanto não podem ser reportadas com dados mockados. Ficam como parte do roadmap:
+
+- Redução do TMA (Tempo Médio de Atendimento) real.
+- Taxa de handoff efetivamente utilizado por sessão.
+- Taxa de abandono comparada com jornadas single-channel.
+- CSAT / NPS antes e depois da implementação.
+- Redução de custo operacional em canais humanos.
+
+---
+
+## 14. Cenários de validação (usar como roteiros de teste)
 
 Esses cenários **não são o produto**, são checklists para validar que o sistema genérico funciona corretamente.
 
@@ -720,24 +792,148 @@ Esses cenários **não são o produto**, são checklists para validar que o sist
 
 **Validação:** regra reativa funciona.
 
+### Cenário 4 (opcional) — Degradação de canal
+
+1. Iniciar cenário 1 até o passo 5 (bot mostra planos).
+2. Parar o container do backend: `docker compose stop api`.
+3. Enviar a escolha do plano no chat.
+4. Chat deve exibir mensagem de degradação, sem travar.
+5. Painel do atendente aberto em outra aba deve exibir aviso de indisponibilidade.
+6. Subir o backend novamente: `docker compose start api`.
+7. Enviar a mesma escolha no chat — agora deve funcionar.
+
+**Validação:** o RNF003 (operação degradada) foi implementado corretamente.
+
 ---
 
-## 14. Fora do escopo do protótipo (roadmap para o documento de visão)
+## 15. Roadmap de evolução
 
-Para deixar claro nas próximas iterações e na apresentação final, os itens abaixo ficam explicitamente para evolução futura:
+Esta seção consolida tudo que está **fora do escopo do protótipo** e materializa a resposta aos feedbacks dos sprints anteriores. Serve como referência para a apresentação final e para o documento de visão de evolução.
 
-- Autenticação real por JWT/token de serviço entre canais e CFE.
-- Login e perfis de acesso no painel do atendente.
-- Job de background para expiração ativa (fora do modelo reativo).
-- Integração com WhatsApp Business API (via 360dialog/Twilio/Meta Cloud API) ou Telegram Bot API.
-- Outros canais: Alexa, RCS, SMS, USSD, Site, Portal Cautivo, Totem, Dial My App, AppBot.
-- Outras intenções: 2ª via de fatura, negociação, suporte técnico, aquisição de produto.
-- Métricas operacionais no painel: TMA, taxa de handoff, taxa de abandono.
-- Notificação automática para o time técnico via webhook/e-mail em degradação.
-- Extração dos módulos internos para microsserviços independentes.
-- Painel em React (ou reescrita da UI para stack moderno).
-- LGPD: implementação completa de retenção, exclusão sob solicitação e portabilidade de dados.
-- Acessibilidade: integração com VLibras e adequação a WCAG 2.1 AA.
+### 15.1. Autenticação e segurança de nível produção
+
+- Substituição do `X-Channel-Token` mockado por autenticação real via JWT ou OAuth2 client credentials entre cada canal e o CFE.
+- Login e perfis de acesso no painel do atendente, com identificação do atendente ativo e auditoria completa de acessos.
+- Rate limiting por canal e por endpoint.
+- HTTPS obrigatório com certificados válidos.
+- Rotação automática de segredos via cofre (HashiCorp Vault, AWS Secrets Manager, Azure Key Vault).
+
+### 15.2. Notificação de falhas para o time técnico da Claro (feedback direto do Sprint 1)
+
+O feedback do professor questionou explicitamente sobre notificação técnica em RNF003. A evolução prevê:
+
+- Integração com sistema de alertas (PagerDuty, Opsgenie, ou similar) para falhas críticas em produção.
+- Notificação por webhook em degradação de performance (latência acima do SLA).
+- E-mail automático ao time técnico em caso de indisponibilidade prolongada.
+- Dashboards operacionais (Grafana + Prometheus) com métricas em tempo real.
+
+### 15.3. Acessibilidade e inclusão (feedback direto do Sprint 1)
+
+O feedback do professor questionou sobre clientes com necessidades especiais. A evolução prevê:
+
+- Integração com a **API vLibras** (https://www.gov.br/conecta/catalogo/apis/vlibras) nos canais visuais para tradução automática para Língua Brasileira de Sinais.
+- Adequação a **WCAG 2.1 nível AA** em todas as interfaces (contraste, navegação por teclado, leitores de tela, hierarquia semântica).
+- Modo de alto contraste e ajuste de tamanho de fonte no App e no painel do atendente.
+- Suporte a leitura de áudio nas mensagens do chat.
+
+### 15.4. Expansão para outros canais
+
+O MVP cobre WhatsApp e App Minha Claro. A camada de orquestração está preparada para receber, sem reformulação estrutural, os demais canais da Claro:
+
+- **Alexa** (voz)
+- **RCS** (mensagem enriquecida)
+- **SMS** (mensagem simples)
+- **USSD** (menu de discagem)
+- **Site**
+- **Portal Cautivo** (Wi-Fi público)
+- **Totem** (autoatendimento presencial)
+- **Dial My App** (transição telefone → app)
+- **AppBot** (bot dentro do App)
+
+Cada canal exige apenas a implementação de um adaptador que consuma as APIs REST do CFE, sem alteração no núcleo.
+
+### 15.5. Expansão para outras intenções
+
+O MVP cobre apenas "troca de plano". A camada de contexto suporta genericamente qualquer intenção. Evolução prevista:
+
+- Segunda via de fatura
+- Negociação de dívida
+- Suporte técnico
+- Aquisição de novo produto (linha adicional, TV, banda larga)
+- Cancelamento com retenção
+- Consulta de consumo
+- Alteração de dados cadastrais
+
+### 15.6. Extração para microsserviços
+
+O monolito modular tem fronteiras arquiteturais desenhadas para permitir extração dos módulos internos como microsserviços independentes sem reescrita da lógica de negócio:
+
+- Cada módulo (Identity, Context, Handoff) vira um serviço independente.
+- Comunicação via message broker (RabbitMQ, Kafka) ou gRPC.
+- Cada serviço com sua base de dados dedicada, seguindo o padrão de "database per service".
+- Introdução de um API Gateway real (Kong, Ocelot, YARP) fazendo roteamento entre os serviços.
+
+### 15.7. Painel do atendente enriquecido (feedback direto do Sprint 2)
+
+O feedback pediu métricas operacionais no painel. Evolução prevista:
+
+- **TMA** (Tempo Médio de Atendimento) por atendente e por período.
+- **Taxa de handoff** por canal de origem.
+- **Taxa de abandono** de jornadas antes da conclusão.
+- **Lista de jornadas em andamento** com filtros por canal, intenção, status.
+- **Histórico completo** de todas as jornadas do cliente (não apenas a ativa).
+- **Ferramentas de ação:** capacidade de retomar jornada em nome do cliente, transferir para outro atendente, adicionar anotação.
+
+### 15.8. Persistência do estado do bot no servidor
+
+No MVP, o estado do bot conversacional é mantido em memória do cliente (localStorage). Evolução prevista:
+
+- Sessão do bot persistida em Redis ou similar.
+- Recuperação de sessão em caso de reload da página.
+- Múltiplas sessões simultâneas do mesmo cliente em canais distintos.
+
+### 15.9. Job de expiração ativa
+
+No MVP, jornadas expiradas são detectadas apenas quando acessadas (regra reativa). Evolução prevista:
+
+- Job de background (Hangfire, Quartz.NET) que varre `journey_contexts` a cada N minutos e marca inativas como `expired` proativamente.
+- Notificação ao cliente antes da expiração ("Sua sessão expira em 1h — deseja continuar?").
+
+### 15.10. Cobertura LGPD ampliada
+
+O MVP já contempla auditabilidade e retenção. Evolução prevista:
+
+- Endpoint para exercício de direitos do titular (acesso, correção, exclusão, portabilidade).
+- Anonimização automática de campos sensíveis após período de retenção.
+- Encryption at rest do banco.
+- Log completo de acessos a dados pessoais, com dashboard de compliance.
+- Consentimento explícito rastreável para uso de dados em canais específicos.
+
+### 15.11. Integração real com WhatsApp e Telegram
+
+O canal simulado atual é um chat web próprio. Evolução prevista:
+
+- Integração com **WhatsApp Business API** via 360dialog, Twilio ou Meta Cloud API.
+- Adaptador para **Telegram Bot API** como canal adicional de baixo custo para PMEs.
+- Templates de mensagem homologados na plataforma da Meta.
+
+### 15.12. Painel em stack moderno
+
+O painel do atendente e o painel de orquestração foram construídos em HTML/CSS/JS puro por questão de tempo. Evolução prevista:
+
+- Reescrita em **React** ou **Vue** com componentes reutilizáveis.
+- Design system alinhado à identidade visual da Claro.
+- SSR (Next.js) se SEO ou performance inicial forem relevantes.
+
+### 15.13. Modo explicação em produção
+
+O modo explicação atual é uma ferramenta didática para apresentação. Em produção, evolução prevista:
+
+- Autenticação de admin obrigatória para iniciar sessão de explicação.
+- Sanitização automática de dados sensíveis nos snapshots.
+- Restrição por IP ou VPN.
+- Uso apenas em ambientes de staging/homologação, não produção.
+- Registro de auditoria específico para uso da ferramenta.
 
 ---
 
