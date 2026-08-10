@@ -798,15 +798,32 @@ _logger.LogInformation(
 
 ## 9. Configuração do ambiente
 
+O projeto suporta **dois modos de execução**, para propósitos diferentes:
+
+| | **Modo desenvolvimento** | **Modo full (Docker)** |
+|---|---|---|
+| Quando usar | Dia a dia de desenvolvimento — hot reload, debug, iteração rápida | Demo/teste de ponta a ponta, validar que "do zero" funciona, sem instalar .NET/node localmente |
+| O que sobe | Só o Postgres via Docker; API via `dotnet run`; canais via `http-server` (3 processos separados) | Postgres **e** API via Docker Compose; API também serve os canais estáticos em `/channels/*` |
+| Arquivo | `docker-compose.yml` (só banco) | `docker-compose.full.yml` (banco + API) |
+| Portas dos canais | 5171 / 5173 / 5175 (uma por canal) | Todas sob `http://localhost:5104/channels/<nome-do-canal>` (mesma origem da API) |
+
+Os dois arquivos de compose são independentes — cada um sobe seu próprio container de Postgres (nomes e volumes distintos), então **não é necessário nem recomendado rodar os dois ao mesmo tempo** sem ajustar portas.
+
 ### 9.1. Pré-requisitos
 
-- .NET 8 SDK
+**Modo desenvolvimento:**
+- .NET SDK (8 LTS conforme documentado originalmente; o protótipo em implementação usa .NET 10, também LTS — decisão registrada nos relatórios de fase, sem impacto de contrato)
 - Docker + Docker Compose
 - Git
 - Editor à escolha (VS Code recomendado + C# Dev Kit)
-- Um servidor estático leve (Live Server, http-server, dotnet serve)
+- Um servidor estático leve (Live Server, http-server, dotnet serve) — só para os canais
 
-### 9.2. docker-compose.yml
+**Modo full:**
+- Docker + Docker Compose — **nada mais**. Não precisa de .NET SDK nem Node instalados na máquina; tudo roda dentro dos containers.
+
+### 9.2. Modo desenvolvimento
+
+#### 9.2.1. docker-compose.yml (só o banco)
 
 ```yaml
 services:
@@ -825,7 +842,9 @@ volumes:
   cfe_pgdata:
 ```
 
-### 9.3. appsettings.Development.json
+> Nota de implementação: no ambiente onde o protótipo foi construído, a porta 5432 do host já estava ocupada por uma instância nativa do PostgreSQL do Windows, então o `docker-compose.yml` real do repositório mapeia `5433:5432` no host (a porta interna do container continua 5432). Ajuste conforme o seu ambiente.
+
+#### 9.2.2. appsettings.Development.json
 
 ```json
 {
@@ -854,7 +873,7 @@ volumes:
 
 Este arquivo vai no `.gitignore`. O `appsettings.json` (versionado) tem valores placeholder.
 
-### 9.4. Comandos essenciais
+#### 9.2.3. Comandos essenciais
 
 ```bash
 # Subir postgres
@@ -876,7 +895,94 @@ npx http-server ../../channels/minha-claro-app -p 5173 -c-1
 npx http-server ../../channels/attendant-panel -p 5175 -c-1
 ```
 
-### 9.5. Seed automático na inicialização
+Neste modo, a API também serve `/channels/*` automaticamente se a pasta `channels/` existir no caminho relativo configurado (`StaticFiles:ChannelsPath`, padrão `../../channels` a partir de `src/ClaroFlowEngine.Api/`) — é opcional usar isso em dev, já que os `http-server` separados cobrem o mesmo papel com hot-reload melhor por canal.
+
+### 9.3. Modo full (Docker Compose completo)
+
+Sobe Postgres **e** API juntos, com a API compilada dentro de uma imagem Docker (multi-stage: SDK para build, ASP.NET Core Runtime para execução) que também empacota a pasta `channels/` e a serve em `/channels/*`.
+
+#### 9.3.1. Dockerfile (`src/ClaroFlowEngine.Api/Dockerfile`)
+
+Multi-stage: o estágio `build` usa a imagem `sdk` (mais pesada, com compilador) só para gerar o publish; o estágio final usa a imagem `aspnet` (runtime, bem mais leve) e copia apenas o resultado do publish + a pasta `channels/`. O build precisa rodar com **contexto na raiz do repositório** (não em `src/ClaroFlowEngine.Api/`), porque o `COPY channels/` precisa enxergar essa pasta:
+
+```bash
+docker build -f src/ClaroFlowEngine.Api/Dockerfile -t claro-flow-engine-api .
+```
+
+#### 9.3.2. docker-compose.full.yml
+
+```yaml
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: cfe-postgres-full
+    environment:
+      POSTGRES_USER: cfe
+      POSTGRES_PASSWORD: cfe_local_pwd
+      POSTGRES_DB: cfe
+    ports:
+      - "5434:5432"
+    volumes:
+      - cfe_pgdata_full:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cfe -d cfe"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: src/ClaroFlowEngine.Api/Dockerfile
+    container_name: cfe-api-full
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Staging
+      ConnectionStrings__Postgres: "Host=postgres;Port=5432;Database=cfe;Username=cfe;Password=cfe_local_pwd"
+      Channels__WhatsappSimBaseUrl: "http://localhost:5104/channels/whatsapp-sim"
+      Channels__AppSimBaseUrl: "http://localhost:5104/channels/minha-claro-app"
+      Channels__AttendantPanelBaseUrl: "http://localhost:5104/channels/attendant-panel"
+      Cfe__HandoffTokenTtlMinutes: "30"
+      Cfe__JourneyInactivityTtlHours: "24"
+      Cfe__AllowedChannelTokens__0: "fake-whatsapp-token"
+      Cfe__AllowedChannelTokens__1: "fake-app-token"
+      Cfe__AllowedChannelTokens__2: "fake-panel-token"
+    ports:
+      - "5104:8080"
+
+volumes:
+  cfe_pgdata_full:
+```
+
+Pontos relevantes:
+
+- **`depends_on` com `condition: service_healthy`**: o container da API só inicia depois que o Postgres responde `pg_isready` — evita a corrida clássica de "API sobe antes do banco estar pronto para aceitar conexões".
+- **`ASPNETCORE_ENVIRONMENT=Staging`**: a imagem, por padrão (definido no próprio `Dockerfile`), sobe como `Production` — nesse ambiente o `Program.cs` **não** aplica migration/seed automaticamente (conforme boa prática de não automatizar isso em produção). O compose sobrescreve para `Staging`, que já é um gatilho existente no código para aplicar migration + seed automaticamente, necessário aqui porque não há um passo de deploy manual separado neste modo local.
+- **Host `postgres` na connection string**: dentro da rede interna do Compose, os serviços se resolvem pelo nome do serviço (DNS interno), não por `localhost`. A porta usada é a porta *interna* do container (`5432`), independente da porta publicada no host (`5434`).
+- **Portas diferentes do `docker-compose.yml`** (Postgres em `5434` em vez de `5433`) para permitir rodar os dois stacks lado a lado sem conflito, se necessário.
+- **`Channels:*BaseUrl` apontando para `/channels/<nome>`**: como a própria API serve os três canais sob o mesmo host/porta neste modo, os deep links gerados pelo Handoff (`POST /handoff/generate`) apontam para esses caminhos, não para portas separadas como no modo desenvolvimento.
+
+#### 9.3.3. Comandos essenciais
+
+```bash
+# Build + subida da stack completa
+docker compose -f docker-compose.full.yml up --build
+
+# Em background
+docker compose -f docker-compose.full.yml up --build -d
+
+# Derrubar (mantendo o volume do banco)
+docker compose -f docker-compose.full.yml down
+
+# Derrubar e apagar o volume do banco também
+docker compose -f docker-compose.full.yml down -v
+```
+
+Depois de subir, a API responde em `http://localhost:5104` (Swagger em `/swagger`, health check em `/health`) e os canais ficam em `http://localhost:5104/channels/whatsapp-sim/`, `/channels/minha-claro-app/` e `/channels/attendant-panel/` (os dois últimos ainda não implementados nas fases iniciais do protótipo).
+
+### 9.4. Seed automático na inicialização
 
 No `Program.cs`, após `app.Build()`:
 
@@ -884,12 +990,15 @@ No `Program.cs`, após `app.Build()`:
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<CfeDbContext>();
-    db.Database.Migrate();
-    await DatabaseSeeder.SeedAsync(db);
+    if (app.Environment.IsDevelopment() || app.Environment.IsStaging())
+    {
+        db.Database.Migrate();
+        await DatabaseSeeder.SeedAsync(db);
+    }
 }
 ```
 
-O seeder cria planos e clientes de teste se ainda não existirem (idempotente).
+O seeder cria planos e clientes de teste se ainda não existirem (idempotente). Roda em `Development` (modo desenvolvimento local) e `Staging` (modo full via Docker) — deliberadamente **não** roda em `Production`, conforme a boa prática de migrations serem um passo explícito de deploy nesse ambiente.
 
 ---
 
