@@ -112,9 +112,18 @@ var channelsPathConfig = app.Configuration["StaticFiles:ChannelsPath"] ?? "../..
 var channelsFullPath = Path.GetFullPath(Path.Combine(app.Environment.ContentRootPath, channelsPathConfig));
 if (Directory.Exists(channelsFullPath))
 {
+    var channelsFileProvider = new PhysicalFileProvider(channelsFullPath);
+
+    // UseDefaultFiles resolve "/channels/whatsapp-sim/" -> "/channels/whatsapp-sim/index.html".
+    // Sem isso, só a URL com o nome do arquivo explícito funciona — UseStaticFiles sozinho não faz esse fallback.
+    app.UseDefaultFiles(new DefaultFilesOptions
+    {
+        FileProvider = channelsFileProvider,
+        RequestPath = "/channels",
+    });
     app.UseStaticFiles(new StaticFileOptions
     {
-        FileProvider = new PhysicalFileProvider(channelsFullPath),
+        FileProvider = channelsFileProvider,
         RequestPath = "/channels",
     });
     app.Logger.LogInformation("Servindo canais estáticos de {Path} em /channels", channelsFullPath);
