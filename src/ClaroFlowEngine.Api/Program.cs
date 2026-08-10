@@ -8,6 +8,7 @@ using ClaroFlowEngine.Api.Modules.Handoff;
 using ClaroFlowEngine.Api.Modules.Identity;
 using HealthChecks.NpgSql;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.FileProviders;
 using Serilog;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -103,6 +104,27 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseSerilogRequestLogging();
+
+// Serve os canais simulados (HTML/CSS/JS) em /channels/*. Usado no modo "full" (docker-compose.full.yml),
+// onde a própria API entrega os arquivos estáticos; em dev, os canais normalmente rodam via http-server
+// à parte (portas 5171/5173/5175), então isso é só um bônus opcional — não quebra nada se a pasta não existir.
+var channelsPathConfig = app.Configuration["StaticFiles:ChannelsPath"] ?? "../../channels";
+var channelsFullPath = Path.GetFullPath(Path.Combine(app.Environment.ContentRootPath, channelsPathConfig));
+if (Directory.Exists(channelsFullPath))
+{
+    app.UseStaticFiles(new StaticFileOptions
+    {
+        FileProvider = new PhysicalFileProvider(channelsFullPath),
+        RequestPath = "/channels",
+    });
+    app.Logger.LogInformation("Servindo canais estáticos de {Path} em /channels", channelsFullPath);
+}
+else
+{
+    app.Logger.LogWarning(
+        "Pasta de canais não encontrada em {Path} — /channels não será servido pela API.", channelsFullPath);
+}
+
 app.UseCors();
 app.UseChannelAuth();
 app.UseAuthorization();

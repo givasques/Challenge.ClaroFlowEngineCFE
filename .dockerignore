@@ -1,0 +1,11 @@
+**/bin/
+**/obj/
+**/.vs/
+**/.vscode/
+**/.idea/
+**/logs/
+.git/
+.gitignore
+specs/relatorios/
+node_modules/
+*.md

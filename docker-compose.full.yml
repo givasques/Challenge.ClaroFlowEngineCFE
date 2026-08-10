@@ -1,0 +1,58 @@
+# Stack completa (Postgres + API, com a API servindo também os canais simulados em /channels/*).
+# Uso: demo/teste rápido de ponta a ponta sem precisar rodar `dotnet run` nem servidores estáticos à parte.
+#
+#   docker compose -f docker-compose.full.yml up --build
+#
+# Para o dia a dia de desenvolvimento, use o docker-compose.yml normal (só o banco) + `dotnet run`.
+# Não rode os dois ao mesmo tempo sem ajustar portas — este arquivo sobe seu próprio Postgres,
+# independente do container do docker-compose.yml (volumes e nomes de container são distintos).
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: cfe-postgres-full
+    environment:
+      POSTGRES_USER: cfe
+      POSTGRES_PASSWORD: cfe_local_pwd
+      POSTGRES_DB: cfe
+    ports:
+      # 5434 no host para não colidir com o docker-compose.yml (que usa 5433) caso ambos rodem juntos.
+      - "5434:5432"
+    volumes:
+      - cfe_pgdata_full:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cfe -d cfe"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: src/ClaroFlowEngine.Api/Dockerfile
+    container_name: cfe-api-full
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # Staging (não Production) é o gatilho já existente em Program.cs para aplicar migration + seed
+      # automaticamente na subida — necessário aqui porque não há passo de deploy manual neste modo.
+      ASPNETCORE_ENVIRONMENT: Staging
+      # "postgres" é o nome do serviço acima, resolvido via DNS interno do Docker Compose;
+      # a porta aqui é a porta *interna* do container (5432), não a publicada no host (5434).
+      ConnectionStrings__Postgres: "Host=postgres;Port=5432;Database=cfe;Username=cfe;Password=cfe_local_pwd"
+      # Todos os canais são servidos pela própria API neste modo, sob o mesmo host:porta —
+      # por isso o deep link do handoff aponta para /channels/minha-claro-app, não para uma porta separada.
+      Channels__WhatsappSimBaseUrl: "http://localhost:5104/channels/whatsapp-sim"
+      Channels__AppSimBaseUrl: "http://localhost:5104/channels/minha-claro-app"
+      Channels__AttendantPanelBaseUrl: "http://localhost:5104/channels/attendant-panel"
+      Cfe__HandoffTokenTtlMinutes: "30"
+      Cfe__JourneyInactivityTtlHours: "24"
+      Cfe__AllowedChannelTokens__0: "fake-whatsapp-token"
+      Cfe__AllowedChannelTokens__1: "fake-app-token"
+      Cfe__AllowedChannelTokens__2: "fake-panel-token"
+    ports:
+      # 5104 no host — mesma porta usada em dev (config.js dos canais já aponta para ela, sem precisar de ajuste.
+      - "5104:8080"
+
+volumes:
+  cfe_pgdata_full:

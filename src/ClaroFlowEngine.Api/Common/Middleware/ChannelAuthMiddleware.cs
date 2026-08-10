@@ -54,7 +54,10 @@ public class ChannelAuthMiddleware
     private static bool IsPublicRoute(PathString path) =>
         path.StartsWithSegments("/health") ||
         path.StartsWithSegments("/swagger") ||
-        path.StartsWithSegments("/plans");
+        path.StartsWithSegments("/plans") ||
+        // Canais simulados (HTML/CSS/JS) servidos pela própria API no modo "full" (ver docker-compose.full.yml).
+        // Arquivos estáticos não fazem sentido exigir X-Channel-Token — são as próprias páginas dos canais.
+        path.StartsWithSegments("/channels");
 }
 
 public static class ChannelAuthMiddlewareExtensions
