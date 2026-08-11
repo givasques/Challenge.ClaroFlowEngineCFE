@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Minha Claro (simulado)</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="phone">
+    <header class="app-header">
+      <div class="app-logo">claro</div>
+      <div class="app-subtitle">Minha Claro — App (simulado)</div>
+    </header>
+
+    <main class="app-content">
+
+      <!-- Sem token na URL -->
+      <section id="screen-no-token" class="screen hidden">
+        <div class="icon">🔗</div>
+        <h1>Link inválido</h1>
+        <p>Nenhum token de acesso foi encontrado nesta URL. Abra o App a partir do link enviado no WhatsApp.</p>
+      </section>
+
+      <!-- Login mockado -->
+      <section id="screen-login" class="screen hidden">
+        <h1>Entrar</h1>
+        <p class="muted">Login simulado — qualquer usuário e senha são aceitos.</p>
+        <form id="login-form" class="form">
+          <label for="login-username">Usuário</label>
+          <input id="login-username" type="text" autocomplete="username" placeholder="seu.usuario" />
+
+          <label for="login-password">Senha</label>
+          <input id="login-password" type="password" autocomplete="current-password" placeholder="••••••••" />
+
+          <div id="login-error" class="error-message hidden"></div>
+
+          <button type="submit" class="primary-button">Entrar</button>
+        </form>
+      </section>
+
+      <!-- Resolvendo token -->
+      <section id="screen-resolving" class="screen hidden">
+        <div class="spinner"></div>
+        <p>Recuperando sua sessão...</p>
+      </section>
+
+      <!-- Confirmação -->
+      <section id="screen-confirmation" class="screen hidden">
+        <div class="cfe-banner">
+          ⚙️ Contexto de jornada recuperado pelo CFE — continuando sua solicitação iniciada no WhatsApp.
+        </div>
+
+        <h1>Confirmar troca de plano</h1>
+
+        <div class="data-card">
+          <div class="data-row">
+            <span class="data-label">Nome</span>
+            <span id="customer-name" class="data-value"></span>
+          </div>
+          <div class="data-row">
+            <span class="data-label">CPF</span>
+            <span id="customer-cpf" class="data-value"></span>
+          </div>
+          <div class="data-row">
+            <span class="data-label">Plano atual</span>
+            <span id="current-plan" class="data-value"></span>
+          </div>
+          <div class="data-row highlight">
+            <span class="data-label">Novo plano</span>
+            <span id="selected-plan" class="data-value"></span>
+          </div>
+        </div>
+
+        <button id="confirm-button" class="primary-button">Confirmar troca de plano</button>
+        <button id="cancel-button" class="secondary-button">Cancelar</button>
+      </section>
+
+      <!-- Encerrando jornada -->
+      <section id="screen-closing" class="screen hidden">
+        <div class="spinner"></div>
+        <p>Processando...</p>
+      </section>
+
+      <!-- Concluído -->
+      <section id="screen-completed" class="screen hidden">
+        <div class="icon">✅</div>
+        <h1>Troca de plano confirmada!</h1>
+        <p>Sua solicitação foi concluída com sucesso.</p>
+      </section>
+
+      <!-- Cancelado -->
+      <section id="screen-cancelled" class="screen hidden">
+        <div class="icon">↩️</div>
+        <h1>Solicitação cancelada</h1>
+        <p>Você pode iniciar uma nova solicitação a qualquer momento pelo WhatsApp.</p>
+      </section>
+
+      <!-- Sessão expirada / token inválido -->
+      <section id="screen-session-expired" class="screen hidden">
+        <div class="icon">⏱️</div>
+        <h1>Sessão expirada</h1>
+        <p id="session-expired-message"></p>
+        <a id="reopen-chat-link" class="primary-button" href="#">Abrir chat da Claro novamente</a>
+      </section>
+
+      <!-- CFE indisponível -->
+      <section id="screen-unavailable" class="screen hidden">
+        <div class="icon">⚠️</div>
+        <h1>Instabilidade temporária</h1>
+        <p>
+          Não conseguimos recuperar sua sessão neste momento. Você pode continuar acessando o App
+          normalmente, mas os dados da sua conversa anterior não estão disponíveis agora.
+          Tente novamente em alguns instantes.
+        </p>
+        <button id="retry-button" class="primary-button">Tentar novamente</button>
+      </section>
+
+    </main>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+  <script>
+    document.getElementById('reopen-chat-link').href = CFE_CONFIG.whatsappSimUrl;
+  </script>
+</body>
+</html>
