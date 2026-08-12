@@ -51,7 +51,6 @@ O projeto pode ser rodado de duas formas, dependendo do que você precisa fazer:
    npx http-server channels/minha-claro-app -p 5173 -c-1
    npx http-server channels/attendant-panel -p 5175 -c-1
    ```
-   (os dois últimos ainda não implementados nas fases iniciais do protótipo.)
 
 ---
 
@@ -69,8 +68,8 @@ Depois de subir:
 
 - API: `http://localhost:5104` (Swagger em `/swagger`, health check em `/health`)
 - Chat WhatsApp simulado: `http://localhost:5104/channels/whatsapp-sim/`
-- App Minha Claro simulado: `http://localhost:5104/channels/minha-claro-app/` *(ainda não implementado)*
-- Painel do atendente: `http://localhost:5104/channels/attendant-panel/` *(ainda não implementado)*
+- App Minha Claro simulado: `http://localhost:5104/channels/minha-claro-app/`
+- Painel do atendente: `http://localhost:5104/channels/attendant-panel/`
 
 Para derrubar:
 
@@ -99,11 +98,56 @@ ClaroFlowEngine/
 │       ├── Data/               # entidades, migrations, seed
 │       └── Common/             # middleware, erros, serviços compartilhados
 ├── channels/
-│   ├── whatsapp-sim/          # chat simulado (implementado)
-│   ├── minha-claro-app/       # App simulado (pendente)
-│   └── attendant-panel/       # painel do atendente (pendente)
+│   ├── whatsapp-sim/          # chat simulado
+│   ├── minha-claro-app/       # App simulado
+│   └── attendant-panel/       # painel do atendente
 └── specs/                     # especificações funcional, técnica e de padrões
 ```
+
+---
+
+## Roteiro de demonstração
+
+Os três clientes de teste já vêm no seed automático. Com a stack rodando (qualquer um dos dois modos), abra o chat, o App e o painel em abas separadas e siga um dos roteiros abaixo.
+
+### Cenário 1 — Caminho feliz (Ana Silva, CPF `12345678900`)
+
+1. No chat, diga algo como "quero trocar de plano".
+2. Informe o CPF `12345678900` quando pedido.
+3. Escolha um plano (ex: "60GB") quando o bot listar as opções.
+4. Clique no botão "Continuar no App" do card que aparece.
+5. No App, faça login com qualquer usuário/senha e confirme a troca.
+6. Verifique no painel (buscando `12345678900`) que a jornada aparece como "Concluída".
+
+### Cenário 2 — Escalada humana (Carlos Mendes, CPF `98765432100`)
+
+1. Repita os passos 1-3 do cenário 1 com o CPF `98765432100`.
+2. **Não** clique no link do card.
+3. Abra o painel em outra aba e busque `98765432100` — deve aparecer "Em andamento".
+4. Volte ao chat, clique no link, abra o App, mas não confirme ainda.
+5. Volte ao painel **sem recarregar a página** — em até 4 segundos, o histórico deve mostrar "Jornada retomada em outro canal" sozinho (polling).
+
+### Cenário 3 — Abandono e expiração (Mariana Souza, CPF `45678912300`)
+
+1. Repita os passos 1-3 do cenário 1 com o CPF `45678912300`.
+2. **Não** clique no link.
+3. Force a expiração via SQL (ajuste o container conforme o modo usado):
+   ```sql
+   UPDATE journey_contexts
+   SET updated_at = NOW() - INTERVAL '25 hours'
+   WHERE customer_id = (SELECT id FROM customers WHERE cpf = '45678912300') AND status = 'open';
+   ```
+4. Clique no link do chat agora — o App deve mostrar a tela de "Sessão expirada".
+
+### Cenário 4 (opcional) — Degradação de canal
+
+1. Inicie uma conversa no chat até a etapa de escolha de plano.
+2. Pare o container/processo da API (`docker stop cfe-api-full` no modo full, ou `Ctrl+C` no `dotnet run` em dev).
+3. Envie a escolha do plano — o chat deve avisar sobre a instabilidade, sem travar.
+4. No painel (se estiver com uma jornada aberta), a mesma indisponibilidade deve aparecer como uma faixa de aviso, mantendo os últimos dados carregados visíveis.
+5. Suba a API de novo e repita o envio — deve funcionar normalmente.
+
+---
 
 ## Status do projeto
 
