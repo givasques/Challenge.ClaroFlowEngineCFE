@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Painel do Atendente (simulado)</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="layout">
+
+    <aside class="sidebar">
+      <div class="sidebar-logo">claro</div>
+      <div class="attendant-card">
+        <div class="attendant-avatar">JS</div>
+        <div>
+          <div class="attendant-name">Júlia Souza</div>
+          <div class="attendant-status">Em atendimento</div>
+        </div>
+      </div>
+      <nav class="sidebar-nav">
+        <div class="sidebar-nav-item active">Consulta de jornada</div>
+      </nav>
+    </aside>
+
+    <main class="main">
+      <header class="main-header">
+        <h1>Painel do Atendente</h1>
+        <div class="readonly-notice">
+          Este painel exibe o contexto de jornada em modo somente leitura. Nenhuma alteração pode ser
+          feita aqui. Para atualizar dados do cliente, utilize o sistema CRM.
+        </div>
+      </header>
+
+      <div id="degraded-banner" class="degraded-banner hidden">
+        <span id="degraded-banner-text"></span>
+      </div>
+
+      <form id="search-form" class="search-form">
+        <input id="search-input" type="text" placeholder="Buscar por CPF ou telefone..." autocomplete="off" />
+        <button type="submit">Buscar</button>
+      </form>
+
+      <div id="search-message" class="search-message hidden"></div>
+
+      <section id="customer-block" class="panel-block hidden">
+        <h2>Dados do Cliente</h2>
+        <div class="data-grid">
+          <div class="data-item"><span class="data-label">Nome</span><span id="customer-name" class="data-value"></span></div>
+          <div class="data-item"><span class="data-label">CPF</span><span id="customer-cpf" class="data-value"></span></div>
+          <div class="data-item"><span class="data-label">Telefone</span><span id="customer-phone" class="data-value"></span></div>
+          <div class="data-item"><span class="data-label">Plano atual</span><span id="customer-plan" class="data-value"></span></div>
+        </div>
+      </section>
+
+      <section id="status-block" class="panel-block hidden">
+        <h2>Status da Jornada</h2>
+        <div class="data-grid">
+          <div class="data-item">
+            <span class="data-label">Status</span>
+            <span id="journey-status-badge" class="status-badge"></span>
+          </div>
+          <div class="data-item"><span class="data-label">Canal de origem</span><span id="journey-origin-channel" class="data-value"></span></div>
+          <div class="data-item"><span class="data-label">Canal atual</span><span id="journey-current-channel" class="data-value">—</span></div>
+          <div class="data-item"><span class="data-label">Intenção</span><span id="journey-intent" class="data-value"></span></div>
+          <div class="data-item"><span class="data-label">Última ação</span><span id="journey-last-update" class="data-value"></span></div>
+        </div>
+      </section>
+
+      <section id="history-block" class="panel-block hidden">
+        <h2>Histórico da Jornada</h2>
+        <ul id="history-list" class="history-list"></ul>
+      </section>
+    </main>
+
+  </div>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

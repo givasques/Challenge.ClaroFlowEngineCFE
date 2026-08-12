@@ -1,0 +1,281 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  background: #f3f4f6;
+  color: #1f2937;
+}
+
+.layout {
+  display: flex;
+  min-height: 100vh;
+}
+
+/* Sidebar */
+
+.sidebar {
+  width: 220px;
+  background: #111827;
+  color: white;
+  padding: 20px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  flex-shrink: 0;
+}
+
+.sidebar-logo {
+  font-weight: 800;
+  font-style: italic;
+  font-size: 18px;
+  color: #c1121f;
+}
+
+.attendant-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  padding: 10px;
+  border-radius: 10px;
+}
+
+.attendant-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #4338ca;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.attendant-name {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.attendant-status {
+  font-size: 11px;
+  color: #86efac;
+}
+
+.sidebar-nav-item {
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #cbd5e1;
+}
+
+.sidebar-nav-item.active {
+  background: rgba(255, 255, 255, 0.08);
+  color: white;
+  font-weight: 600;
+}
+
+/* Main */
+
+.main {
+  flex: 1;
+  padding: 28px 36px;
+  max-width: 900px;
+}
+
+.main-header h1 {
+  font-size: 22px;
+  margin: 0 0 8px;
+}
+
+.readonly-notice {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fde68a;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 12px;
+  margin-bottom: 20px;
+}
+
+.degraded-banner {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+
+.search-form {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.search-form input {
+  flex: 1;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid #d1d5db;
+  font-size: 14px;
+  outline: none;
+}
+
+.search-form input:focus {
+  border-color: #4338ca;
+}
+
+.search-form button {
+  background: #4338ca;
+  color: white;
+  border: none;
+  padding: 0 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.search-form button:hover {
+  background: #362f9e;
+}
+
+.search-message {
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+
+.search-message.info {
+  background: #eff6ff;
+  color: #1e40af;
+}
+
+.search-message.error {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.panel-block {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 18px 20px;
+  margin-bottom: 16px;
+}
+
+.panel-block h2 {
+  font-size: 14px;
+  margin: 0 0 14px;
+  color: #374151;
+}
+
+.data-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+}
+
+.data-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.data-label {
+  font-size: 11px;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.data-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.status-badge {
+  display: inline-block;
+  width: fit-content;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.status-open {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.status-concluded {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.status-abandoned {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.status-expired {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+/* Timeline */
+
+.history-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.history-item {
+  display: flex;
+  gap: 12px;
+}
+
+.history-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #f3f4f6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.history-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.history-description {
+  font-size: 12px;
+  color: #4b5563;
+  margin-top: 1px;
+}
+
+.history-meta {
+  font-size: 11px;
+  color: #9ca3af;
+  margin-top: 2px;
+}
+
+.hidden {
+  display: none !important;
+}
