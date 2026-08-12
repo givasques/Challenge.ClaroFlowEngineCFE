@@ -138,7 +138,7 @@ public class ContextService : IContextService
         if (_expirationService.TryExpireIfInactive(journey))
             await _db.SaveChangesAsync(cancellationToken);
 
-        return ToDetail(journey);
+        return await ToDetailAsync(journey, cancellationToken);
     }
 
     public async Task<ActiveJourneyResponse> GetActiveByCustomerAsync(
@@ -176,7 +176,17 @@ public class ContextService : IContextService
         if (active is null && !includeHistory)
             throw new NotFoundException("active_journey_not_found", "Não há jornada ativa para este cliente.");
 
-        return new ActiveJourneyResponse(active is null ? null : ToDetail(active), recentJourneys);
+        // UC09 passo 5: o painel do atendente audita o acesso à jornada. Registrado só aqui (na busca inicial
+        // por cliente), não em GetByIdAsync — que também é usado pelo polling do painel a cada poucos segundos;
+        // gravar a cada poll inundaria o próprio histórico que o painel exibe.
+        if (active is not null && _currentChannel.Channel == Channels.Panel)
+        {
+            _transitionRecorder.Record(active.Id, Channels.Panel, TransitionEventTypes.PanelAccessed,
+                "Painel do atendente consultou esta jornada.");
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+
+        return new ActiveJourneyResponse(active is null ? null : await ToDetailAsync(active, cancellationToken), recentJourneys);
     }
 
     public async Task<TransitionsResponse> GetTransitionsAsync(Guid journeyId, CancellationToken cancellationToken)
@@ -257,7 +267,26 @@ public class ContextService : IContextService
     private static JourneySummaryResponse ToSummary(JourneyContext j) => new(
         j.Id, j.CustomerId, j.OriginChannel, j.Intent, j.CurrentStep, j.Payload, j.Status, j.CreatedAt, j.UpdatedAt, j.ClosedAt);
 
-    private static JourneyDetailResponse ToDetail(JourneyContext j) => new(
-        j.Id, j.CustomerId, new CustomerSummaryDto(j.Customer.Id, j.Customer.FullName, j.Customer.Cpf),
-        j.OriginChannel, j.Intent, j.CurrentStep, j.Payload, j.Status, j.CreatedAt, j.UpdatedAt, j.ClosedAt);
+    /// <summary>
+    /// Monta o DTO de detalhe, enriquecendo o cliente com telefone (via identity_links, canal whatsapp)
+    /// e plano ativo (via customer_plans) — dados usados pelo Painel do Atendente (Fase 8).
+    /// </summary>
+    private async Task<JourneyDetailResponse> ToDetailAsync(JourneyContext j, CancellationToken cancellationToken)
+    {
+        var phone = await _db.IdentityLinks
+            .AsNoTracking()
+            .Where(l => l.CustomerId == j.CustomerId && l.Channel == Channels.Whatsapp)
+            .Select(l => l.Identifier)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var currentPlan = await _db.CustomerPlans
+            .AsNoTracking()
+            .Where(cp => cp.CustomerId == j.CustomerId && cp.Active)
+            .Select(cp => new PlanInfoDto(cp.Plan.Code, cp.Plan.Name, cp.Plan.MonthlyPriceCents))
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return new JourneyDetailResponse(
+            j.Id, j.CustomerId, new CustomerSummaryDto(j.Customer.Id, j.Customer.FullName, j.Customer.Cpf, phone, currentPlan),
+            j.OriginChannel, j.Intent, j.CurrentStep, j.Payload, j.Status, j.CreatedAt, j.UpdatedAt, j.ClosedAt);
+    }
 }

@@ -27,8 +27,14 @@ public record JourneyDetailResponse(
     DateTime UpdatedAt,
     DateTime? ClosedAt);
 
-/// <summary>Cópia local e enxuta do resumo de cliente — evita acoplar o módulo Context ao Identity.</summary>
-public record CustomerSummaryDto(Guid Id, string FullName, string Cpf);
+/// <summary>
+/// Cópia local e enxuta do resumo de cliente — evita acoplar o módulo Context ao Identity.
+/// Phone e CurrentPlan são enriquecidos sob demanda (usados pelo Painel do Atendente, Fase 8);
+/// nulos quando o cliente não tem link de WhatsApp ou plano ativo, respectivamente.
+/// </summary>
+public record CustomerSummaryDto(Guid Id, string FullName, string Cpf, string? Phone, PlanInfoDto? CurrentPlan);
+
+public record PlanInfoDto(string Code, string Name, int MonthlyPriceCents);
 
 /// <summary>Resposta de GET /context/customer/{customerId}: jornada ativa (se houver) + histórico opcional.</summary>
 public record ActiveJourneyResponse(
