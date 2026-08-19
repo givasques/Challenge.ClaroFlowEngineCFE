@@ -199,4 +199,5 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('confirm-button').addEventListener('click', () => closeJourney('concluded'));
   document.getElementById('cancel-button').addEventListener('click', () => closeJourney('abandoned'));
   document.getElementById('retry-button').addEventListener('click', () => state.lastFailedAction && state.lastFailedAction());
+  document.getElementById('forgot-password-link').addEventListener('click', event => event.preventDefault()); // link visual, sem ação real (login é mockado)
 });

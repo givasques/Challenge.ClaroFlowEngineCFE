@@ -1,3 +1,43 @@
+:root {
+  --claro-red: #e30613;
+  --claro-red-dark: #b8050f;
+  --claro-red-light: #ff4d5a;
+  --claro-red-hover: #c60510;
+
+  --page-bg: linear-gradient(135deg, #f5f5f5 0%, #e8e8e8 100%);
+  --app-bg: #ffffff;
+  --surface-elevated: #ffffff;
+  --surface-muted: #f7f8fa;
+
+  --text-primary: #1a1a1a;
+  --text-secondary: #4b5563;
+  --text-muted: #6b7280;
+  --text-on-red: #ffffff;
+
+  --border-subtle: #e5e7eb;
+  --border-input: #d1d5db;
+
+  --success: #10b981;
+  --warning-bg: #fef3c7;
+  --warning-text: #92400e;
+  --warning: #d97706;
+  --error: #b91c1c;
+  --neutral: #6b7280;
+
+  --cfe-banner-bg: linear-gradient(135deg, #eef2ff, #f5f3ff);
+  --cfe-banner-border: #c7d2fe;
+  --cfe-banner-text: #4338ca;
+  --cfe-banner-icon: #6366f1;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.15);
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -5,44 +45,105 @@
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  background: #f2f2f2;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: var(--page-bg);
   display: flex;
   justify-content: center;
   align-items: center;
   min-height: 100vh;
+  padding: 20px;
 }
 
+/* ---------- Container "phone" ---------- */
+
 .phone {
+  position: relative;
   width: 100%;
   max-width: 400px;
   height: 100vh;
   max-height: 800px;
-  background: white;
+  background: var(--app-bg);
   display: flex;
   flex-direction: column;
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15);
-  border-radius: 12px;
+  box-shadow: var(--shadow-lg);
+  border-radius: 28px;
   overflow: hidden;
 }
 
+.phone-notch {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 120px;
+  height: 6px;
+  background: #111827;
+  border-radius: 0 0 10px 10px;
+  z-index: 10;
+}
+
+/* ---------- Header ---------- */
+
 .app-header {
-  background: #c1121f;
-  color: white;
-  padding: 20px 20px 16px;
+  background: linear-gradient(135deg, var(--claro-red), var(--claro-red-dark));
+  background-image:
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0) 40%),
+    linear-gradient(135deg, var(--claro-red), var(--claro-red-dark));
+  color: var(--text-on-red);
+  padding: 10px 20px 18px;
+  flex-shrink: 0;
+}
+
+.status-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 2px 10px;
+  opacity: 0.95;
+}
+
+.status-icons {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.header-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .app-logo {
-  font-weight: 800;
-  font-size: 20px;
+  font-weight: 900;
+  font-size: 25px;
   font-style: italic;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.03em;
+  line-height: 1;
 }
 
 .app-subtitle {
   font-size: 12px;
-  opacity: 0.9;
-  margin-top: 2px;
+  font-weight: 500;
+  opacity: 0.92;
+  margin-top: 3px;
 }
+
+.header-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* ---------- Conteúdo / telas ---------- */
 
 .app-content {
   flex: 1;
@@ -56,128 +157,37 @@ body {
   display: flex;
   flex-direction: column;
   flex: 1;
+  animation: fade-in 0.25s ease-out;
 }
 
 .screen.hidden {
   display: none;
 }
 
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 .screen h1 {
   font-size: 20px;
-  color: #1a1a1a;
+  color: var(--text-primary);
   margin: 0 0 8px;
 }
 
 .screen p {
   font-size: 14px;
-  color: #4b5563;
+  color: var(--text-secondary);
   line-height: 1.5;
 }
 
 .muted {
-  color: #6b7280;
+  color: var(--text-muted);
   font-size: 13px;
 }
 
-.icon {
-  font-size: 40px;
-  margin-bottom: 12px;
-}
-
-/* Login */
-
-.form {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-top: 16px;
-}
-
-.form label {
-  font-size: 12px;
-  font-weight: 600;
-  color: #374151;
-  margin-top: 8px;
-}
-
-.form input {
-  padding: 10px 12px;
-  border-radius: 8px;
-  border: 1px solid #d1d5db;
-  font-size: 14px;
-  outline: none;
-}
-
-.form input:focus {
-  border-color: #c1121f;
-}
-
-.error-message {
-  color: #b91c1c;
-  font-size: 12px;
-  margin-top: 4px;
-}
-
-/* Botões */
-
-.primary-button {
-  display: block;
-  text-align: center;
-  text-decoration: none;
-  background: #c1121f;
-  color: white;
-  border: none;
-  padding: 12px;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 700;
-  cursor: pointer;
-  margin-top: 16px;
-}
-
-.primary-button:hover {
-  background: #a10e19;
-}
-
-.secondary-button {
-  background: transparent;
-  color: #6b7280;
-  border: 1px solid #d1d5db;
-  padding: 12px;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  margin-top: 8px;
-}
-
-.secondary-button:hover {
-  background: #f9fafb;
-}
-
-/* Loading */
-
-.spinner {
-  width: 32px;
-  height: 32px;
-  border: 3px solid #e5e7eb;
-  border-top-color: #c1121f;
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-  margin: 40px auto 16px;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
 .screen#screen-resolving,
-.screen#screen-closing {
-  align-items: center;
-  text-align: center;
-  justify-content: center;
-}
-
+.screen#screen-closing,
 .screen#screen-no-token,
 .screen#screen-completed,
 .screen#screen-cancelled,
@@ -188,52 +198,356 @@ body {
   justify-content: center;
 }
 
-/* Confirmação */
+/* ---------- Ícones de estado (círculos coloridos) ---------- */
 
-.cfe-banner {
-  background: #eef2ff;
-  color: #3730a3;
-  border: 1px solid #c7d2fe;
-  border-radius: 8px;
-  padding: 10px 12px;
-  font-size: 12px;
-  font-weight: 600;
-  margin-bottom: 16px;
+.state-icon {
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 18px;
+  box-shadow: var(--shadow-md);
 }
 
+.state-icon-success { background: var(--success); }
+.state-icon-neutral { background: var(--neutral); }
+.state-icon-warning { background: var(--warning); }
+.state-icon-error { background: var(--claro-red); }
+
+/* ---------- Banner informativo (tela de login) ---------- */
+
+.info-banner {
+  display: flex;
+  gap: 10px;
+  background: var(--surface-muted);
+  border-left: 4px solid var(--claro-red);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  margin-bottom: 20px;
+}
+
+.info-banner-icon {
+  color: var(--claro-red);
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.info-banner-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.info-banner-text strong {
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.info-banner-text span {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+/* ---------- Formulário / login ---------- */
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.form label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #374151;
+  margin-top: 10px;
+}
+
+.input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-icon {
+  position: absolute;
+  left: 12px;
+  color: var(--text-muted);
+  display: flex;
+  pointer-events: none;
+}
+
+.form input {
+  width: 100%;
+  padding: 10px 12px 10px 36px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-input);
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.form input:focus {
+  border-color: var(--claro-red);
+  box-shadow: 0 0 0 3px rgba(227, 6, 19, 0.1);
+}
+
+.error-message {
+  color: var(--error);
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.link-muted {
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-muted);
+  text-decoration: none;
+  margin-top: 14px;
+}
+
+.link-muted:hover {
+  color: var(--claro-red);
+  text-decoration: underline;
+}
+
+/* ---------- Botões ---------- */
+
+.primary-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-align: center;
+  text-decoration: none;
+  background: var(--claro-red);
+  color: white;
+  border: none;
+  padding: 13px;
+  border-radius: 11px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  margin-top: 16px;
+  transition: background 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.primary-button:hover {
+  background: var(--claro-red-hover);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+.button-icon {
+  display: flex;
+  align-items: center;
+}
+
+.secondary-button {
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px solid var(--border-input);
+  padding: 13px;
+  border-radius: 11px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 8px;
+  text-align: center;
+  transition: background 0.15s ease;
+}
+
+.secondary-button:hover {
+  background: var(--surface-muted);
+}
+
+/* ---------- Loading ---------- */
+
+.spinner {
+  width: 34px;
+  height: 34px;
+  border: 4px solid var(--border-subtle);
+  border-top-color: var(--claro-red);
+  border-right-color: var(--claro-red-light);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin: 40px auto 16px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ---------- Banner do CFE (confirmação) ---------- */
+
+.cfe-banner {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  background: var(--cfe-banner-bg);
+  border: 1px solid var(--cfe-banner-border);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  margin-bottom: 16px;
+  box-shadow: var(--shadow-sm);
+}
+
+.cfe-banner-icon {
+  color: var(--cfe-banner-icon);
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.cfe-banner-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.cfe-banner-text strong {
+  font-size: 13px;
+  color: var(--cfe-banner-text);
+}
+
+.cfe-banner-text span {
+  font-size: 11.5px;
+  color: var(--cfe-banner-text);
+  opacity: 0.85;
+  line-height: 1.4;
+}
+
+/* ---------- Card de dados (confirmação) ---------- */
+
 .data-card {
-  background: #f9fafb;
-  border: 1px solid #e5e7eb;
-  border-radius: 10px;
-  padding: 4px 14px;
+  background: var(--surface-muted);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 14px;
   margin: 12px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.data-card-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 8px;
 }
 
 .data-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 0;
-  border-bottom: 1px solid #e5e7eb;
-}
-
-.data-row:last-child {
-  border-bottom: none;
-}
-
-.data-row.highlight .data-value {
-  color: #c1121f;
-  font-weight: 700;
+  padding: 6px 0;
 }
 
 .data-label {
   font-size: 12px;
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 .data-value {
   font-size: 14px;
   font-weight: 600;
-  color: #1a1a1a;
+  color: var(--text-primary);
   text-align: right;
+}
+
+.plan-change {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.plan-box {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background: var(--app-bg);
+}
+
+.plan-box-current {
+  opacity: 0.85;
+}
+
+.plan-box-new {
+  background: #fef2f3;
+  border: 1px solid var(--claro-red);
+}
+
+.plan-box-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.plan-box-current .plan-box-value {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.plan-box-new .plan-box-value {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--claro-red);
+}
+
+.plan-arrow {
+  color: var(--text-muted);
+  flex-shrink: 0;
+  display: flex;
+}
+
+.fine-print {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-align: center;
+  line-height: 1.5;
+  margin-top: 14px;
+}
+
+/* ---------- Rodapé ---------- */
+
+.app-footer {
+  flex-shrink: 0;
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-muted);
+  background: var(--surface-muted);
+  border-top: 1px solid var(--border-subtle);
+  padding: 8px;
+}
+
+/* ---------- Responsivo ---------- */
+
+@media (max-width: 520px) {
+  body {
+    padding: 0;
+  }
+
+  .phone {
+    max-width: 100%;
+    height: 100vh;
+    max-height: none;
+    border-radius: 0;
+  }
+
+  .phone-notch {
+    display: none;
+  }
 }
