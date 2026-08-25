@@ -13,6 +13,13 @@ const BOT_STATES = {
   COMPLETED: 'completed',
 };
 
+// SVGs reutilizados na renderização
+const SVG_CHECKS_READ = `<svg class="bubble-checks" viewBox="0 0 16 15" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M15.01 3.316l-.478-.372a.365.365 0 0 0-.51.063L8.666 9.879a.32.32 0 0 1-.484.033l-.358-.325a.319.319 0 0 0-.484.032l-.378.483a.418.418 0 0 0 .036.541l1.32 1.266c.143.14.361.125.484-.033l6.272-8.048a.366.366 0 0 0-.064-.512zm-4.1 0l-.478-.372a.365.365 0 0 0-.51.063L4.566 9.879a.32.32 0 0 1-.484.033L1.891 7.769a.366.366 0 0 0-.515.006l-.423.433a.364.364 0 0 0 .006.514l3.258 3.185c.143.14.361.125.484-.033l6.272-8.048a.365.365 0 0 0-.063-.51z"/></svg>`;
+
+const SVG_CFE_ICON = `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 15a3 3 0 100-6 3 3 0 000 6z" stroke="currentColor" stroke-width="2"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
+const SVG_CLOCK = `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="10" height="10"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/><polyline points="12 6 12 12 16 14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
 let session = null;
 
 // ---------- Cliente HTTP com timeout, retry (só GET) e detecção de indisponibilidade (RNF003 / spec-funcional §8.4) ----------
@@ -76,11 +83,11 @@ async function apiCall(path, { method = 'GET', body } = {}) {
     onCallSucceeded();
     return result;
   } catch (err) {
-    if (err.isApiError) throw err; // erro de negócio — não é indisponibilidade, não retenta aqui
+    if (err.isApiError) throw err;
 
     if (allowRetry) {
       await sleep(2000);
-      const result = await rawFetch(path, method, body, 10000); // se falhar de novo, propaga
+      const result = await rawFetch(path, method, body, 10000);
       onCallSucceeded();
       return result;
     }
@@ -93,7 +100,7 @@ function onCallSucceeded() {
   if (session && session.degraded) {
     session.degraded = false;
     showDegradedBanner(false);
-    addSystemMessage('Conexão com o CFE restabelecida. ✅');
+    addSystemMessage('Conexão com o CFE restabelecida.');
   }
 }
 
@@ -120,7 +127,9 @@ function loadOrInitSession() {
   const saved = localStorage.getItem(SESSION_KEY);
   if (saved) {
     session = JSON.parse(saved);
-    session.messages.forEach(renderMessage);
+    // Compatibilidade com sessões antigas que não tinham timestamp
+    session.messages.forEach(m => { if (!m.ts) m.ts = Date.now(); });
+    session.messages.forEach((m, i) => renderMessage(m, session.messages[i - 1]));
     showDegradedBanner(!!session.degraded);
   } else {
     session = createFreshSession();
@@ -132,7 +141,11 @@ function loadOrInitSession() {
 
 function resetSession() {
   localStorage.removeItem(SESSION_KEY);
-  document.getElementById('messages').innerHTML = '';
+  // Preserva o separador "HOJE", limpa só as mensagens
+  const container = document.getElementById('messages');
+  const dayLabel = container.querySelector('.day-separator');
+  container.innerHTML = '';
+  if (dayLabel) container.appendChild(dayLabel);
   loadOrInitSession();
 }
 
@@ -166,8 +179,8 @@ function formatCents(cents) {
   return (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
-function formatTime(isoString) {
-  return new Date(isoString).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+function formatMessageTime(ts) {
+  return new Date(ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 }
 
 // ---------- Máquina de estados ----------
@@ -193,7 +206,7 @@ async function handleUserMessage(text) {
         await handleAwaitingPlanChoice(text);
         break;
       default:
-        addBotMessage('Já concluímos essa solicitação por aqui! Clique em "Reiniciar conversa" para começar de novo. 😊');
+        addBotMessage('Já concluímos essa solicitação por aqui! Toque no menu ⋮ e escolha "Reiniciar conversa" para começar de novo. 😊');
     }
   } catch (err) {
     handleUnexpectedError(err);
@@ -262,7 +275,7 @@ async function onIdentityResolved(identity) {
   session.customerId = identity.unified_customer_id;
   session.customerName = identity.customer.full_name;
 
-  addCfeBadge('CFE — identidade resolvida · unified_customer_id vinculado');
+  addCfeBadge('Identidade resolvida — cliente vinculado');
 
   let journey;
   try {
@@ -282,7 +295,7 @@ async function onIdentityResolved(identity) {
   }
 
   session.journeyId = journey.id;
-  addCfeBadge(`CFE — jornada aberta · status: ${journey.status}`);
+  addCfeBadge(`Jornada aberta — status: ${journey.status}`);
 
   const firstName = session.customerName.split(' ')[0];
   addBotMessage(`Prazer, ${firstName}! Identidade confirmada. ✅`);
@@ -326,7 +339,7 @@ async function handleAwaitingPlanChoice(text) {
     return handleDomainError(err);
   }
 
-  addCfeBadge(`CFE — jornada atualizada · plano selecionado: ${plan.name}`);
+  addCfeBadge(`Contexto atualizado — plano selecionado: ${plan.name}`);
 
   let handoff;
   try {
@@ -339,10 +352,10 @@ async function handleAwaitingPlanChoice(text) {
     return handleDomainError(err);
   }
 
-  addCfeBadge(`CFE — deep link gerado · válido até ${formatTime(handoff.expires_at)}`);
+  addCfeBadge(`Deep link gerado — válido até ${formatMessageTime(handoff.expires_at)}`);
 
   addBotMessage(`Prontinho! Já deixei tudo preparado para você confirmar a troca para o plano ${plan.name}. 🎉`);
-  addLinkCard(handoff.deep_link_url);
+  addLinkCard(handoff.deep_link_url, handoff.expires_at);
 
   session.state = BOT_STATES.COMPLETED;
 }
@@ -369,41 +382,74 @@ function showDegraded(err) {
 
 // ---------- Renderização ----------
 
-function addMessage(sender, text) {
-  const msg = { sender, text, ts: Date.now() };
+function addMessage(sender, text, extra) {
+  const msg = { sender, text, ts: Date.now(), ...extra };
+  const previous = session.messages[session.messages.length - 1];
   session.messages.push(msg);
-  renderMessage(msg);
+  renderMessage(msg, previous);
   scrollToBottom();
 }
 
-function addBotMessage(text) { addMessage('bot', text); }
-function addSystemMessage(text) { addMessage('system', text); }
-function addCfeBadge(text) { addMessage('badge', text); }
-function addLinkCard(url) { addMessage('link-card', url); }
+function addBotMessage(text)     { addMessage('bot', text); }
+function addSystemMessage(text)  { addMessage('system', text); }
+function addCfeBadge(text)       { addMessage('badge', text); }
+function addLinkCard(url, expiresAt) { addMessage('link-card', url, { expiresAt }); }
 
-function renderMessage(msg) {
+function renderMessage(msg, previous) {
   const container = document.getElementById('messages');
   const el = document.createElement('div');
+  const timeText = formatMessageTime(msg.ts);
 
   if (msg.sender === 'badge') {
     el.className = 'cfe-badge';
-    el.textContent = `⚙️ ${msg.text}`;
+    el.innerHTML = `${SVG_CFE_ICON}<span>${escapeHtml(msg.text)}</span>`;
   } else if (msg.sender === 'system') {
     el.className = 'system-message';
     el.textContent = msg.text;
   } else if (msg.sender === 'link-card') {
     el.className = 'link-card';
+    const expiresText = msg.expiresAt
+      ? `válido até ${formatMessageTime(msg.expiresAt)}`
+      : 'válido por tempo limitado';
     el.innerHTML = `
-      <div class="link-card-title">Continuar troca de plano</div>
-      <div class="link-card-subtitle">Seus dados já estão preenchidos</div>
-      <a class="link-card-button" href="${msg.text}" target="_blank" rel="noopener">Continuar no App</a>
+      <div class="link-card-header">
+        <div class="link-card-icon" aria-hidden="true">M</div>
+        <div class="link-card-info">
+          <div class="link-card-title">Continuar troca de plano</div>
+          <div class="link-card-subtitle">Seus dados já estão preenchidos no Meu Claro</div>
+        </div>
+      </div>
+      <a class="link-card-button" href="${escapeAttr(msg.text)}" target="_blank" rel="noopener">
+        Continuar no App
+      </a>
+      <div class="link-card-time">${SVG_CLOCK}<span>${expiresText}</span></div>
     `;
   } else {
-    el.className = `bubble ${msg.sender === 'user' ? 'bubble-user' : 'bubble-bot'}`;
-    el.textContent = msg.text;
+    const isUser = msg.sender === 'user';
+    const isGrouped = previous
+      && previous.sender === msg.sender
+      && (msg.sender === 'user' || msg.sender === 'bot');
+    el.className = `bubble ${isUser ? 'bubble-user' : 'bubble-bot'}${isGrouped ? ' grouped' : ''}`;
+    el.innerHTML = `
+      <div class="bubble-text">${escapeHtml(msg.text)}</div>
+      <div class="bubble-meta">
+        <span class="bubble-time">${timeText}</span>
+        ${isUser ? SVG_CHECKS_READ : ''}
+      </div>
+    `;
   }
 
   container.appendChild(el);
+}
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+function escapeAttr(text) {
+  return String(text).replace(/"/g, '&quot;').replace(/</g, '&lt;');
 }
 
 function scrollToBottom() {
@@ -422,13 +468,36 @@ function showDegradedBanner(visible) {
 
 function setInputEnabled(enabled) {
   document.getElementById('message-input').disabled = !enabled;
-  document.getElementById('send-button').disabled = !enabled;
+  const btn = document.getElementById('send-button');
+  btn.disabled = !enabled;
+}
+
+// ---------- Menu dropdown (3 pontos) ----------
+
+function setupMenu() {
+  const toggle = document.getElementById('menu-toggle');
+  const dropdown = document.getElementById('menu-dropdown');
+
+  toggle.addEventListener('click', event => {
+    event.stopPropagation();
+    const isOpen = !dropdown.classList.contains('hidden');
+    dropdown.classList.toggle('hidden');
+    toggle.setAttribute('aria-expanded', String(!isOpen));
+  });
+
+  document.addEventListener('click', event => {
+    if (!dropdown.contains(event.target) && !toggle.contains(event.target)) {
+      dropdown.classList.add('hidden');
+      toggle.setAttribute('aria-expanded', 'false');
+    }
+  });
 }
 
 // ---------- Bootstrap ----------
 
 document.addEventListener('DOMContentLoaded', () => {
   loadOrInitSession();
+  setupMenu();
 
   const form = document.getElementById('chat-form');
   const input = document.getElementById('message-input');
@@ -442,6 +511,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   document.getElementById('reset-button').addEventListener('click', () => {
+    document.getElementById('menu-dropdown').classList.add('hidden');
     if (confirm('Reiniciar a conversa? O histórico atual será perdido.')) {
       resetSession();
     }

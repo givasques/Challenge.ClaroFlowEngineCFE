@@ -8,37 +8,118 @@
 </head>
 <body>
   <div class="chat-window">
+
     <header class="chat-header">
       <div class="chat-header-info">
-        <div class="chat-avatar">C</div>
-        <div>
-          <div class="chat-title">Claro Atendimento</div>
-          <div class="chat-subtitle">Canal simulado — WhatsApp</div>
+        <div class="chat-avatar" aria-hidden="true">
+          <span>C</span>
+        </div>
+        <div class="chat-header-text">
+          <div class="chat-title-row">
+            <span class="chat-title">Claro Atendimento</span>
+            <svg class="verified-badge" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Conta verificada">
+              <circle cx="12" cy="12" r="10" fill="#53bdeb"/>
+              <path d="M8 12.5L10.5 15L16 9.5" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <div class="chat-subtitle">online</div>
         </div>
       </div>
-      <button id="reset-button" class="reset-button" title="Reiniciar conversa">↺ Reiniciar</button>
+
+      <div class="chat-header-actions">
+        <button class="header-icon-btn" title="Chamada de vídeo" aria-label="Chamada de vídeo">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M23 7L16 12L23 17V7Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <rect x="1" y="5" width="15" height="14" rx="2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+        <button class="header-icon-btn" title="Chamada de voz" aria-label="Chamada de voz">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M22 16.92V19.92C22.0011 20.1985 21.9441 20.4742 21.8325 20.7293C21.7209 20.9845 21.5573 21.2136 21.3521 21.4019C21.1468 21.5901 20.9046 21.7335 20.6407 21.8227C20.3769 21.9119 20.0974 21.9451 19.82 21.92C16.7428 21.5856 13.787 20.5341 11.19 18.85C8.77383 17.3147 6.72534 15.2662 5.18999 12.85C3.49997 10.2412 2.44824 7.27099 2.11999 4.18C2.09499 3.90347 2.12787 3.62476 2.21649 3.36162C2.30512 3.09849 2.44756 2.85669 2.63476 2.65162C2.82196 2.44655 3.0498 2.28271 3.30379 2.17052C3.55777 2.05833 3.83233 2.00026 4.10999 2H7.10999C7.59522 1.99522 8.06574 2.16708 8.43376 2.48353C8.80178 2.79999 9.04216 3.23945 9.10999 3.72C9.23662 4.68007 9.47144 5.62273 9.80999 6.53C9.94454 6.88792 9.97366 7.27691 9.89396 7.65088C9.81427 8.02485 9.62914 8.36811 9.35999 8.64L8.08999 9.91C9.51355 12.4135 11.5865 14.4864 14.09 15.91L15.36 14.64C15.6319 14.3708 15.9752 14.1857 16.3491 14.106C16.7231 14.0263 17.1121 14.0555 17.47 14.19C18.3773 14.5286 19.3199 14.7634 20.28 14.89C20.7658 14.9585 21.2094 15.2032 21.5265 15.5775C21.8437 15.9518 22.0122 16.4296 22 16.92Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+        <div class="menu-container">
+          <button class="header-icon-btn" id="menu-toggle" title="Mais opções" aria-label="Mais opções" aria-haspopup="true" aria-expanded="false">
+            <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="12" cy="5" r="1.8"/>
+              <circle cx="12" cy="12" r="1.8"/>
+              <circle cx="12" cy="19" r="1.8"/>
+            </svg>
+          </button>
+          <div class="menu-dropdown hidden" id="menu-dropdown" role="menu">
+            <button class="menu-item" id="reset-button" role="menuitem">
+              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M1 4V10H7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M3.51 15C4.15839 16.8404 5.38734 18.4202 7.01166 19.5014C8.63598 20.5826 10.5677 21.1066 12.5157 20.9945C14.4637 20.8823 16.3226 20.14 17.8121 18.8798C19.3017 17.6197 20.3413 15.9089 20.7742 14.0064C21.2072 12.1039 21.0101 10.112 20.2126 8.32966C19.4152 6.54734 18.0605 5.07284 16.3528 4.13214C14.6451 3.19144 12.6769 2.83583 10.7447 3.11952C8.81245 3.40321 7.02091 4.31071 5.65 5.70L1 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              Reiniciar conversa
+            </button>
+          </div>
+        </div>
+      </div>
     </header>
 
     <div id="degraded-banner" class="degraded-banner hidden">
-      ⚠️ Modo degradado — CFE indisponível
+      <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="14" height="14" style="flex-shrink:0;">
+        <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <line x1="12" y1="9" x2="12" y2="13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        <line x1="12" y1="17" x2="12.01" y2="17" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      <span>Modo degradado — CFE indisponível</span>
     </div>
 
-    <div id="messages" class="messages"></div>
+    <div class="messages-wrapper">
+      <div id="messages" class="messages">
+        <div class="day-separator">
+          <span>HOJE</span>
+        </div>
+      </div>
 
-    <div id="typing-indicator" class="typing-indicator hidden">
-      <span></span><span></span><span></span>
+      <div id="typing-indicator" class="typing-indicator hidden">
+        <span></span><span></span><span></span>
+      </div>
     </div>
 
     <form id="chat-form" class="chat-form">
+      <button type="button" class="input-icon-btn" title="Emoji" aria-label="Emoji">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
+          <path d="M8 14C8 14 9.5 16 12 16C14.5 16 16 14 16 14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <line x1="9" y1="9" x2="9.01" y2="9" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+          <line x1="15" y1="9" x2="15.01" y2="9" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+        </svg>
+      </button>
+      <button type="button" class="input-icon-btn" title="Anexar" aria-label="Anexar">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M21.44 11.05L12.25 20.24C11.1242 21.3658 9.59712 21.9983 8.005 21.9983C6.41288 21.9983 4.88581 21.3658 3.76 20.24C2.63419 19.1142 2.00171 17.5871 2.00171 15.995C2.00171 14.4029 2.63419 12.8758 3.76 11.75L12.95 2.56C13.7006 1.80942 14.7186 1.38777 15.78 1.38777C16.8414 1.38777 17.8594 1.80942 18.61 2.56C19.3606 3.31058 19.7822 4.32862 19.7822 5.39C19.7822 6.45138 19.3606 7.46942 18.61 8.22L9.41 17.41C9.03472 17.7853 8.52573 17.9961 7.995 17.9961C7.46427 17.9961 6.95528 17.7853 6.58 17.41C6.20472 17.0347 5.99389 16.5257 5.99389 15.995C5.99389 15.4643 6.20472 14.9553 6.58 14.58L15.07 6.1" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
       <input
         id="message-input"
         class="message-input"
         type="text"
-        placeholder="Digite uma mensagem..."
+        placeholder="Digite uma mensagem"
         autocomplete="off"
       />
-      <button id="send-button" class="send-button" type="submit">Enviar</button>
+      <button type="button" class="input-icon-btn" title="Gravar áudio" aria-label="Gravar áudio">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 1C10.9391 1 9.92172 1.42143 9.17157 2.17157C8.42143 2.92172 8 3.93913 8 5V12C8 13.0609 8.42143 14.0783 9.17157 14.8284C9.92172 15.5786 10.9391 16 12 16C13.0609 16 14.0783 15.5786 14.8284 14.8284C15.5786 14.0783 16 13.0609 16 12V5C16 3.93913 15.5786 2.92172 14.8284 2.17157C14.0783 1.42143 13.0609 1 12 1Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M19 10V12C19 13.8565 18.2625 15.637 16.9497 16.9497C15.637 18.2625 13.8565 19 12 19C10.1435 19 8.36301 18.2625 7.05025 16.9497C5.7375 15.637 5 13.8565 5 12V10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <line x1="12" y1="19" x2="12" y2="23" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <line x1="8" y1="23" x2="16" y2="23" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </button>
+      <button id="send-button" class="send-button" type="submit" aria-label="Enviar mensagem" title="Enviar">
+        <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+          <path d="M1.101 21.757L23.8 12.028 1.101 2.3l.011 7.912 13.623 1.816-13.623 1.817-.011 7.912z"/>
+        </svg>
+      </button>
     </form>
+
+    <div class="simulation-footer">
+      Canal simulado para demonstração
+    </div>
+
   </div>
 
   <script src="config.js"></script>
