@@ -2,13 +2,9 @@
 
 Camada de orquestração conversacional que preserva contexto de jornada entre canais de atendimento da Claro
 
-![MVP funcional](https://img.shields.io/badge/MVP-funcional-brightgreen)
-![.NET 10](https://img.shields.io/badge/.NET-10-512BD4)
-![PostgreSQL 16](https://img.shields.io/badge/PostgreSQL-16-336791)
-![Docker](https://img.shields.io/badge/Docker-ready-2496ED)
-![Licença acadêmica](https://img.shields.io/badge/licen%C3%A7a-acad%C3%AAmica-lightgrey)
+![MVP funcional](https://img.shields.io/badge/MVP-funcional-brightgreen) ![.NET 10](https://img.shields.io/badge/.NET-10-512BD4) ![PostgreSQL 16](https://img.shields.io/badge/PostgreSQL-16-336791) ![Docker](https://img.shields.io/badge/Docker-ready-2496ED) ![Challenge FIAP × Claro 2026](https://img.shields.io/badge/Challenge-FIAP%20%C3%97%20Claro%202026-E30613) ![Licença acadêmica](https://img.shields.io/badge/licen%C3%A7a-acad%C3%AAmica-lightgrey)
 
-Protótipo funcional desenvolvido para o Challenge FIAP × Claro 2026, pelo time Horizon (4SI).
+Protótipo funcional desenvolvido para o Challenge FIAP × Claro 2026, pela Equipe Horizon — Turma 4SI FIAP.
 
 ---
 
@@ -34,23 +30,23 @@ Este repositório contém um **protótipo funcional**, não um produto de produ�
 
 ---
 
-## Integrantes do time Horizon
+## Integrantes — Equipe Horizon — Turma 4SI FIAP
 
 <!-- preencher com integrantes do time -->
 
 | Nome | RM | GitHub | LinkedIn |
 |---|---|---|---|
-| [Nome] | [RM] | [link] | [link] |
-| [Nome] | [RM] | [link] | [link] |
-| [Nome] | [RM] | [link] | [link] |
+| | | | |
+| | | | |
+| | | | |
 
 ---
 
 ## Screenshots
 
-![Chat WhatsApp simulado](docs/screenshots/chat.png)
-![App Minha Claro simulado](docs/screenshots/app.png)
-![Painel do Atendente](docs/screenshots/painel.png)
+<!-- ![Chat WhatsApp simulado](docs/screenshots/chat.png) -->
+<!-- ![App Minha Claro simulado](docs/screenshots/app.png) -->
+<!-- ![Painel do Atendente](docs/screenshots/painel.png) -->
 
 *(prints ainda não adicionados — ver [`docs/screenshots/`](docs/screenshots/))*
 
@@ -64,22 +60,22 @@ Este repositório contém um **protótipo funcional**, não um produto de produ�
 │  WhatsApp     │   │  Minha Claro  │   │  Atendente        │
 │  (simulado)   │   │  (simulado)   │   │  (simulado)       │
 └──────┬───────┘   └──────┬───────┘   └─────────┬─────────┘
-       │                   │                      │
-       │      HTTP/JSON — header X-Channel-Token  │
-       └───────────────────┼──────────────────────┘
-                            ▼
-              ┌──────────────────────────┐
-              │   Claro Flow Engine API   │
-              │  ┌─────────┬───────────┐  │
-              │  │Identity │ Context   │  │
-              │  ├─────────┼───────────┤  │
-              │  │      Handoff        │  │
-              │  └──────────────────────┘  │
-              └────────────┬──────────────┘
-                            ▼
-                   ┌─────────────────┐
-                   │   PostgreSQL 16  │
-                   └─────────────────┘
+      │                   │                      │
+      │      HTTP/JSON — header X-Channel-Token  │
+      └───────────────────┼──────────────────────┘
+                           ▼
+            ┌──────────────────────────┐
+            │   Claro Flow Engine API   │
+            │  ┌─────────┬───────────┐  │
+            │  │Identity │ Context   │  │
+            │  ├─────────┼───────────┤  │
+            │  │      Handoff        │  │
+            │  └──────────────────────┘  │
+            └────────────┬──────────────┘
+                           ▼
+                  ┌─────────────────┐
+                  │   PostgreSQL 16  │
+                  └─────────────────┘
 ```
 
 - **Identity** — resolve a identidade unificada do cliente a partir de qualquer identificador (CPF, telefone, login).
@@ -269,7 +265,16 @@ Este README aponta para a documentação completa — o conteúdo detalhado vive
 
 ## Roadmap de evolução
 
-### Próximo passo planejado
+### Próximo passo planejado — ETAPA 2
+
+Refinamento do protótipo em quatro frentes:
+
+- **(0) Housekeeping** — correção de bugs conhecidos e limpezas pontuais identificadas ao longo do desenvolvimento.
+- **(A) Bot com interativos** — evolução do chat simulado para suportar elementos de interação estruturada (ex: botões/listas), além do texto livre atual.
+- **(B) Painel enriquecido** — dados adicionais e recursos operacionais no painel do atendente, além do que existe hoje.
+- **(C) Intenção "contestação de cobrança indevida"** — segunda intenção suportada pelo CFE, além de troca de plano, validando a genericidade da arquitetura de contexto.
+
+### Depois da ETAPA 2
 
 **Modo Explicação** — um painel de orquestração que pausa a execução do CFE em pontos-chave e exibe, em tempo real, qual componente está processando o quê — pensado para tornar a demonstração didática, já que o protótipo em operação normal executa em menos de um segundo por requisição. Especificado em `specs/v2-modo-explicacao/spec-modo-explicacao.md`, ainda não implementado.
 
