@@ -134,7 +134,7 @@ docker compose -f docker-compose.full.yml down
 docker compose -f docker-compose.full.yml down -v
 ```
 
-⚠️ Não rode os dois modos ao mesmo tempo sem ajustar portas — cada um sobe seu próprio container de Postgres.
+Os dois arquivos declaram nomes de projeto Docker Compose explícitos (`claroflowengine-dev` e `claroflowengine-full`) e usam portas de Postgres distintas (5433 e 5434) — os dois modos podem coexistir sem risco de um substituir containers do outro (ver ETAPA 2, Passo 0, item 3.10).
 
 ### Testes
 
@@ -167,32 +167,32 @@ Challenge.ClaroFlowEngineCFE/
 
 Os três clientes de teste já vêm no seed automático. Com a stack rodando, abra o chat, o App e o painel em abas separadas.
 
-### Cenário 1 — Caminho feliz (Ana Silva, CPF `12345678900`) · ~2 min
+### Cenário 1 — Caminho feliz (Ana Silva, CPF `11144477735`) · ~2 min
 
 1. No chat, diga algo como "quero trocar de plano".
-2. Informe o CPF `12345678900` quando pedido.
+2. Informe o CPF `11144477735` quando pedido.
 3. Escolha um plano (ex: "60GB") quando o bot listar as opções.
 4. Clique no botão "Continuar no App" do card que aparece.
 5. No App, faça login com qualquer usuário/senha e confirme a troca.
-6. Verifique no painel (buscando `12345678900`) que a jornada aparece como "Concluída".
+6. Verifique no painel (buscando `11144477735`) que a jornada aparece como "Concluída".
 
-### Cenário 2 — Escalada humana (Carlos Mendes, CPF `98765432100`) · ~3 min
+### Cenário 2 — Escalada humana (Carlos Mendes, CPF `22255588846`) · ~3 min
 
-1. Repita os passos 1-3 do cenário 1 com o CPF `98765432100`.
+1. Repita os passos 1-3 do cenário 1 com o CPF `22255588846`.
 2. **Não** clique no link do card.
-3. Abra o painel em outra aba e busque `98765432100` — deve aparecer "Em andamento".
+3. Abra o painel em outra aba e busque `22255588846` — deve aparecer "Em andamento".
 4. Volte ao chat, clique no link, abra o App, mas não confirme ainda.
 5. Volte ao painel **sem recarregar a página** — em até 4 segundos, o histórico deve mostrar "Jornada retomada em outro canal" sozinho (polling).
 
-### Cenário 3 — Abandono e expiração (Mariana Souza, CPF `45678912300`) · ~2 min
+### Cenário 3 — Abandono e expiração (Mariana Souza, CPF `33366699957`) · ~2 min
 
-1. Repita os passos 1-3 do cenário 1 com o CPF `45678912300`.
+1. Repita os passos 1-3 do cenário 1 com o CPF `33366699957`.
 2. **Não** clique no link.
 3. Force a expiração via SQL (ajuste o container conforme o modo usado):
    ```sql
    UPDATE journey_contexts
    SET updated_at = NOW() - INTERVAL '25 hours'
-   WHERE customer_id = (SELECT id FROM customers WHERE cpf = '45678912300') AND status = 'open';
+   WHERE customer_id = (SELECT id FROM customers WHERE cpf = '33366699957') AND status = 'open';
    ```
 4. Clique no link do chat agora — o App deve mostrar a tela de "Sessão expirada".
 
