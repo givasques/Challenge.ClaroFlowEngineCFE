@@ -297,9 +297,9 @@ INSERT INTO plans (code, name, data_gb, monthly_price_cents) VALUES
 
 -- clientes de teste
 INSERT INTO customers (cpf, full_name) VALUES
-    ('12345678900', 'Ana Silva'),
-    ('98765432100', 'Carlos Mendes'),
-    ('45678912300', 'Mariana Souza');
+    ('11144477735', 'Ana Silva'),
+    ('22255588846', 'Carlos Mendes'),
+    ('33366699957', 'Mariana Souza');
 
 -- links de identidade (associar telefones aos clientes do seed)
 -- (usar subqueries para pegar os IDs)
@@ -327,7 +327,7 @@ Todos os endpoints são REST/JSON. Base URL local: `http://localhost:5000` (ou p
 ```json
 {
   "error_code": "invalid_cpf",
-  "message": "CPF deve conter 11 dígitos numéricos.",
+  "message": "CPF inválido — verifique os dígitos digitados.",
   "details": { "field": "identifier" }
 }
 ```
@@ -343,7 +343,7 @@ Resolve ou cria a identidade unificada para um par (canal, identificador).
 {
   "channel": "whatsapp",
   "identifier": "5511999998888",
-  "cpf_hint": "12345678900",
+  "cpf_hint": "11144477735",
   "full_name_hint": null
 }
 ```
@@ -360,7 +360,7 @@ Resolve ou cria a identidade unificada para um par (canal, identificador).
   "customer": {
     "id": "3f2504e0-4f89-11d3-9a0c-0305e82c3301",
     "full_name": "Ana Silva",
-    "cpf": "12345678900"
+    "cpf": "11144477735"
   },
   "was_created": false,
   "resolved_link": { "channel": "whatsapp", "identifier": "5511999998888" }
@@ -443,7 +443,7 @@ Retorna estado atual da jornada.
 {
   "id": "aaaa1111-...",
   "customer_id": "3f2504e0-...",
-  "customer": { "full_name": "Ana Silva", "cpf": "12345678900" },
+  "customer": { "full_name": "Ana Silva", "cpf": "11144477735" },
   "origin_channel": "whatsapp",
   "intent": "change_plan",
   "current_step": "plan_selected",
@@ -555,7 +555,7 @@ Endpoint usado pelo canal de destino (App simulado) para recuperar contexto via 
     "payload": { "selected_plan_code": "claro_60gb", "current_plan_code": "claro_15gb" },
     "status": "open"
   },
-  "customer": { "full_name": "Ana Silva", "cpf": "12345678900" },
+  "customer": { "full_name": "Ana Silva", "cpf": "11144477735" },
   "plan_details": {
     "current_plan": { "code": "claro_15gb", "name": "Claro 15GB", "monthly_price_cents": 4990 },
     "selected_plan": { "code": "claro_60gb", "name": "Claro 60GB", "monthly_price_cents": 8990 }
@@ -585,7 +585,7 @@ Ao resolver com sucesso, o sistema:
 
 Health check. Retorna 200 com:
 ```json
-{ "status": "healthy", "checks": { "db": "up" } }
+{ "status": "healthy", "checks": { "db": "healthy" } }
 ```
 
 #### `GET /plans`
@@ -1296,7 +1296,7 @@ O protótipo está tecnicamente pronto quando:
 - [ ] `docker compose up -d` sobe o postgres corretamente.
 - [ ] `dotnet run` na API inicia sem erros, aplica migrations, executa seed.
 - [ ] Swagger acessível em `http://localhost:5000/swagger` com todos os endpoints documentados.
-- [ ] `/health` retorna 200 com `db: up`.
+- [ ] `/health` retorna 200 com `db: healthy`.
 - [ ] Todos os endpoints da §5 respondem conforme os contratos, incluindo os códigos de erro.
 - [ ] Todo endpoint de escrita bem-sucedido cria uma linha em `journey_transitions`.
 - [ ] Header `X-Channel-Token` é validado; ausência ou valor inválido resulta em 401.

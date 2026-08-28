@@ -114,7 +114,7 @@ O protótipo tem por objetivo demonstrar, de forma navegável e defensável, que
 - Um identificador foi coletado (CPF, telefone, login do App).
 
 **Fluxo principal:**
-1. Sistema recebe um par `{channel, identifier}` (ex: `{whatsapp, "5511999998888"}`, `{cpf, "12345678900"}` ou `{app, "user_abc"}`).
+1. Sistema recebe um par `{channel, identifier}` (ex: `{whatsapp, "5511999998888"}`, `{cpf, "11144477735"}` ou `{app, "user_abc"}`).
 2. Sistema busca em `identity_links` se algum link já existe para esse par.
 3. Se existir, retorna o `unified_customer_id` associado.
 4. Se não existir mas o identificador é um CPF, busca em `customers` por CPF; se encontrado, cria o link e retorna o `unified_customer_id`.
@@ -302,7 +302,8 @@ Isso simula corretamente o comportamento de expiração sem exigir job agendado,
 ### 6.1. Validação de CPF
 
 - Deve ter exatamente 11 dígitos numéricos (após remoção de pontos e traços).
-- **Não é necessário validar dígitos verificadores** no protótipo — os CPFs do seed são fictícios. Basta validar formato.
+- **Validação completa de CPF** (ETAPA 2, Passo 0, item 3.5): formato **e** dígitos verificadores, pelo algoritmo padrão brasileiro. CPFs com todos os dígitos iguais (`00000000000`, `11111111111`, etc.) são sempre rejeitados. Falha retorna `invalid_cpf` (400).
+- Os CPFs do seed são gerados para passar na validação de dígitos verificadores (não correspondem a pessoas reais).
 
 ### 6.2. Formato de identificadores por canal
 
@@ -335,8 +336,9 @@ Uma vez fora do estado `open`, a jornada é imutável (nenhum PATCH ou close adi
 
 ### 6.6. Uma jornada ativa por cliente por vez
 
-- No MVP, um cliente só pode ter **uma jornada com status `open`** simultânea.
-- Se uma nova tentativa de abertura ocorrer com jornada ativa existente, o sistema retorna a jornada existente (idempotência) ou encerra a anterior como `abandoned` antes de abrir uma nova — **decidir na implementação** a política; recomendamos retornar a existente e registrar transição `journey_reopen_attempted`.
+- No MVP, um cliente só pode ter **uma jornada com status `open`** simultânea (por cliente + intenção).
+- Política adotada (ETAPA 2, Passo 0): `POST /context/open` é **sempre idempotente** — se já existe jornada `open` para o mesmo cliente + intenção, o sistema retorna a jornada existente sem criar uma nova, registrando a transição `journey_reopen_attempted`. O backend nunca encerra uma jornada anterior implicitamente ao receber uma nova tentativa de abertura.
+- Canais que oferecem alguma forma de "reiniciar conversa" (ex: menu do chat WhatsApp) são responsáveis por encerrar explicitamente a jornada anterior via `POST /context/{id}/close` (`outcome: "abandoned"`) **antes** de abrir uma nova — nunca contornando isso apenas no estado local do canal.
 
 ### 6.7. Rastreabilidade de acessos
 
@@ -640,7 +642,7 @@ Estado do bot pode ser mantido em memória (dicionário indexado por session_id)
 Sempre retorne resposta JSON com `error_code`, `message` e (quando útil) `details`. Ex:
 
 ```json
-{ "error_code": "invalid_cpf", "message": "CPF deve conter 11 dígitos numéricos." }
+{ "error_code": "invalid_cpf", "message": "CPF inválido — verifique os dígitos digitados." }
 ```
 
 ### 11.6. Idempotência onde possível
@@ -760,21 +762,23 @@ Esses cenários **não são o produto**, são checklists para validar que o sist
 
 1. Abrir chat. Bot cumprimenta.
 2. Enviar "quero trocar de plano".
-3. Bot pergunta CPF. Enviar `12345678900` (cliente do seed).
+3. Bot pergunta CPF. Enviar `11144477735` (cliente do seed).
 4. Bot confirma identidade. Badge do CFE aparece.
 5. Bot mostra planos. Escolher "60GB".
 6. Bot envia deep link.
 7. Clicar no link → App abre → login mockado → tela de confirmação com nome, CPF, plano atual, novo plano.
 8. Clicar "Confirmar troca" → jornada fecha com `concluded`.
 
-**Validação:** verificar no banco que jornada tem `status=concluded`, e histórico tem no mínimo 6 transições.
+**Validação:** verificar no banco que jornada tem `status=concluded`, e histórico tem no mínimo **5 transições** (`journey_started`, `step_updated`, `deep_link_generated`, `journey_resumed`, `journey_closed`).
+
+> **Nota (ETAPA 2, Passo 0, item 3.8):** a resolução de identidade (UC02) acontece antes da criação da jornada (UC01), portanto não gera entrada em `journey_transitions` — essa tabela exige FK obrigatória para a jornada. A auditoria da resolução de identidade fica registrada em logs estruturados (Serilog), não em transições de jornada.
 
 ### Cenário 2 — Escalada humana (Carlos)
 
-1. Repetir passos 1-6 com outro CPF (`98765432100`).
+1. Repetir passos 1-6 com outro CPF (`22255588846`).
 2. NÃO clicar no link. Deixar aberto.
 3. Abrir painel em outra aba.
-4. Buscar por `98765432100`.
+4. Buscar por `22255588846`.
 5. Ver status "em andamento", canal atual "WhatsApp", última ação recente.
 6. Enquanto isso, voltar ao chat, clicar no link, chegar até a tela do App.
 7. Voltar ao painel. **Sem recarregar**, o histórico deve ter atualizado sozinho mostrando "Jornada retomada no App Minha Claro" (via polling).
@@ -783,7 +787,7 @@ Esses cenários **não são o produto**, são checklists para validar que o sist
 
 ### Cenário 3 — Abandono e expiração (Mariana)
 
-1. Repetir passos 1-6 com outro CPF (`45678912300`).
+1. Repetir passos 1-6 com outro CPF (`33366699957`).
 2. NÃO clicar no link.
 3. Via SQL, manipular `updated_at` da jornada para `NOW() - INTERVAL '25 hours'`.
 4. Clicar no link agora → App tenta resolver → CFE retorna 410 "expired".

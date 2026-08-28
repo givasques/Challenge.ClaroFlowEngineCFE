@@ -285,7 +285,7 @@ Exemplo de snapshot em `identity_resolved`:
   "input": {
     "channel": "whatsapp",
     "identifier": "5511999998888",
-    "cpf_hint": "12345678900"
+    "cpf_hint": "11144477735"
   },
   "actions_taken": [
     { "type": "customer_lookup_by_cpf", "found": true },
@@ -293,7 +293,7 @@ Exemplo de snapshot em `identity_resolved`:
   ],
   "output": {
     "unified_customer_id": "3f2504e0-4f89-11d3-9a0c-0305e82c3301",
-    "customer": { "full_name": "Ana Silva", "cpf": "12345678900" },
+    "customer": { "full_name": "Ana Silva", "cpf": "11144477735" },
     "was_created": false
   },
   "database_changes": [
@@ -573,7 +573,7 @@ Painel dinâmico com o snapshot do step aguardando:
 │ ── ENTRADA ───────────────────────  │
 │ { channel: "whatsapp",             │
 │   identifier: "551199...",         │
-│   cpf_hint: "12345678900" }        │
+│   cpf_hint: "11144477735" }        │
 │                                    │
 │ ── AÇÕES REALIZADAS ──────────────  │
 │ • Busca customer por CPF: OK       │
