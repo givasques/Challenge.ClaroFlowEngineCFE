@@ -655,6 +655,26 @@ body {
   gap: 20px;
 }
 
+.customer-description-block {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.customer-description-text {
+  background: var(--claro-red-subtle);
+  border: 1px solid rgba(227, 6, 19, 0.2);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  font-size: 13px;
+  font-style: italic;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
 .journey-status-col {
   display: flex;
   flex-direction: column;

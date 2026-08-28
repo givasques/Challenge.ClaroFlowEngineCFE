@@ -64,6 +64,15 @@ const CHANNEL_LABELS = {
 
 const INTENT_LABELS = {
   change_plan: 'Troca de plano',
+  dispute_charge: 'Contestação de cobrança',
+};
+
+const CURRENT_STEP_LABELS = {
+  identity_resolved: 'Identidade resolvida',
+  plan_selected: 'Plano selecionado',
+  invoice_selected: 'Fatura selecionada',
+  description_provided: 'Descrição do problema enviada',
+  dispute_formalized: 'Contestação formalizada',
 };
 
 const state = {
@@ -388,8 +397,18 @@ function renderJourneyStatus(journey) {
 
   document.getElementById('journey-origin-channel').textContent = journey.origin_channel;
   document.getElementById('journey-origin-channel-icon').innerHTML = CHANNEL_ICONS[journey.origin_channel] || CHANNEL_ICON_DEFAULT;
-  document.getElementById('journey-intent').textContent = journey.intent;
+  document.getElementById('journey-intent').textContent = INTENT_LABELS[journey.intent] || journey.intent;
   document.getElementById('journey-last-update').textContent = relativeTime(journey.updated_at);
+
+  // Descrição do cliente em destaque, quando presente (ex: contestação de cobrança — ETAPA 2, Passo C).
+  const descriptionBlock = document.getElementById('customer-description-block');
+  const description = journey.payload && journey.payload.customer_description;
+  if (description) {
+    document.getElementById('customer-description-text').textContent = description;
+    descriptionBlock.classList.remove('hidden');
+  } else {
+    descriptionBlock.classList.add('hidden');
+  }
 
   block.classList.remove('hidden');
 }
@@ -463,7 +482,7 @@ function buildPreviousJourneyItem(journey) {
     <span class="previous-journey-meta">
       ${CHANNEL_ICONS[journey.origin_channel] || CHANNEL_ICON_DEFAULT}
       ${CHANNEL_LABELS[journey.origin_channel] || journey.origin_channel} ·
-      ${relativeTime(journey.updated_at)} · última etapa: ${journey.current_step}
+      ${relativeTime(journey.updated_at)} · última etapa: ${CURRENT_STEP_LABELS[journey.current_step] || journey.current_step}
     </span>
     <span class="previous-journey-chevron" aria-hidden="true">
       <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="14" height="14"><polyline points="6 9 12 15 18 9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
