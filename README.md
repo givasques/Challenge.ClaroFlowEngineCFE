@@ -204,11 +204,23 @@ Os três clientes de teste já vêm no seed automático. Com a stack rodando, ab
 4. No painel (se estiver com uma jornada aberta), a mesma indisponibilidade deve aparecer como uma faixa de aviso, mantendo os últimos dados carregados visíveis.
 5. Suba a API de novo e repita o envio — deve funcionar normalmente.
 
+### Cenário 5 — Contestação de cobrança (Ana Silva, CPF `11144477735`) · ~3 min
+
+1. No chat, clique no botão "Contestar cobrança" (ou digite algo como "tem uma cobrança indevida na minha fatura").
+2. Informe o CPF `11144477735` quando pedido.
+3. Escolha uma das 3 últimas faturas mostradas na lista.
+4. Descreva o problema livremente (ex: "tem um serviço que eu não contratei").
+5. Clique no botão "Continuar no App" do card que aparece.
+6. No App, faça login com qualquer usuário/senha — a fatura detalhada e sua descrição já aparecem preenchidas.
+7. Marque pelo menos um item da fatura e clique "Formalizar contestação".
+8. Confira o número de protocolo exibido na tela final.
+9. Verifique no painel (buscando `11144477735`) que a intenção aparece como "Contestação de cobrança" e a descrição do cliente fica em destaque.
+
 ---
 
 ## Mapeamento de requisitos
 
-A spec funcional deste projeto organiza os requisitos como casos de uso (UC01–UC09), não como uma lista numerada de RF/RNF — a tabela abaixo segue essa mesma estrutura.
+A spec funcional deste projeto organiza os requisitos como casos de uso (UC01–UC10), não como uma lista numerada de RF/RNF — a tabela abaixo segue essa mesma estrutura.
 
 | Caso de uso | Descrição | Implementação |
 |---|---|---|
@@ -221,6 +233,7 @@ A spec funcional deste projeto organiza os requisitos como casos de uso (UC01–
 | UC07 | Encerrar jornada | `POST /context/{id}/close` |
 | UC08 | Expirar jornada por inatividade | Verificação reativa em todo acesso a uma jornada aberta (`IJourneyExpirationService`) |
 | UC09 | Consultar histórico de jornada (painel) | `GET /context/customer/{id}` + `GET /context/{id}/transitions`, com polling |
+| UC10 | Contestar cobrança indevida (ETAPA 2, Passo C) | `GET /invoices/customer/{id}` + fluxo dedicado nos 3 canais, `intent: dispute_charge` |
 | RNF003 | Operação em modo degradado quando o CFE está indisponível | Timeout + retry + banner de indisponibilidade nos 3 canais |
 
 Detalhamento completo de cada caso de uso (atores, pré-condições, fluxos alternativos) em `specs/v2-modo-explicacao/spec-funcional.md §5`.
@@ -265,14 +278,16 @@ Este README aponta para a documentação completa — o conteúdo detalhado vive
 
 ## Roadmap de evolução
 
-### Próximo passo planejado — ETAPA 2
+### ETAPA 2 — Refinamentos pós-MVP (em finalização)
 
-Refinamento do protótipo em quatro frentes:
+Refinamento do protótipo em quatro frentes, desenvolvido na branch `feat/etapa2-feedback-claro`:
 
-- **(0) Housekeeping** — correção de bugs conhecidos e limpezas pontuais identificadas ao longo do desenvolvimento.
-- **(A) Bot com interativos** — evolução do chat simulado para suportar elementos de interação estruturada (ex: botões/listas), além do texto livre atual.
-- **(B) Painel enriquecido** — dados adicionais e recursos operacionais no painel do atendente, além do que existe hoje.
-- **(C) Intenção "contestação de cobrança indevida"** — segunda intenção suportada pelo CFE, além de troca de plano, validando a genericidade da arquitetura de contexto.
+- **(0) Housekeeping** ✅ — correção de bugs conhecidos e limpezas pontuais identificadas ao longo do desenvolvimento (validação real de CPF, indicadores de processamento, deduplicação, nomes explícitos do Docker Compose, entre outros).
+- **(A) Bot com interativos** ✅ — chat simulado passou a suportar botões e listas, além do texto livre.
+- **(B) Painel enriquecido** ✅ — dados agregados do cliente (cliente desde, canal preferido, total de interações) e histórico de jornadas anteriores no painel do atendente.
+- **(C) Intenção "contestação de cobrança indevida"** ✅ — segunda intenção suportada pelo CFE (`intent: dispute_charge`), com faturas e itens de linha, validando a genericidade da arquitetura de contexto.
+
+Os 4 passos estão implementados e testados manualmente via `curl`; falta o merge para `main`, a tag `v2.0-etapa2-completa` e a validação em navegador real.
 
 ### Depois da ETAPA 2
 

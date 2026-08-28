@@ -46,7 +46,7 @@ O protótipo tem por objetivo demonstrar, de forma navegável e defensável, que
 - Canal simulado App Minha Claro (web), que abre via deep link, resolve o token e apresenta a tela de confirmação com dados preservados.
 - Painel do atendente (web), que consulta o CFE em tempo real (polling) e exibe histórico completo da jornada.
 - **Painel de Orquestração** com Modo Explicação — 4ª interface web que expõe visualmente o funcionamento interno do CFE, com capacidade de pausar a execução em pontos-chave para explicações didáticas durante a apresentação. Detalhes completos em `spec-modo-explicacao.md`.
-- Uma intenção suportada: **troca de plano**.
+- Duas intenções suportadas: **troca de plano** e **contestação de cobrança indevida** (ETAPA 2, Passo C) — validando que a arquitetura de contexto é genérica o suficiente para múltiplas intenções.
 - Ciclo de vida completo da jornada: aberta, atualizada, encerrada (concluída, abandonada) e expirada por inatividade.
 - Rastreabilidade: todas as transições e acessos ficam registrados em tabela auditável.
 - Health check da API e logs estruturados.
@@ -58,7 +58,7 @@ O protótipo tem por objetivo demonstrar, de forma navegável e defensável, que
 - Autenticação real por token de serviço entre canais e CFE (usaremos header mockado).
 - Notificação de falhas via webhook/e-mail em produção.
 - Outros canais (Alexa, RCS, SMS, USSD, Site, etc.).
-- Outras intenções além de troca de plano.
+- Outras intenções além de troca de plano e contestação de cobrança (suporte técnico, renegociação, portabilidade, aquisição etc. — roadmap futuro).
 - Métricas operacionais no painel (TMA, taxa de abandono etc.).
 - Painel em React (usaremos HTML/CSS/JS puro por questão de tempo; funcionalmente equivalente).
 - Alertas automáticos por degradação.
@@ -297,6 +297,41 @@ Isso simula corretamente o comportamento de expiração sem exigir job agendado,
 
 ---
 
+### UC10 — Contestar cobrança indevida (ETAPA 2, Passo C)
+
+**Ator principal:** Cliente Claro (via Bot WhatsApp), com formalização no App Minha Claro
+
+**Pré-condições:**
+- Sistema disponível.
+- Cliente tem acesso ao chat simulado.
+
+**Fluxo principal:**
+1. Cliente abre o chat simulado; bot cumprimenta e mostra botões de intenção (`Trocar de plano`, `Contestar cobrança`).
+2. Cliente clica em `Contestar cobrança`.
+3. Bot solicita CPF (texto livre); sistema aciona **UC02 (Resolver identidade unificada)**.
+4. Sistema abre a jornada (`POST /context/open`) com `intent: dispute_charge`.
+5. Bot busca as 3 últimas faturas do cliente (`GET /invoices/customer/{customerId}?limit=3`) e as apresenta como lista interativa (mês/ano + valor).
+6. Cliente seleciona uma fatura; sistema atualiza o contexto (`PATCH /context/{id}`) com `payload_merge: { invoice_id }` e `current_step: invoice_selected`.
+7. Bot pede uma descrição livre do problema; cliente descreve.
+8. Sistema atualiza o contexto com `payload_merge: { customer_description }` e `current_step: description_provided`.
+9. Bot gera o deep link (`POST /handoff/generate`) e envia o card de continuação.
+10. Cliente abre o App: login mockado, resolução do token (`GET /context/resolve`) já traz a fatura selecionada embutida (`invoice_details`, ver §6 e spec técnica §5.5).
+11. App renderiza a fatura detalhada (itens de linha) e a descrição do cliente; cliente marca os itens que deseja contestar.
+12. Cliente clica "Formalizar contestação": App registra os itens contestados (`PATCH /context/{id}` com `payload_merge: { contested_item_ids, protocol_number }`, `current_step: dispute_formalized`) e encerra a jornada (`POST /context/{id}/close`, `outcome: concluded`).
+13. App exibe protocolo gerado e prazo de retorno.
+
+**Fluxos alternativos:**
+- **A1.** CPF não cadastrado → aciona **UC03 (Registrar novo cliente)**, fluxo continua normalmente após o cadastro.
+- **A2.** Cliente não tem nenhuma fatura no cadastro → bot informa e encerra a conversa, sem abrir contestação incompleta.
+- **A3.** Cliente cancela no App (sem marcar nenhum item, ou explicitamente) → `POST /context/{id}/close` com `outcome: abandoned`.
+- **A4.** Atendente consulta o cliente no painel durante o fluxo (UC09) → painel mostra `intent: dispute_charge` com rótulo amigável e a descrição do cliente em destaque.
+
+**Pós-condições:**
+- Jornada encerrada como `concluded` (contestação formalizada) ou `abandoned` (cancelada).
+- Itens contestados e número de protocolo registrados no `payload` da jornada, auditáveis via `journey_transitions`.
+
+---
+
 ## 6. Regras de negócio
 
 ### 6.1. Validação de CPF
@@ -349,6 +384,11 @@ Uma vez fora do estado `open`, a jornada é imutável (nenhum PATCH ou close adi
 ### 6.8. Idempotência recomendada
 
 - Endpoints de escrita devem tolerar retentativas idempotentes onde fizer sentido (ex: `open` retorna a jornada existente; `close` em jornada já fechada retorna 200 com estado atual em vez de 409, ou 409 explícito — decidir e documentar).
+
+### 6.9. Validação de fatura na contestação de cobrança (ETAPA 2, Passo C)
+
+- Regra de negócio pretendida: um cliente só pode contestar faturas associadas ao seu próprio `customer_id`.
+- **Simplificação assumida no protótipo:** assim como o restante do CFE (ver "fora do escopo" §3 — sem autenticação real de canal/sessão), `GET /invoices/{invoiceId}` não valida contra qual cliente está autenticado, pela mesma razão que `GET /context/{id}` também não o faz — o protótipo autentica apenas o **canal** (`X-Channel-Token`), não uma sessão de cliente individual. Enforcement real de propriedade fica para uma futura camada de autenticação de usuário final, fora do escopo do MVP.
 
 ---
 
@@ -408,6 +448,40 @@ Estados de erro tratados: `cpf_invalid_retry`, `plan_invalid_retry`, `intent_not
 
 O bot precisa **guardar em memória de sessão** (server-side) qual estado a conversa está, e reagir a cada mensagem de acordo com o estado atual. A cada avanço válido, o bot chama o CFE (`/context/open` ou `/context/{id}`) para persistir a etapa. Assim, o estado do bot fica sincronizado com o estado da jornada no CFE.
 
+### 7.3. Bot Conversation (chat simulado — intenção "contestação de cobrança indevida", ETAPA 2 Passo C)
+
+```
+   ┌─────────────────┐
+   │ awaiting_intent │ (compartilhado com 7.2 — botões: "Trocar de plano" | "Contestar cobrança")
+   └─────┬───────────┘
+         │ (intenção = "Contestar cobrança")
+         ▼
+   ┌──────────────┐
+   │ awaiting_cpf │◄──── loop se CPF inválido
+   └─────┬────────┘
+         │ (CPF válido, opc: coleta nome se cliente novo)
+         ▼
+   ┌───────────────────────────┐
+   │  awaiting_invoice_choice  │◄──── loop se escolha inválida
+   └─────┬─────────────────────┘
+         │ (fatura válida)
+         ▼
+   ┌────────────────────────────────┐
+   │  awaiting_problem_description  │◄──── loop se descrição muito curta
+   └─────┬──────────────────────────┘
+         │ (descrição fornecida)
+         ▼
+   ┌──────────────────┐
+   │  link_generated  │
+   └─────┬────────────┘
+         ▼
+   ┌────────────┐
+   │  completed │ (bot informa que finalize no App)
+   └────────────┘
+```
+
+Reaproveita a infraestrutura de elementos interativos do Passo A (botões na detecção de intenção, lista na escolha de fatura). CPF e a descrição do problema são sempre texto livre.
+
 ---
 
 ## 8. Comportamento das interfaces
@@ -418,7 +492,8 @@ O bot precisa **guardar em memória de sessão** (server-side) qual estado a con
 - O bot responde a cada mensagem do cliente conforme a máquina de estados (7.2).
 - **Elementos interativos (ETAPA 2, Passo A):** onde faz sentido, o bot oferece **botões** (até 3 opções, decisões rápidas) ou uma **lista** (até 10 opções, com descrição) em vez de exigir texto livre — padrão real de bots do WhatsApp Business. Usado hoje na detecção de intenção (botão "Trocar de plano") e na escolha de plano (lista com nome e preço de cada plano). CPF, nome (cliente novo) e descrições livres continuam sendo sempre texto livre, por natureza. Uma camada oculta de heurística por palavras-chave continua aceitando texto livre residual equivalente à opção interativa (ex: digitar "quero trocar de plano" mesmo com o botão visível); texto que não corresponde a nenhuma opção é rejeitado com um pedido para usar as opções mostradas. Uma vez respondida (por clique ou por texto reconhecido), a mensagem interativa correspondente fica visualmente desabilitada e não pode ser respondida de novo.
 - **Badges internos do CFE** aparecem visíveis (com estilo diferenciado) para tornar a orquestração perceptível na demo — por exemplo, após `POST /identity/resolve`, aparece uma pequena tag `CFE — identidade resolvida · unified_customer_id vinculado`. Isso é uma escolha didática, e reforça a visualização do funcionamento (equivalente aos wireframes do Sprint 2).
-- Ao final, o bot exibe um "card" clicável com o deep link. O card mostra: título ("Continuar troca de plano"), status ("Seus dados já estão preenchidos") e botão "Continuar no App".
+- Ao final, o bot exibe um "card" clicável com o deep link. O card mostra: título (ex: "Continuar troca de plano" ou "Continuar contestação", conforme a intenção), status ("Seus dados já estão preenchidos") e botão "Continuar no App".
+- **Contestação de cobrança (ETAPA 2, Passo C):** máquina de estados própria (§7.3) — após identidade resolvida, o bot mostra a lista das 3 últimas faturas (`GET /invoices/customer/{customerId}?limit=3`) e, após a escolha, pede uma descrição livre do problema antes de gerar o deep link.
 
 ### 8.2. App Minha Claro simulado
 
@@ -431,6 +506,14 @@ O bot precisa **guardar em memória de sessão** (server-side) qual estado a con
   - Botão "Confirmar troca de plano" → chama `POST /context/{id}/close` com `outcome=concluded`.
   - Botão "Cancelar" → chama `POST /context/{id}/close` com `outcome=abandoned`.
 - Em caso de token inválido/expirado/usado: exibe tela de "Sessão expirada" com CTA "Abrir chat da Claro novamente".
+- **Tela de contestação de cobrança** (ETAPA 2, Passo C): quando `journey_context.intent === 'dispute_charge'`, renderiza uma tela alternativa em vez da confirmação de troca de plano:
+  - Banner: "Contexto recuperado pelo CFE — continuando sua contestação iniciada no WhatsApp."
+  - Dados do cliente (nome, CPF).
+  - Fatura detalhada (`invoice_details`, já embutida no `GET /context/resolve` — ver spec técnica §5.5): mês/ano, vencimento, valor total e a lista de itens de linha.
+  - A descrição do cliente (`payload.customer_description`), em destaque.
+  - Um checkbox por item da fatura ("contestar este item"); botão "Formalizar contestação" fica desabilitado até pelo menos um item ser marcado.
+  - "Formalizar contestação" → grava os itens contestados e um número de protocolo gerado localmente (`PATCH /context/{id}`), encerra a jornada (`POST /context/{id}/close`, `outcome=concluded`) e exibe o protocolo com o prazo de retorno.
+  - "Cancelar contestação" → `POST /context/{id}/close` com `outcome=abandoned`, mesma tela de cancelamento genérica do fluxo de troca de plano.
 
 ### 8.3. Painel do atendente
 
@@ -439,7 +522,7 @@ O bot precisa **guardar em memória de sessão** (server-side) qual estado a con
 - Após localizar, exibe:
   - **Bloco Dados do Cliente:** nome, CPF, telefone, plano atual, segmento (sempre "—", sem dado disponível). Desde a ETAPA 2 (Passo B), também: **cliente desde** (data de cadastro, exibida como "há X anos/meses" no destaque do topo e como data completa no detalhe) e **meio preferido** (canal de origem com mais jornadas do cliente; empate resolvido pelo mais recente).
   - **Bloco Resumo de interações:** total de jornadas do cliente, com quebra por desfecho (concluídas/abandonadas/expiradas) — ETAPA 2, Passo B. Oculto se o cliente não tem nenhuma jornada.
-  - **Bloco Status da Jornada:** em andamento (com badge), canal de origem, canal atual, intenção, última ação (tempo relativo).
+  - **Bloco Status da Jornada:** em andamento (com badge), canal de origem, canal atual, intenção (rótulo amigável — ex: "Contestação de cobrança"), última ação (tempo relativo). Quando `payload.customer_description` existir (ex: contestação de cobrança — ETAPA 2, Passo C), é exibida em destaque logo abaixo.
   - **Bloco Histórico da Jornada:** timeline da jornada **ativa**, ordenada da mais recente para a mais antiga, com ícone, título, descrição, canal e horário de cada transição.
   - **Bloco Histórico de jornadas anteriores** (ETAPA 2, Passo B): lista separada com as últimas jornadas **não ativas** do cliente (concluídas/abandonadas/expiradas — até `history_limit`, padrão 5), cada uma com status, intenção, canal de origem, última etapa e data relativa. Clicar num item expande e carrega (sob demanda) a timeline completa daquela jornada, no mesmo formato do bloco de histórico da jornada ativa. Aparece mesmo quando não há jornada ativa no momento.
 - **Polling:** a cada 3-5 segundos, refaz as chamadas `GET /context/{id}` e `GET /context/{id}/transitions` para manter o painel atualizado em tempo real, **apenas para a jornada ativa** — jornadas anteriores não são re-buscadas automaticamente. Se detectar mudança, atualiza a UI sem recarregar a página.
@@ -811,6 +894,22 @@ Esses cenários **não são o produto**, são checklists para validar que o sist
 7. Enviar a mesma escolha no chat — agora deve funcionar.
 
 **Validação:** o RNF003 (operação degradada) foi implementado corretamente.
+
+---
+
+### Cenário 5 — Contestação de cobrança (piloto adicional, ETAPA 2 Passo C)
+
+1. Abrir chat. Bot cumprimenta com botões de intenção.
+2. Clicar em "Contestar cobrança".
+3. Informar CPF de um cliente do seed (ex: `11144477735`).
+4. Bot mostra lista com as 3 últimas faturas; escolher uma.
+5. Bot pede descrição do problema; descrever livremente (ex: "tem uma cobrança que não reconheço").
+6. Bot envia o card de deep link ("Continuar contestação").
+7. Clicar no link → App abre → login mockado → tela de contestação com a fatura detalhada e a descrição preenchida.
+8. Marcar pelo menos um item da fatura e clicar "Formalizar contestação".
+9. App exibe o protocolo gerado e o prazo de retorno.
+
+**Validação:** jornada com `intent=dispute_charge` e `status=concluded`; `payload` contém `invoice_id`, `customer_description`, `contested_item_ids` e `protocol_number`. Painel exibe a intenção com rótulo amigável e a descrição do cliente em destaque, se consultado durante o fluxo.
 
 ---
 

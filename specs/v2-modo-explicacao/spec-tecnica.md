@@ -192,6 +192,7 @@ ClaroFlowEngine/
 customers (1) ─── (N) identity_links
 customers (1) ─── (N) customer_plans (N) ─── (1) plans
 customers (1) ─── (N) journey_contexts
+customers (1) ─── (N) invoices (1) ─── (N) invoice_items    -- ETAPA 2, Passo C
 journey_contexts (1) ─── (N) journey_transitions
 journey_contexts (1) ─── (N) handoff_tokens
 ```
@@ -283,6 +284,33 @@ CREATE TABLE handoff_tokens (
 );
 
 CREATE INDEX ix_handoff_tokens_token ON handoff_tokens(token);
+
+-- ETAPA 2, Passo C — intenção "contestação de cobrança indevida"
+CREATE TABLE invoices (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    customer_id UUID NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+    reference_month DATE NOT NULL,          -- primeiro dia do mês da referência
+    due_date DATE NOT NULL,
+    total_cents INT NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'issued', -- 'issued', 'paid', 'overdue', 'contested'
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT ck_invoices_status CHECK (status IN ('issued', 'paid', 'overdue', 'contested')),
+    CONSTRAINT ck_invoices_total_positive CHECK (total_cents > 0)
+);
+
+CREATE INDEX ix_invoices_customer_month ON invoices(customer_id, reference_month DESC);
+
+CREATE TABLE invoice_items (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    invoice_id UUID NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
+    description VARCHAR(200) NOT NULL,       -- 'Mensalidade Claro 60GB', 'Franquia adicional 2GB', 'ICMS'
+    category VARCHAR(50) NOT NULL,           -- 'subscription', 'add_on', 'tax', 'fee'
+    amount_cents INT NOT NULL,
+    sequence INT NOT NULL,                   -- ordem de exibição
+    CONSTRAINT ux_invoice_items_invoice_sequence UNIQUE (invoice_id, sequence)
+);
+
+CREATE INDEX ix_invoice_items_invoice ON invoice_items(invoice_id);
 ```
 
 ### 4.3. Seed obrigatório
@@ -305,6 +333,9 @@ INSERT INTO customers (cpf, full_name) VALUES
 -- (usar subqueries para pegar os IDs)
 
 -- planos ativos por cliente (Ana e Carlos têm plano; Mariana também)
+
+-- faturas (ETAPA 2, Passo C): 3 por cliente (últimos 3 meses), 5 itens de linha cada.
+-- A fatura mais recente de cada cliente inclui um item de valor estranho, para a demo de contestação.
 ```
 
 O seeder em C# fará isso via EF Core (ver seção 8).
@@ -610,6 +641,65 @@ Lista os planos ativos (útil para o chat mostrar as opções).
 
 ---
 
+### 5.6. Módulo Invoices (ETAPA 2, Passo C)
+
+#### `GET /invoices/customer/{customerId}?limit=N`
+
+Lista as últimas `N` (padrão 3) faturas do cliente, ordenadas por `reference_month` DESC.
+
+**Response 200:**
+```json
+{
+  "customer_id": "...",
+  "invoices": [
+    {
+      "id": "...",
+      "reference_month": "2026-10-01",
+      "reference_label": "Outubro/2026",
+      "due_date": "2026-10-15",
+      "total_cents": 18990,
+      "status": "issued"
+    }
+  ]
+}
+```
+
+**Response 404:** cliente não encontrado.
+
+#### `GET /invoices/{invoiceId}`
+
+Detalhe de uma fatura, incluindo os itens de linha.
+
+**Response 200:**
+```json
+{
+  "id": "...",
+  "customer_id": "...",
+  "reference_month": "2026-10-01",
+  "reference_label": "Outubro/2026",
+  "due_date": "2026-10-15",
+  "total_cents": 18990,
+  "status": "issued",
+  "items": [
+    { "id": "...", "sequence": 1, "description": "Mensalidade Claro 60GB", "category": "subscription", "amount_cents": 8990 },
+    { "id": "...", "sequence": 2, "description": "Franquia adicional 2GB", "category": "add_on", "amount_cents": 1990 },
+    { "id": "...", "sequence": 3, "description": "ICMS", "category": "tax", "amount_cents": 3600 },
+    { "id": "...", "sequence": 4, "description": "PIS/COFINS", "category": "tax", "amount_cents": 1200 },
+    { "id": "...", "sequence": 5, "description": "Taxa de conveniência", "category": "fee", "amount_cents": 3210 }
+  ]
+}
+```
+
+**Response 404:** fatura não encontrada.
+
+Ambos endpoints exigem `X-Channel-Token`, como os demais. Nenhuma validação de propriedade (cliente ↔ fatura) é aplicada — ver spec funcional §6.9 para a justificativa (mesma simplificação de autenticação do resto do protótipo).
+
+#### Enriquecimento de `GET /context/resolve`
+
+Quando `journey_context.intent === 'dispute_charge'` e `payload.invoice_id` existir, o response de `GET /context/resolve` (§5.4) ganha um campo adicional `invoice_details`, com o mesmo formato do detalhe acima. **Decisão do agente:** aditivo, incorporado ao endpoint existente em vez de o App fazer uma segunda chamada só para buscar a fatura — análogo ao `plan_details` já existente para a troca de plano.
+
+---
+
 ## 6. Máquinas de estado — implementação
 
 ### 6.1. Journey Status (no banco)
@@ -686,6 +776,8 @@ O `appsettings.json` do backend deve conter as URLs:
 ```
 
 E o backend usa `AppSimBaseUrl` para montar `deep_link_url`.
+
+**Nova tela do App (ETAPA 2, Passo C):** `channels/minha-claro-app/index.html` ganhou uma segunda seção de conteúdo (`#screen-dispute-confirmation`), renderizada em vez da tela de confirmação de troca de plano quando `journey_context.intent === 'dispute_charge'`. Descrição funcional completa em spec-funcional §8.2; contrato de dados (`invoice_details`) em spec-tecnica §5.6.
 
 ### 7.2. Comunicação com a API
 
