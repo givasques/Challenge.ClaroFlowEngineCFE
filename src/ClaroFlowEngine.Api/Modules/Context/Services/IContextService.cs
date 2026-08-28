@@ -11,7 +11,7 @@ public interface IContextService
 
     Task<JourneyDetailResponse> GetByIdAsync(Guid journeyId, CancellationToken cancellationToken);
 
-    Task<ActiveJourneyResponse> GetActiveByCustomerAsync(Guid customerId, bool includeHistory, CancellationToken cancellationToken);
+    Task<ActiveJourneyResponse> GetActiveByCustomerAsync(Guid customerId, bool includeHistory, int historyLimit, CancellationToken cancellationToken);
 
     Task<TransitionsResponse> GetTransitionsAsync(Guid journeyId, CancellationToken cancellationToken);
 

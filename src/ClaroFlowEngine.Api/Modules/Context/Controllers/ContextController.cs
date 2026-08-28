@@ -68,9 +68,12 @@ public class ContextController : ControllerBase
     [ProducesResponseType(typeof(ActiveJourneyResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiError), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetActiveByCustomer(
-        Guid customerId, [FromQuery(Name = "include_history")] bool includeHistory, CancellationToken cancellationToken)
+        Guid customerId,
+        [FromQuery(Name = "include_history")] bool includeHistory,
+        [FromQuery(Name = "history_limit")] int? historyLimit,
+        CancellationToken cancellationToken)
     {
-        var result = await _service.GetActiveByCustomerAsync(customerId, includeHistory, cancellationToken);
+        var result = await _service.GetActiveByCustomerAsync(customerId, includeHistory, historyLimit ?? 5, cancellationToken);
         return Ok(result);
     }
 
