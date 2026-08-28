@@ -96,9 +96,15 @@ function handleLoginSubmit(event) {
   const password = document.getElementById('login-password').value.trim();
   const errorEl = document.getElementById('login-error');
 
-  // Login mockado — qualquer credencial "com cara de credencial" serve; não valida senha de verdade.
-  if (username.length < 3 || password.length < 3) {
-    errorEl.textContent = 'Usuário e senha devem ter pelo menos 3 caracteres.';
+  // Login mockado — valida só formato mínimo, não confere senha contra base real (ver badge na tela).
+  if (username.length < 3) {
+    errorEl.textContent = 'Nome de usuário deve ter no mínimo 3 caracteres.';
+    errorEl.classList.remove('hidden');
+    return;
+  }
+
+  if (password.length < 6) {
+    errorEl.textContent = 'Senha deve ter no mínimo 6 caracteres.';
     errorEl.classList.remove('hidden');
     return;
   }
@@ -149,15 +155,33 @@ function renderConfirmation(data) {
 }
 
 function renderSessionExpired(err) {
-  const messages = {
-    token_not_found: 'Não encontramos essa sessão. O link pode estar incorreto.',
-    token_expired: 'Esse link expirou. Volte ao WhatsApp e peça um novo.',
-    token_already_used: 'Esse link já foi utilizado. Se ainda precisar continuar, peça um novo no WhatsApp.',
-    journey_expired: 'Sua sessão expirou por inatividade. Volte ao WhatsApp para começar de novo.',
-    journey_closed: 'Essa solicitação já foi concluída ou cancelada anteriormente.',
+  const byErrorCode = {
+    token_not_found: {
+      title: 'Link inválido',
+      message: 'Este link não é válido. Verifique se copiou o endereço corretamente ou inicie uma nova conversa.',
+    },
+    token_expired: {
+      title: 'Link expirado',
+      message: 'Sua sessão expirou. Por segurança, links de retomada são válidos por 30 minutos.',
+    },
+    token_already_used: {
+      title: 'Link já utilizado',
+      message: 'Esta sessão já foi retomada anteriormente. Se precisar continuar, inicie uma nova conversa no WhatsApp.',
+    },
+    journey_expired: {
+      title: 'Solicitação expirada',
+      message: 'Sua solicitação expirou por inatividade. Iniciamos uma nova sessão para você continuar.',
+    },
+    journey_closed: {
+      title: 'Solicitação finalizada',
+      message: 'Esta solicitação já foi finalizada. Se precisar de algo, é só nos chamar novamente.',
+    },
   };
-  document.getElementById('session-expired-message').textContent =
-    messages[err.errorCode] || 'Não foi possível recuperar sua sessão.';
+  const fallback = { title: 'Sessão expirada', message: 'Não foi possível recuperar sua sessão.' };
+  const { title, message } = byErrorCode[err.errorCode] || fallback;
+
+  document.getElementById('session-expired-title').textContent = title;
+  document.getElementById('session-expired-message').textContent = message;
 }
 
 async function closeJourney(outcome) {
