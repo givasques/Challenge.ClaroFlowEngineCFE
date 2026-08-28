@@ -344,6 +344,7 @@ Uma vez fora do estado `open`, a jornada é imutável (nenhum PATCH ou close adi
 
 - Toda operação relevante gera uma linha em `journey_transitions`, com `event_type`, `channel`, `description` e `metadata` (JSON).
 - Consultas do painel geram transição do tipo `panel_accessed`.
+- **Deduplicação por tempo** (ETAPA 2, Passo B, item 5.5): uma nova `panel_accessed` só é registrada se a última, na mesma jornada, tiver ocorrido há mais de `PanelAccessDedupMinutes` (configurável, padrão 5 minutos). Evita inflar o histórico quando o atendente troca de aba e volta ao mesmo cliente repetidamente em uma curta janela de tempo.
 
 ### 6.8. Idempotência recomendada
 
@@ -436,10 +437,12 @@ O bot precisa **guardar em memória de sessão** (server-side) qual estado a con
 - Layout: sidebar esquerda com identificação do atendente (mockada, texto simples "Júlia Souza — Em atendimento") e navegação; área principal com dados do cliente + histórico.
 - Campo no topo para buscar por CPF ou telefone.
 - Após localizar, exibe:
-  - **Bloco Dados do Cliente:** nome, CPF, telefone, plano atual, segmento.
+  - **Bloco Dados do Cliente:** nome, CPF, telefone, plano atual, segmento (sempre "—", sem dado disponível). Desde a ETAPA 2 (Passo B), também: **cliente desde** (data de cadastro, exibida como "há X anos/meses" no destaque do topo e como data completa no detalhe) e **meio preferido** (canal de origem com mais jornadas do cliente; empate resolvido pelo mais recente).
+  - **Bloco Resumo de interações:** total de jornadas do cliente, com quebra por desfecho (concluídas/abandonadas/expiradas) — ETAPA 2, Passo B. Oculto se o cliente não tem nenhuma jornada.
   - **Bloco Status da Jornada:** em andamento (com badge), canal de origem, canal atual, intenção, última ação (tempo relativo).
-  - **Bloco Histórico da Jornada:** timeline ordenada da mais recente para a mais antiga, com ícone, título, descrição, canal e horário de cada transição.
-- **Polling:** a cada 3-5 segundos, refaz as chamadas `GET /context/{id}` e `GET /context/{id}/transitions` para manter o painel atualizado em tempo real. Se detectar mudança, atualiza a UI sem recarregar a página.
+  - **Bloco Histórico da Jornada:** timeline da jornada **ativa**, ordenada da mais recente para a mais antiga, com ícone, título, descrição, canal e horário de cada transição.
+  - **Bloco Histórico de jornadas anteriores** (ETAPA 2, Passo B): lista separada com as últimas jornadas **não ativas** do cliente (concluídas/abandonadas/expiradas — até `history_limit`, padrão 5), cada uma com status, intenção, canal de origem, última etapa e data relativa. Clicar num item expande e carrega (sob demanda) a timeline completa daquela jornada, no mesmo formato do bloco de histórico da jornada ativa. Aparece mesmo quando não há jornada ativa no momento.
+- **Polling:** a cada 3-5 segundos, refaz as chamadas `GET /context/{id}` e `GET /context/{id}/transitions` para manter o painel atualizado em tempo real, **apenas para a jornada ativa** — jornadas anteriores não são re-buscadas automaticamente. Se detectar mudança, atualiza a UI sem recarregar a página.
 - Aviso visível: "Este painel exibe o contexto de jornada em modo somente leitura. Nenhuma alteração pode ser feita aqui. Para atualizar dados do cliente, utilize o sistema CRM."
 
 ### 8.4. Comportamento em caso de indisponibilidade do CFE

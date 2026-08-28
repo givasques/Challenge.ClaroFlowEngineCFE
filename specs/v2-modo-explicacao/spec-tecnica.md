@@ -461,7 +461,11 @@ Retorna estado atual da jornada.
 
 Retorna a jornada **aberta** do cliente (ou 404 se não houver).
 
-Query params opcionais: `include_history=true` — se `true`, retorna também as últimas N jornadas fechadas.
+Query params opcionais:
+- `include_history=true` — se `true`, retorna também as últimas jornadas fechadas em `recent_journeys`.
+- `history_limit` (int, padrão `5`, ETAPA 2 Passo B) — limita quantas jornadas fechadas vêm em `recent_journeys`.
+
+O `customer` embutido na jornada (quando há jornada ativa) inclui, desde a ETAPA 2 (Passo B): `customer_since` (data de cadastro), `preferred_channel` (canal de origem com mais jornadas do cliente, empate resolvido pelo mais recente) e `journey_counts` (`{ total, concluded, abandoned, expired }`). Esses agregados são calculados a cada chamada (dataset pequeno no protótipo), não incorporados a um endpoint novo — decisão do agente para evitar multiplicar endpoints no MVP.
 
 #### `GET /context/{id}/transitions`
 
