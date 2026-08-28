@@ -14,6 +14,8 @@ public class CfeDbContext : DbContext
     public DbSet<JourneyContext> JourneyContexts => Set<JourneyContext>();
     public DbSet<JourneyTransition> JourneyTransitions => Set<JourneyTransition>();
     public DbSet<HandoffToken> HandoffTokens => Set<HandoffToken>();
+    public DbSet<Invoice> Invoices => Set<Invoice>();
+    public DbSet<InvoiceItem> InvoiceItems => Set<InvoiceItem>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
