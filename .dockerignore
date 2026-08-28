@@ -8,4 +8,7 @@
 .gitignore
 specs/relatorios/
 node_modules/
-*.md
+
+# Excluir markdowns da raiz e da pasta docs, mas manter os que estão dentro de channels/
+/*.md
+docs/**/*.md
