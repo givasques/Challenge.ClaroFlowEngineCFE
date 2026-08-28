@@ -10,7 +10,14 @@ const BOT_STATES = {
   AWAITING_CPF: 'awaiting_cpf',
   AWAITING_NAME: 'awaiting_name',
   AWAITING_PLAN_CHOICE: 'awaiting_plan_choice',
+  AWAITING_INVOICE_CHOICE: 'awaiting_invoice_choice',
+  AWAITING_PROBLEM_DESCRIPTION: 'awaiting_problem_description',
   COMPLETED: 'completed',
+};
+
+const INTENTS = {
+  CHANGE_PLAN: 'change_plan',
+  DISPUTE_CHARGE: 'dispute_charge',
 };
 
 // SVGs reutilizados na renderização
@@ -114,7 +121,9 @@ function createFreshSession() {
     customerId: null,
     customerName: null,
     journeyId: null,
+    intent: null,
     plans: null,
+    invoices: null,
     degraded: false,
   };
 }
@@ -135,7 +144,10 @@ async function loadOrInitSession() {
     session = createFreshSession();
     await botSay('Olá! 👋 Sou o assistente virtual da Claro. Como posso te ajudar hoje?', {
       type: 'buttons',
-      options: [{ id: 'change_plan', label: 'Trocar de plano' }],
+      options: [
+        { id: INTENTS.CHANGE_PLAN, label: 'Trocar de plano' },
+        { id: INTENTS.DISPUTE_CHARGE, label: 'Contestar cobrança' },
+      ],
     });
   }
   persistSession();
@@ -173,6 +185,13 @@ function detectsChangePlanIntent(text) {
   return mentionsPlan && mentionsChangeVerb;
 }
 
+function detectsDisputeChargeIntent(text) {
+  const t = text.toLowerCase();
+  const mentionsBilling = ['cobrança', 'cobranca', 'fatura', 'conta'].some(k => t.includes(k));
+  const mentionsProblem = ['indevid', 'errad', 'contest', 'duvid', 'estranh'].some(k => t.includes(k));
+  return mentionsBilling && mentionsProblem;
+}
+
 function sanitizeCpf(text) {
   return text.replace(/\D/g, '');
 }
@@ -190,12 +209,22 @@ function matchPlan(text, plans) {
   );
 }
 
+function matchInvoice(text, invoices) {
+  const t = text.toLowerCase();
+  return (invoices || []).find(inv => t.includes(inv.reference_label.split('/')[0].toLowerCase()));
+}
+
 function formatCents(cents) {
   return (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
 function formatMessageTime(ts) {
   return new Date(ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+}
+
+function formatDateShort(isoDate) {
+  const [y, m, d] = isoDate.split('-');
+  return `${d}/${m}/${y}`;
 }
 
 // ---------- Máquina de estados ----------
@@ -218,6 +247,12 @@ async function handleUserMessage(text) {
         break;
       case BOT_STATES.AWAITING_PLAN_CHOICE:
         await handleAwaitingPlanChoice(text);
+        break;
+      case BOT_STATES.AWAITING_INVOICE_CHOICE:
+        await handleAwaitingInvoiceChoice(text);
+        break;
+      case BOT_STATES.AWAITING_PROBLEM_DESCRIPTION:
+        await handleAwaitingProblemDescription(text);
         break;
       default:
         await botSay('Já concluímos essa solicitação por aqui! Toque no menu ⋮ e escolha "Reiniciar conversa" para começar de novo. 😊');
@@ -259,11 +294,17 @@ async function withProcessing(text, fn) {
 async function handleAwaitingIntent(text) {
   // Camada oculta de heurística por texto livre — os botões são o caminho primário (Passo A da ETAPA 2),
   // mas texto residual como "quero trocar de plano" ainda funciona.
-  if (!detectsChangePlanIntent(text)) {
-    await botSay('Por favor, use uma das opções acima. 🙂');
+  if (detectsChangePlanIntent(text)) {
+    session.intent = INTENTS.CHANGE_PLAN;
+    await proceedToCpfCollection();
     return;
   }
-  await proceedToCpfCollection();
+  if (detectsDisputeChargeIntent(text)) {
+    session.intent = INTENTS.DISPUTE_CHARGE;
+    await proceedToCpfCollection();
+    return;
+  }
+  await botSay('Por favor, use uma das opções acima. 🙂');
 }
 
 async function proceedToCpfCollection() {
@@ -336,7 +377,7 @@ async function onIdentityResolved(identity) {
         body: {
           customer_id: session.customerId,
           origin_channel: 'whatsapp',
-          intent: 'change_plan',
+          intent: session.intent,
           initial_step: 'identity_resolved',
           payload: {},
         },
@@ -352,7 +393,11 @@ async function onIdentityResolved(identity) {
   const firstName = session.customerName.split(' ')[0];
   await botSay(`Prazer, ${firstName}! Identidade confirmada. ✅`);
 
-  await presentPlans();
+  if (session.intent === INTENTS.DISPUTE_CHARGE) {
+    await presentInvoices();
+  } else {
+    await presentPlans();
+  }
 }
 
 async function presentPlans() {
@@ -416,7 +461,106 @@ async function proceedWithPlanSelection(plan) {
   addCfeBadge(`Deep link gerado — válido até ${formatMessageTime(handoff.expires_at)}`);
 
   await botSay(`Prontinho! Já deixei tudo preparado para você confirmar a troca para o plano ${plan.name}. 🎉`);
-  addLinkCard(handoff.deep_link_url, handoff.expires_at);
+  addLinkCard(handoff.deep_link_url, handoff.expires_at, 'Continuar troca de plano', 'Seus dados já estão preenchidos no Meu Claro');
+
+  session.state = BOT_STATES.COMPLETED;
+}
+
+// ---------- Fluxo de contestação de cobrança (ETAPA 2, Passo C) ----------
+
+async function presentInvoices() {
+  let invoicesResponse;
+  try {
+    invoicesResponse = await withProcessing('consultando suas faturas...', () =>
+      apiCall(`/invoices/customer/${session.customerId}?limit=3`));
+  } catch (err) {
+    if (err instanceof CfeUnavailableError) return showDegraded(err);
+    return handleDomainError(err);
+  }
+
+  session.invoices = invoicesResponse.invoices;
+
+  if (session.invoices.length === 0) {
+    await botSay('Não encontrei nenhuma fatura recente no seu cadastro. Vou encerrar por aqui — tente novamente mais tarde ou fale com um atendente. 🙏');
+    session.state = BOT_STATES.COMPLETED;
+    return;
+  }
+
+  await botSay('Estas são suas últimas faturas. Qual delas você quer contestar?', {
+    type: 'list',
+    options: session.invoices.map(inv => ({
+      id: inv.id,
+      label: inv.reference_label,
+      description: `${formatCents(inv.total_cents)} — vencimento ${formatDateShort(inv.due_date)}`,
+    })),
+  });
+  session.state = BOT_STATES.AWAITING_INVOICE_CHOICE;
+}
+
+async function handleAwaitingInvoiceChoice(text) {
+  // Camada oculta de heurística por texto livre — a lista é o caminho primário.
+  const invoice = matchInvoice(text, session.invoices);
+  if (!invoice) {
+    await botSay('Não reconheci essa fatura. Use uma das opções da lista acima.');
+    return;
+  }
+  await proceedWithInvoiceSelection(invoice);
+}
+
+async function proceedWithInvoiceSelection(invoice) {
+  try {
+    await withProcessing('atualizando seus dados...', () =>
+      apiCall(`/context/${session.journeyId}`, {
+        method: 'PATCH',
+        body: { current_step: 'invoice_selected', payload_merge: { invoice_id: invoice.id } },
+      }));
+  } catch (err) {
+    if (err instanceof CfeUnavailableError) return showDegraded(err);
+    return handleDomainError(err);
+  }
+
+  addCfeBadge(`Contexto atualizado — fatura selecionada: ${invoice.reference_label}`);
+
+  await botSay('Descreva rapidamente o que está errado nessa fatura (pode escrever à vontade).');
+  session.state = BOT_STATES.AWAITING_PROBLEM_DESCRIPTION;
+}
+
+async function handleAwaitingProblemDescription(text) {
+  const description = text.trim();
+  if (description.length < 5) {
+    await botSay('Pode descrever com um pouco mais de detalhe o que você notou de errado?');
+    return;
+  }
+
+  try {
+    await withProcessing('atualizando seus dados...', () =>
+      apiCall(`/context/${session.journeyId}`, {
+        method: 'PATCH',
+        body: { current_step: 'description_provided', payload_merge: { customer_description: description } },
+      }));
+  } catch (err) {
+    if (err instanceof CfeUnavailableError) return showDegraded(err);
+    return handleDomainError(err);
+  }
+
+  addCfeBadge('Contexto atualizado — descrição do problema registrada');
+
+  let handoff;
+  try {
+    handoff = await withProcessing('preparando continuação...', () =>
+      apiCall('/handoff/generate', {
+        method: 'POST',
+        body: { journey_context_id: session.journeyId, target_channel: 'app' },
+      }));
+  } catch (err) {
+    if (err instanceof CfeUnavailableError) return showDegraded(err);
+    return handleDomainError(err);
+  }
+
+  addCfeBadge(`Deep link gerado — válido até ${formatMessageTime(handoff.expires_at)}`);
+
+  await botSay('Prontinho! Já deixei tudo preparado para você continuar sua contestação. 🎉');
+  addLinkCard(handoff.deep_link_url, handoff.expires_at, 'Continuar contestação', 'Sua fatura e descrição já estão preenchidas no Meu Claro');
 
   session.state = BOT_STATES.COMPLETED;
 }
@@ -456,7 +600,7 @@ function addBotMessage(text, interactive) {
 }
 function addSystemMessage(text)  { addMessage('system', text); }
 function addCfeBadge(text)       { addMessage('badge', text); }
-function addLinkCard(url, expiresAt) { addMessage('link-card', url, { expiresAt }); }
+function addLinkCard(url, expiresAt, title, subtitle) { addMessage('link-card', url, { expiresAt, title, subtitle }); }
 
 /** Chamado ao clicar num botão/item de lista de uma mensagem interativa do bot (Passo A da ETAPA 2). */
 async function handleInteractiveClick(msg, option, wrapEl) {
@@ -473,11 +617,16 @@ async function handleInteractiveClick(msg, option, wrapEl) {
 
   setInputEnabled(false);
   try {
-    if (session.state === BOT_STATES.AWAITING_INTENT && option.id === 'change_plan') {
+    if (session.state === BOT_STATES.AWAITING_INTENT
+      && (option.id === INTENTS.CHANGE_PLAN || option.id === INTENTS.DISPUTE_CHARGE)) {
+      session.intent = option.id;
       await proceedToCpfCollection();
     } else if (session.state === BOT_STATES.AWAITING_PLAN_CHOICE) {
       const plan = session.plans.find(p => p.code === option.id);
       if (plan) await proceedWithPlanSelection(plan);
+    } else if (session.state === BOT_STATES.AWAITING_INVOICE_CHOICE) {
+      const invoice = session.invoices.find(inv => inv.id === option.id);
+      if (invoice) await proceedWithInvoiceSelection(invoice);
     }
   } catch (err) {
     handleUnexpectedError(err);
@@ -509,8 +658,8 @@ function renderMessage(msg, previous) {
       <div class="link-card-header">
         <div class="link-card-icon" aria-hidden="true">M</div>
         <div class="link-card-info">
-          <div class="link-card-title">Continuar troca de plano</div>
-          <div class="link-card-subtitle">Seus dados já estão preenchidos no Meu Claro</div>
+          <div class="link-card-title">${escapeHtml(msg.title || 'Continuar no App')}</div>
+          <div class="link-card-subtitle">${escapeHtml(msg.subtitle || 'Seus dados já estão preenchidos no Meu Claro')}</div>
         </div>
       </div>
       <a class="link-card-button" href="${escapeAttr(msg.text)}" target="_blank" rel="noopener">
