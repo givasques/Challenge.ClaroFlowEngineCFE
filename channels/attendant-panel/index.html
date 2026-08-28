@@ -123,7 +123,7 @@
             <div id="customer-name" class="customer-hero-name"></div>
             <div id="customer-cpf" class="customer-hero-cpf"></div>
           </div>
-          <div class="customer-tenure-badge">Cliente desde 2019</div>
+          <div class="customer-tenure-badge" id="customer-tenure-badge">Cliente desde —</div>
         </div>
         <div class="customer-hero-divider"></div>
         <div class="customer-detail-grid">
@@ -169,7 +169,7 @@
             </span>
             <div>
               <span class="detail-label">Cliente desde</span>
-              <span class="detail-value detail-value-muted">—</span>
+              <span id="customer-since" class="detail-value detail-value-muted">—</span>
             </div>
           </div>
           <div class="detail-item">
@@ -178,7 +178,7 @@
             </span>
             <div>
               <span class="detail-label">Meio preferido</span>
-              <span class="detail-value detail-value-muted">—</span>
+              <span id="customer-preferred-channel" class="detail-value detail-value-muted">—</span>
             </div>
           </div>
         </div>
@@ -216,16 +216,22 @@
         </div>
       </section>
 
-      <!-- Canais utilizados (placeholder — dado real fica para uma próxima etapa) -->
-      <section id="channels-used-block" class="panel-block hidden">
-        <h2>Canais utilizados pelo cliente</h2>
-        <p class="coming-soon">Em breve — estatística de uso por canal.</p>
+      <!-- Resumo de interações históricas do cliente (ETAPA 2, Passo B) -->
+      <section id="interactions-summary-block" class="panel-block hidden">
+        <h2>Resumo de interações</h2>
+        <p id="interactions-summary-text" class="interactions-summary-text"></p>
       </section>
 
       <!-- Histórico -->
       <section id="history-block" class="panel-block hidden">
         <h2>Histórico da Jornada</h2>
         <ul id="history-list" class="history-list"></ul>
+      </section>
+
+      <!-- Jornadas anteriores (ETAPA 2, Passo B) -->
+      <section id="previous-journeys-block" class="panel-block hidden">
+        <h2>Histórico de jornadas anteriores</h2>
+        <ul id="previous-journeys-list" class="previous-journeys-list"></ul>
       </section>
 
       <footer class="polling-footer" id="polling-footer">

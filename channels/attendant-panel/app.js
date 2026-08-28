@@ -56,6 +56,16 @@ const CHANNEL_ICONS = {
 };
 const CHANNEL_ICON_DEFAULT = '<svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" width="8" height="8"><circle cx="12" cy="12" r="8"/></svg>';
 
+const CHANNEL_LABELS = {
+  whatsapp: 'WhatsApp',
+  app: 'App Minha Claro',
+  call: 'Central telefônica',
+};
+
+const INTENT_LABELS = {
+  change_plan: 'Troca de plano',
+};
+
 const state = {
   customerId: null,
   journeyId: null,
@@ -152,6 +162,23 @@ function relativeTime(isoString) {
   return `há ${Math.floor(diffHour / 24)}d`;
 }
 
+function formatDateShort(isoString) {
+  return new Date(isoString).toLocaleDateString('pt-BR');
+}
+
+/** "Cliente desde" em granularidade grosseira, para o badge no topo do bloco (ETAPA 2, Passo B, item 5.2). */
+function formatTenure(isoString) {
+  const since = new Date(isoString);
+  const now = new Date();
+  let months = (now.getFullYear() - since.getFullYear()) * 12 + (now.getMonth() - since.getMonth());
+  if (now.getDate() < since.getDate()) months--;
+
+  if (months < 1) return 'Cliente novo';
+  if (months < 12) return `Cliente há ${months} ${months === 1 ? 'mês' : 'meses'}`;
+  const years = Math.floor(months / 12);
+  return `Cliente há ${years} ${years === 1 ? 'ano' : 'anos'}`;
+}
+
 function detectSearchChannel(digits) {
   if (digits.length === 11) return 'cpf';
   if (digits.length === 12 || digits.length === 13) return 'whatsapp';
@@ -218,10 +245,11 @@ async function loadCustomerJourney() {
 
   clearMessage();
 
+  renderPreviousJourneys(data.recent_journeys || []);
+
   if (!data.journey) {
     renderCustomerBlock(null);
     showMessage('Sem jornadas em andamento para este cliente.', 'info');
-    renderHistoryOnly(data.recent_journeys || []);
     return;
   }
 
@@ -292,6 +320,8 @@ function hideAllResultBlocks() {
   document.getElementById('customer-block').classList.add('hidden');
   document.getElementById('status-block').classList.add('hidden');
   document.getElementById('history-block').classList.add('hidden');
+  document.getElementById('interactions-summary-block').classList.add('hidden');
+  document.getElementById('previous-journeys-block').classList.add('hidden');
   clearMessage();
 }
 
@@ -310,6 +340,7 @@ function renderCustomerBlock(customer) {
   const block = document.getElementById('customer-block');
   if (!customer) {
     block.classList.add('hidden');
+    renderInteractionsSummary(null);
     return;
   }
 
@@ -320,6 +351,30 @@ function renderCustomerBlock(customer) {
   document.getElementById('customer-plan').textContent = customer.current_plan
     ? `${customer.current_plan.name} — ${formatCents(customer.current_plan.monthly_price_cents)}/mês`
     : 'Não informado';
+
+  // Campos agregados do cliente (ETAPA 2, Passo B, item 5.2)
+  document.getElementById('customer-tenure-badge').textContent = formatTenure(customer.customer_since);
+  document.getElementById('customer-since').textContent = formatDateShort(customer.customer_since);
+  document.getElementById('customer-preferred-channel').textContent = customer.preferred_channel
+    ? (CHANNEL_LABELS[customer.preferred_channel] || customer.preferred_channel)
+    : 'Não informado';
+
+  block.classList.remove('hidden');
+  renderInteractionsSummary(customer.journey_counts);
+}
+
+function renderInteractionsSummary(counts) {
+  const block = document.getElementById('interactions-summary-block');
+  if (!counts || counts.total === 0) {
+    block.classList.add('hidden');
+    return;
+  }
+
+  document.getElementById('interactions-summary-text').textContent =
+    `${counts.total} jornada${counts.total === 1 ? '' : 's'} no total — ` +
+    `${counts.concluded} concluída${counts.concluded === 1 ? '' : 's'}, ` +
+    `${counts.abandoned} abandonada${counts.abandoned === 1 ? '' : 's'}, ` +
+    `${counts.expired} expirada${counts.expired === 1 ? '' : 's'}.`;
 
   block.classList.remove('hidden');
 }
@@ -355,6 +410,12 @@ function renderTimeline(transitions) {
     document.getElementById('journey-current-channel-chip').classList.toggle('hidden', current === origin);
   }
 
+  appendTimelineItems(list, transitions);
+
+  block.classList.remove('hidden');
+}
+
+function appendTimelineItems(list, transitions) {
   for (const t of transitions) {
     const li = document.createElement('li');
     li.className = 'history-item';
@@ -369,35 +430,80 @@ function renderTimeline(transitions) {
     `;
     list.appendChild(li);
   }
-
-  block.classList.remove('hidden');
 }
 
-function renderHistoryOnly(recentJourneys) {
-  const block = document.getElementById('history-block');
-  const list = document.getElementById('history-list');
+/** Bloco "Histórico de jornadas anteriores" (ETAPA 2, Passo B, item 5.3) — separado da timeline da jornada ativa. */
+function renderPreviousJourneys(journeys) {
+  const block = document.getElementById('previous-journeys-block');
+  const list = document.getElementById('previous-journeys-list');
   list.innerHTML = '';
 
-  if (recentJourneys.length === 0) {
+  if (!journeys || journeys.length === 0) {
     block.classList.add('hidden');
     return;
   }
 
-  for (const j of recentJourneys) {
-    const li = document.createElement('li');
-    li.className = 'history-item';
-    li.innerHTML = `
-      <div class="history-icon history-icon--event-closed">${EVENT_ICONS.journey_closed}</div>
-      <div class="history-body">
-        <div class="history-title">${j.intent} — ${STATUS_LABELS[j.status] || j.status}</div>
-        <div class="history-description">Canal de origem: ${j.origin_channel}</div>
-        <div class="history-meta">${relativeTime(j.updated_at)}</div>
-      </div>
-    `;
-    list.appendChild(li);
+  for (const j of journeys) {
+    list.appendChild(buildPreviousJourneyItem(j));
   }
 
   block.classList.remove('hidden');
+}
+
+function buildPreviousJourneyItem(journey) {
+  const li = document.createElement('li');
+  li.className = 'previous-journey-item';
+
+  const summary = document.createElement('button');
+  summary.type = 'button';
+  summary.className = 'previous-journey-summary';
+  summary.innerHTML = `
+    <span class="status-badge status-${journey.status}">${STATUS_LABELS[journey.status] || journey.status}</span>
+    <span class="previous-journey-intent">${INTENT_LABELS[journey.intent] || journey.intent}</span>
+    <span class="previous-journey-meta">
+      ${CHANNEL_ICONS[journey.origin_channel] || CHANNEL_ICON_DEFAULT}
+      ${CHANNEL_LABELS[journey.origin_channel] || journey.origin_channel} ·
+      ${relativeTime(journey.updated_at)} · última etapa: ${journey.current_step}
+    </span>
+    <span class="previous-journey-chevron" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="14" height="14"><polyline points="6 9 12 15 18 9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </span>
+  `;
+
+  const detail = document.createElement('div');
+  detail.className = 'previous-journey-detail hidden';
+  let loaded = false;
+
+  summary.addEventListener('click', async () => {
+    const isExpanded = li.classList.contains('expanded');
+    if (isExpanded) {
+      li.classList.remove('expanded');
+      detail.classList.add('hidden');
+      return;
+    }
+
+    li.classList.add('expanded');
+    detail.classList.remove('hidden');
+
+    if (!loaded) {
+      detail.innerHTML = '<p class="coming-soon">Carregando histórico...</p>';
+      try {
+        const data = await apiCall(`/context/${journey.id}/transitions`);
+        detail.innerHTML = '';
+        const ul = document.createElement('ul');
+        ul.className = 'history-list';
+        appendTimelineItems(ul, data.transitions);
+        detail.appendChild(ul);
+        loaded = true;
+      } catch (err) {
+        detail.innerHTML = '<p class="coming-soon">Não foi possível carregar o histórico desta jornada.</p>';
+      }
+    }
+  });
+
+  li.appendChild(summary);
+  li.appendChild(detail);
+  return li;
 }
 
 function showDegradedBanner(visible) {
