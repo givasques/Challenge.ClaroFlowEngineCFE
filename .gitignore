@@ -32,5 +32,5 @@ TestResults/
 # Node (front-ends simulados, se algum dia usarem node_modules)
 node_modules/
 
-# Relatórios de fase — uso interno, não sobem para o repositório remoto
-specs/relatorios/
+# Specs — material pessoal/interno, não sobe para o repositório remoto
+specs/
