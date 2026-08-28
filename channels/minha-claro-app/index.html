@@ -181,6 +181,76 @@
         <p class="fine-print">Ao confirmar, você aceita os termos da nova mensalidade a partir do próximo ciclo.</p>
       </section>
 
+      <!-- Confirmação de contestação de cobrança (ETAPA 2, Passo C) -->
+      <section id="screen-dispute-confirmation" class="screen hidden">
+        <div class="cfe-banner">
+          <div class="cfe-banner-icon">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="18" height="18">
+              <path d="M12 15a3 3 0 100-6 3 3 0 000 6z" stroke="currentColor" stroke-width="1.6"/>
+              <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <div class="cfe-banner-text">
+            <strong>Contexto recuperado</strong>
+            <span>Continuando sua contestação iniciada no WhatsApp.</span>
+          </div>
+        </div>
+
+        <h1>Confirmar contestação de cobrança</h1>
+
+        <div class="data-card">
+          <div class="data-card-section">
+            <div class="data-card-section-title">Seus dados</div>
+            <div class="data-row">
+              <span class="data-label">Nome</span>
+              <span id="dispute-customer-name" class="data-value"></span>
+            </div>
+            <div class="data-row">
+              <span class="data-label">CPF</span>
+              <span id="dispute-customer-cpf" class="data-value"></span>
+            </div>
+          </div>
+
+          <div class="data-card-section">
+            <div class="data-card-section-title">Fatura</div>
+            <div class="data-row">
+              <span class="data-label">Referência</span>
+              <span id="dispute-invoice-label" class="data-value"></span>
+            </div>
+            <div class="data-row">
+              <span class="data-label">Vencimento</span>
+              <span id="dispute-invoice-due" class="data-value"></span>
+            </div>
+            <div class="data-row">
+              <span class="data-label">Total</span>
+              <span id="dispute-invoice-total" class="data-value"></span>
+            </div>
+          </div>
+
+          <div class="data-card-section">
+            <div class="data-card-section-title">Sua descrição</div>
+            <p id="dispute-description" class="dispute-description-box"></p>
+          </div>
+
+          <div class="data-card-section">
+            <div class="data-card-section-title">Itens da fatura — marque o que deseja contestar</div>
+            <div id="dispute-items-list" class="dispute-items-list"></div>
+          </div>
+        </div>
+
+        <button id="formalize-dispute-button" class="primary-button" disabled>
+          <span class="button-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="16" height="16">
+              <polyline points="4 12 9.5 17.5 20 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
+          Formalizar contestação
+        </button>
+        <button id="cancel-dispute-button" class="secondary-button">Cancelar contestação</button>
+
+        <p class="fine-print">Selecione pelo menos um item para formalizar a contestação.</p>
+      </section>
+
       <!-- Encerrando jornada -->
       <section id="screen-closing" class="screen hidden">
         <div class="spinner"></div>
@@ -194,8 +264,9 @@
             <polyline points="5 13 10 18 19 7" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
         </div>
-        <h1>Troca de plano confirmada!</h1>
-        <p>Sua solicitação foi concluída com sucesso.</p>
+        <h1 id="completed-title">Troca de plano confirmada!</h1>
+        <p id="completed-message">Sua solicitação foi concluída com sucesso.</p>
+        <p id="completed-protocol" class="fine-print hidden"></p>
       </section>
 
       <!-- Cancelado -->

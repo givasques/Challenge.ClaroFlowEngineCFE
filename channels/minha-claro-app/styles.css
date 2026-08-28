@@ -513,6 +513,57 @@ body {
   display: flex;
 }
 
+/* ---------- Contestação de cobrança (ETAPA 2, Passo C) ---------- */
+
+.dispute-description-box {
+  background: var(--app-bg);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  font-style: italic;
+  margin: 0;
+}
+
+.dispute-items-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dispute-item-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 4px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.dispute-item-row:last-child {
+  border-bottom: none;
+}
+
+.dispute-item-checkbox {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--claro-red);
+  flex-shrink: 0;
+}
+
+.dispute-item-desc {
+  flex: 1;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.dispute-item-amount {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
 .fine-print {
   font-size: 11px;
   color: var(--text-muted);
