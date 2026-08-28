@@ -123,7 +123,7 @@ function persistSession() {
   localStorage.setItem(SESSION_KEY, JSON.stringify(session));
 }
 
-function loadOrInitSession() {
+async function loadOrInitSession() {
   const saved = localStorage.getItem(SESSION_KEY);
   if (saved) {
     session = JSON.parse(saved);
@@ -133,13 +133,25 @@ function loadOrInitSession() {
     showDegradedBanner(!!session.degraded);
   } else {
     session = createFreshSession();
-    addBotMessage('Olá! 👋 Sou o assistente virtual da Claro. Como posso te ajudar hoje?');
+    await botSay('Olá! 👋 Sou o assistente virtual da Claro. Como posso te ajudar hoje?');
   }
   persistSession();
   scrollToBottom();
 }
 
-function resetSession() {
+async function resetSession() {
+  if (session && session.journeyId) {
+    try {
+      await apiCall(`/context/${session.journeyId}/close`, {
+        method: 'POST',
+        body: { outcome: 'abandoned', channel: 'whatsapp', reason: 'Reiniciado pelo usuário' },
+      });
+    } catch (err) {
+      // Resiliente de propósito: CFE indisponível ou jornada já fechada não pode travar o reinício da conversa.
+      console.error('Falha ao encerrar jornada anterior ao reiniciar:', err);
+    }
+  }
+
   localStorage.removeItem(SESSION_KEY);
   // Preserva o separador "HOJE", limpa só as mensagens
   const container = document.getElementById('messages');
@@ -190,7 +202,6 @@ async function handleUserMessage(text) {
   persistSession();
 
   setInputEnabled(false);
-  showTyping(true);
   try {
     switch (session.state) {
       case BOT_STATES.AWAITING_INTENT:
@@ -206,42 +217,72 @@ async function handleUserMessage(text) {
         await handleAwaitingPlanChoice(text);
         break;
       default:
-        addBotMessage('Já concluímos essa solicitação por aqui! Toque no menu ⋮ e escolha "Reiniciar conversa" para começar de novo. 😊');
+        await botSay('Já concluímos essa solicitação por aqui! Toque no menu ⋮ e escolha "Reiniciar conversa" para começar de novo. 😊');
     }
   } catch (err) {
     handleUnexpectedError(err);
   } finally {
     showTyping(false);
+    showProcessing(false);
     setInputEnabled(true);
     persistSession();
   }
 }
 
+// ---------- Indicadores de processamento simulado (reforço de realismo da demo) ----------
+
+function randomBetween(minMs, maxMs) {
+  return minMs + Math.random() * (maxMs - minMs);
+}
+
+/** Indicador "bot digitando" — usado antes de mensagens do bot não ligadas a uma chamada de API. */
+async function botSay(text) {
+  showTyping(true);
+  await sleep(randomBetween(800, 1500));
+  showTyping(false);
+  addBotMessage(text);
+}
+
+/** Indicador "processando" — usado ao redor de chamadas à API, com texto contextual. */
+async function withProcessing(text, fn) {
+  showProcessing(text);
+  try {
+    return await fn();
+  } finally {
+    showProcessing(false);
+  }
+}
+
 async function handleAwaitingIntent(text) {
   if (!detectsChangePlanIntent(text)) {
-    addBotMessage('No momento, só consigo ajudar com troca de plano. Digite algo como "quero trocar de plano" para continuarmos. 🙂');
+    await botSay('No momento, só consigo ajudar com troca de plano. Digite algo como "quero trocar de plano" para continuarmos. 🙂');
     return;
   }
-  addBotMessage('Perfeito! Para continuar, preciso confirmar sua identidade. Pode me informar seu CPF (só números)?');
+  await botSay('Perfeito! Para continuar, preciso confirmar sua identidade. Pode me informar seu CPF (só números)?');
   session.state = BOT_STATES.AWAITING_CPF;
 }
 
 async function handleAwaitingCpf(text) {
   const cpf = sanitizeCpf(text);
   if (!isValidCpfFormat(cpf)) {
-    addBotMessage('Esse CPF não parece válido — preciso de 11 números, sem letras. Pode digitar novamente?');
+    await botSay('Esse CPF não parece válido — preciso de 11 números, sem letras. Pode digitar novamente?');
     return;
   }
   session.cpf = cpf;
 
   let identity;
   try {
-    identity = await apiCall('/identity/resolve', { method: 'POST', body: { channel: 'cpf', identifier: cpf } });
+    identity = await withProcessing('verificando cadastro...', () =>
+      apiCall('/identity/resolve', { method: 'POST', body: { channel: 'cpf', identifier: cpf } }));
   } catch (err) {
     if (err instanceof CfeUnavailableError) return showDegraded(err);
     if (err.errorCode === 'cpf_not_found') {
-      addBotMessage('Não encontrei esse CPF no nosso cadastro. Parece que você é novo por aqui — qual é o seu nome completo?');
+      await botSay('Não encontrei esse CPF no nosso cadastro. Parece que você é novo por aqui — qual é o seu nome completo?');
       session.state = BOT_STATES.AWAITING_NAME;
+      return;
+    }
+    if (err.errorCode === 'invalid_cpf') {
+      await botSay('Esse CPF não é válido — confira os números e tente novamente.');
       return;
     }
     return handleDomainError(err);
@@ -253,16 +294,17 @@ async function handleAwaitingCpf(text) {
 async function handleAwaitingName(text) {
   const name = text.trim();
   if (name.length < 3) {
-    addBotMessage('Pode me passar seu nome completo, por favor?');
+    await botSay('Pode me passar seu nome completo, por favor?');
     return;
   }
 
   let identity;
   try {
-    identity = await apiCall('/identity/resolve', {
-      method: 'POST',
-      body: { channel: 'cpf', identifier: session.cpf, full_name_hint: name },
-    });
+    identity = await withProcessing('verificando cadastro...', () =>
+      apiCall('/identity/resolve', {
+        method: 'POST',
+        body: { channel: 'cpf', identifier: session.cpf, full_name_hint: name },
+      }));
   } catch (err) {
     if (err instanceof CfeUnavailableError) return showDegraded(err);
     return handleDomainError(err);
@@ -279,16 +321,17 @@ async function onIdentityResolved(identity) {
 
   let journey;
   try {
-    journey = await apiCall('/context/open', {
-      method: 'POST',
-      body: {
-        customer_id: session.customerId,
-        origin_channel: 'whatsapp',
-        intent: 'change_plan',
-        initial_step: 'identity_resolved',
-        payload: {},
-      },
-    });
+    journey = await withProcessing('abrindo sua solicitação...', () =>
+      apiCall('/context/open', {
+        method: 'POST',
+        body: {
+          customer_id: session.customerId,
+          origin_channel: 'whatsapp',
+          intent: 'change_plan',
+          initial_step: 'identity_resolved',
+          payload: {},
+        },
+      }));
   } catch (err) {
     if (err instanceof CfeUnavailableError) return showDegraded(err);
     return handleDomainError(err);
@@ -298,7 +341,7 @@ async function onIdentityResolved(identity) {
   addCfeBadge(`Jornada aberta — status: ${journey.status}`);
 
   const firstName = session.customerName.split(' ')[0];
-  addBotMessage(`Prazer, ${firstName}! Identidade confirmada. ✅`);
+  await botSay(`Prazer, ${firstName}! Identidade confirmada. ✅`);
 
   await presentPlans();
 }
@@ -306,7 +349,7 @@ async function onIdentityResolved(identity) {
 async function presentPlans() {
   let plansResponse;
   try {
-    plansResponse = await apiCall('/plans');
+    plansResponse = await withProcessing('carregando opções...', () => apiCall('/plans'));
   } catch (err) {
     if (err instanceof CfeUnavailableError) return showDegraded(err);
     return handleDomainError(err);
@@ -318,22 +361,23 @@ async function presentPlans() {
     .map(p => `• ${p.name} — ${formatCents(p.monthly_price_cents)}/mês`)
     .join('\n');
 
-  addBotMessage(`Estes são os planos disponíveis:\n${list}\n\nQual você gostaria? Pode digitar o nome (ex: "60GB").`);
+  await botSay(`Estes são os planos disponíveis:\n${list}\n\nQual você gostaria? Pode digitar o nome (ex: "60GB").`);
   session.state = BOT_STATES.AWAITING_PLAN_CHOICE;
 }
 
 async function handleAwaitingPlanChoice(text) {
   const plan = matchPlan(text, session.plans);
   if (!plan) {
-    addBotMessage('Não reconheci esse plano. Pode escolher um da lista acima, digitando por exemplo "30GB" ou "100GB"?');
+    await botSay('Não reconheci esse plano. Pode escolher um da lista acima, digitando por exemplo "30GB" ou "100GB"?');
     return;
   }
 
   try {
-    await apiCall(`/context/${session.journeyId}`, {
-      method: 'PATCH',
-      body: { current_step: 'plan_selected', payload_merge: { selected_plan_code: plan.code } },
-    });
+    await withProcessing('atualizando seus dados...', () =>
+      apiCall(`/context/${session.journeyId}`, {
+        method: 'PATCH',
+        body: { current_step: 'plan_selected', payload_merge: { selected_plan_code: plan.code } },
+      }));
   } catch (err) {
     if (err instanceof CfeUnavailableError) return showDegraded(err);
     return handleDomainError(err);
@@ -343,10 +387,11 @@ async function handleAwaitingPlanChoice(text) {
 
   let handoff;
   try {
-    handoff = await apiCall('/handoff/generate', {
-      method: 'POST',
-      body: { journey_context_id: session.journeyId, target_channel: 'app' },
-    });
+    handoff = await withProcessing('preparando continuação...', () =>
+      apiCall('/handoff/generate', {
+        method: 'POST',
+        body: { journey_context_id: session.journeyId, target_channel: 'app' },
+      }));
   } catch (err) {
     if (err instanceof CfeUnavailableError) return showDegraded(err);
     return handleDomainError(err);
@@ -354,7 +399,7 @@ async function handleAwaitingPlanChoice(text) {
 
   addCfeBadge(`Deep link gerado — válido até ${formatMessageTime(handoff.expires_at)}`);
 
-  addBotMessage(`Prontinho! Já deixei tudo preparado para você confirmar a troca para o plano ${plan.name}. 🎉`);
+  await botSay(`Prontinho! Já deixei tudo preparado para você confirmar a troca para o plano ${plan.name}. 🎉`);
   addLinkCard(handoff.deep_link_url, handoff.expires_at);
 
   session.state = BOT_STATES.COMPLETED;
@@ -459,6 +504,14 @@ function scrollToBottom() {
 
 function showTyping(visible) {
   document.getElementById('typing-indicator').classList.toggle('hidden', !visible);
+  if (visible) scrollToBottom();
+}
+
+function showProcessing(textOrFalse) {
+  const el = document.getElementById('processing-indicator');
+  const visible = !!textOrFalse;
+  if (visible) document.getElementById('processing-text').textContent = textOrFalse;
+  el.classList.toggle('hidden', !visible);
   if (visible) scrollToBottom();
 }
 

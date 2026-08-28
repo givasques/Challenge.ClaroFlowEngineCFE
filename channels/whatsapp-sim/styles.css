@@ -531,6 +531,33 @@ body {
   30%           { transform: translateY(-4px); opacity: 1; }
 }
 
+/* ---------- Indicador de "processando" (chamadas à API) ---------- */
+
+.processing-indicator {
+  padding: 4px 20px 8px;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  min-height: 24px;
+}
+
+.processing-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--primary-color, #075e54);
+  animation: typing-bounce 1s infinite ease-in-out;
+}
+
+.processing-dot:nth-child(2) { animation-delay: 0.15s; }
+.processing-dot:nth-child(3) { animation-delay: 0.3s; }
+
+.processing-text {
+  font-size: 12.5px;
+  color: var(--meta-text);
+  font-style: italic;
+}
+
 /* ---------- Formulário de input ---------- */
 
 .chat-form {
