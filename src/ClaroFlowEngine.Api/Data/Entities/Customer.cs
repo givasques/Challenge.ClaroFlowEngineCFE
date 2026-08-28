@@ -13,4 +13,5 @@ public class Customer
     public ICollection<IdentityLink> IdentityLinks { get; set; } = new List<IdentityLink>();
     public ICollection<CustomerPlan> CustomerPlans { get; set; } = new List<CustomerPlan>();
     public ICollection<JourneyContext> JourneyContexts { get; set; } = new List<JourneyContext>();
+    public ICollection<Invoice> Invoices { get; set; } = new List<Invoice>();
 }

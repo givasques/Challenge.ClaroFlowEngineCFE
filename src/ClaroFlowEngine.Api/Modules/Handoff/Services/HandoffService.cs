@@ -156,12 +156,14 @@ public class HandoffService : IHandoffService
         _logger.LogInformation("Handoff token resolved for journey {JourneyId} on {Channel}", journey.Id, handoffToken.TargetChannel);
 
         var planDetails = await BuildPlanDetailsAsync(journey, cancellationToken);
+        var invoiceDetails = await BuildInvoiceDetailsAsync(journey, cancellationToken);
 
         return new ResolveTokenResponse(
             UnifiedCustomerId: journey.CustomerId,
             JourneyContext: new ResolvedJourneyDto(journey.Id, journey.Intent, journey.CurrentStep, journey.Payload, journey.Status),
             Customer: new HandoffCustomerDto(journey.Customer.FullName, journey.Customer.Cpf),
-            PlanDetails: planDetails);
+            PlanDetails: planDetails,
+            InvoiceDetails: invoiceDetails);
     }
 
     public async Task<PlansResponse> GetActivePlansAsync(CancellationToken cancellationToken)
@@ -196,10 +198,35 @@ public class HandoffService : IHandoffService
         return currentPlan is null && selectedPlan is null ? null : new PlanDetailsDto(currentPlan, selectedPlan);
     }
 
-    // Valores no payload (coluna JSONB) chegam como JsonElement quando desserializados para Dictionary<string, object>.
-    private static string? ExtractSelectedPlanCode(Dictionary<string, object> payload)
+    /// <summary>Embute a fatura selecionada quando `payload.invoice_id` existir (ETAPA 2, Passo C, item 6.5).</summary>
+    private async Task<InvoiceDetailsDto?> BuildInvoiceDetailsAsync(JourneyContext journey, CancellationToken cancellationToken)
     {
-        if (!payload.TryGetValue("selected_plan_code", out var raw)) return null;
+        var invoiceIdRaw = ExtractPayloadString(journey.Payload, "invoice_id");
+        if (invoiceIdRaw is null || !Guid.TryParse(invoiceIdRaw, out var invoiceId)) return null;
+
+        var invoice = await _db.Invoices
+            .AsNoTracking()
+            .Include(i => i.Items)
+            .FirstOrDefaultAsync(i => i.Id == invoiceId, cancellationToken);
+
+        if (invoice is null) return null;
+
+        var items = invoice.Items
+            .OrderBy(it => it.Sequence)
+            .Select(it => new InvoiceItemInfoDto(it.Id, it.Sequence, it.Description, it.Category, it.AmountCents))
+            .ToList();
+
+        return new InvoiceDetailsDto(
+            invoice.Id, invoice.ReferenceMonth, InvoiceFormatting.ReferenceLabel(invoice.ReferenceMonth),
+            invoice.DueDate, invoice.TotalCents, invoice.Status, items);
+    }
+
+    // Valores no payload (coluna JSONB) chegam como JsonElement quando desserializados para Dictionary<string, object>.
+    private static string? ExtractSelectedPlanCode(Dictionary<string, object> payload) => ExtractPayloadString(payload, "selected_plan_code");
+
+    private static string? ExtractPayloadString(Dictionary<string, object> payload, string key)
+    {
+        if (!payload.TryGetValue(key, out var raw)) return null;
 
         return raw switch
         {

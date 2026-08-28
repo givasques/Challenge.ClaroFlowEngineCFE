@@ -27,8 +27,26 @@ public record JourneyDetailResponse(
     DateTime UpdatedAt,
     DateTime? ClosedAt);
 
-/// <summary>Cópia local e enxuta do resumo de cliente — evita acoplar o módulo Context ao Identity.</summary>
-public record CustomerSummaryDto(Guid Id, string FullName, string Cpf);
+/// <summary>
+/// Cópia local e enxuta do resumo de cliente — evita acoplar o módulo Context ao Identity.
+/// Phone, CurrentPlan e os campos agregados (CustomerSince, PreferredChannel, JourneyCounts) são
+/// enriquecidos sob demanda (usados pelo Painel do Atendente — Fase 8 e ETAPA 2, Passo B);
+/// nulos/zerados quando não há dado correspondente.
+/// </summary>
+public record CustomerSummaryDto(
+    Guid Id,
+    string FullName,
+    string Cpf,
+    string? Phone,
+    PlanInfoDto? CurrentPlan,
+    DateTime CustomerSince,
+    string? PreferredChannel,
+    JourneyCountsDto JourneyCounts);
+
+public record PlanInfoDto(string Code, string Name, int MonthlyPriceCents);
+
+/// <summary>Contagem de jornadas do cliente por desfecho (ETAPA 2, Passo B, item 5.2).</summary>
+public record JourneyCountsDto(int Total, int Concluded, int Abandoned, int Expired);
 
 /// <summary>Resposta de GET /context/customer/{customerId}: jornada ativa (se houver) + histórico opcional.</summary>
 public record ActiveJourneyResponse(

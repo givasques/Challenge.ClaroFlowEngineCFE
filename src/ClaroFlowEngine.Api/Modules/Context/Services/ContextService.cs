@@ -1,10 +1,12 @@
 using ClaroFlowEngine.Api.Common.Contracts;
 using ClaroFlowEngine.Api.Common.Errors;
 using ClaroFlowEngine.Api.Common.Services;
+using ClaroFlowEngine.Api.Configuration;
 using ClaroFlowEngine.Api.Data;
 using ClaroFlowEngine.Api.Data.Entities;
 using ClaroFlowEngine.Api.Modules.Context.Dtos;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace ClaroFlowEngine.Api.Modules.Context.Services;
 
@@ -14,6 +16,7 @@ public class ContextService : IContextService
     private readonly ITransitionRecorder _transitionRecorder;
     private readonly IJourneyExpirationService _expirationService;
     private readonly ICurrentChannelAccessor _currentChannel;
+    private readonly CfeOptions _cfeOptions;
     private readonly ILogger<ContextService> _logger;
 
     public ContextService(
@@ -21,12 +24,14 @@ public class ContextService : IContextService
         ITransitionRecorder transitionRecorder,
         IJourneyExpirationService expirationService,
         ICurrentChannelAccessor currentChannel,
+        IOptions<CfeOptions> cfeOptions,
         ILogger<ContextService> logger)
     {
         _db = db;
         _transitionRecorder = transitionRecorder;
         _expirationService = expirationService;
         _currentChannel = currentChannel;
+        _cfeOptions = cfeOptions.Value;
         _logger = logger;
     }
 
@@ -138,11 +143,11 @@ public class ContextService : IContextService
         if (_expirationService.TryExpireIfInactive(journey))
             await _db.SaveChangesAsync(cancellationToken);
 
-        return ToDetail(journey);
+        return await ToDetailAsync(journey, cancellationToken);
     }
 
     public async Task<ActiveJourneyResponse> GetActiveByCustomerAsync(
-        Guid customerId, bool includeHistory, CancellationToken cancellationToken)
+        Guid customerId, bool includeHistory, int historyLimit, CancellationToken cancellationToken)
     {
         var customerExists = await _db.Customers.AsNoTracking().AnyAsync(c => c.Id == customerId, cancellationToken);
         if (!customerExists)
@@ -166,7 +171,7 @@ public class ContextService : IContextService
                 .AsNoTracking()
                 .Where(j => j.CustomerId == customerId && j.Status != JourneyStatus.Open && j.Id != excludedId)
                 .OrderByDescending(j => j.CreatedAt)
-                .Take(5)
+                .Take(historyLimit)
                 .Select(j => new JourneySummaryResponse(
                     j.Id, j.CustomerId, j.OriginChannel, j.Intent, j.CurrentStep, j.Payload, j.Status, j.CreatedAt, j.UpdatedAt, j.ClosedAt))
                 .ToListAsync(cancellationToken);
@@ -176,7 +181,33 @@ public class ContextService : IContextService
         if (active is null && !includeHistory)
             throw new NotFoundException("active_journey_not_found", "Não há jornada ativa para este cliente.");
 
-        return new ActiveJourneyResponse(active is null ? null : ToDetail(active), recentJourneys);
+        // UC09 passo 5: o painel do atendente audita o acesso à jornada. Registrado só aqui (na busca inicial
+        // por cliente), não em GetByIdAsync — que também é usado pelo polling do painel a cada poucos segundos;
+        // gravar a cada poll inundaria o próprio histórico que o painel exibe.
+        // Deduplicado por tempo (ETAPA 2, Passo B, item 5.5): trocar de aba e voltar ao mesmo cliente em
+        // menos de PanelAccessDedupMinutes não gera uma nova entrada — só uma consulta real após esse intervalo.
+        if (active is not null && _currentChannel.Channel == Channels.Panel)
+        {
+            var lastPanelAccess = await _db.JourneyTransitions
+                .AsNoTracking()
+                .Where(t => t.JourneyContextId == active.Id
+                    && t.EventType == TransitionEventTypes.PanelAccessed
+                    && t.Channel == Channels.Panel)
+                .OrderByDescending(t => t.OccurredAt)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            var dedupWindow = TimeSpan.FromMinutes(_cfeOptions.PanelAccessDedupMinutes);
+            var shouldRecord = lastPanelAccess is null || DateTime.UtcNow - lastPanelAccess.OccurredAt > dedupWindow;
+
+            if (shouldRecord)
+            {
+                _transitionRecorder.Record(active.Id, Channels.Panel, TransitionEventTypes.PanelAccessed,
+                    "Painel do atendente consultou esta jornada.");
+                await _db.SaveChangesAsync(cancellationToken);
+            }
+        }
+
+        return new ActiveJourneyResponse(active is null ? null : await ToDetailAsync(active, cancellationToken), recentJourneys);
     }
 
     public async Task<TransitionsResponse> GetTransitionsAsync(Guid journeyId, CancellationToken cancellationToken)
@@ -257,7 +288,51 @@ public class ContextService : IContextService
     private static JourneySummaryResponse ToSummary(JourneyContext j) => new(
         j.Id, j.CustomerId, j.OriginChannel, j.Intent, j.CurrentStep, j.Payload, j.Status, j.CreatedAt, j.UpdatedAt, j.ClosedAt);
 
-    private static JourneyDetailResponse ToDetail(JourneyContext j) => new(
-        j.Id, j.CustomerId, new CustomerSummaryDto(j.Customer.Id, j.Customer.FullName, j.Customer.Cpf),
-        j.OriginChannel, j.Intent, j.CurrentStep, j.Payload, j.Status, j.CreatedAt, j.UpdatedAt, j.ClosedAt);
+    /// <summary>
+    /// Monta o DTO de detalhe, enriquecendo o cliente com telefone (via identity_links, canal whatsapp)
+    /// e plano ativo (via customer_plans) — dados usados pelo Painel do Atendente (Fase 8).
+    /// </summary>
+    private async Task<JourneyDetailResponse> ToDetailAsync(JourneyContext j, CancellationToken cancellationToken)
+    {
+        var phone = await _db.IdentityLinks
+            .AsNoTracking()
+            .Where(l => l.CustomerId == j.CustomerId && l.Channel == Channels.Whatsapp)
+            .Select(l => l.Identifier)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var currentPlan = await _db.CustomerPlans
+            .AsNoTracking()
+            .Where(cp => cp.CustomerId == j.CustomerId && cp.Active)
+            .Select(cp => new PlanInfoDto(cp.Plan.Code, cp.Plan.Name, cp.Plan.MonthlyPriceCents))
+            .FirstOrDefaultAsync(cancellationToken);
+
+        // Agregados do cliente (ETAPA 2, Passo B, item 5.2) — dataset pequeno no protótipo, agregado em memória
+        // em vez de várias queries GROUP BY separadas.
+        var journeyStats = await _db.JourneyContexts
+            .AsNoTracking()
+            .Where(other => other.CustomerId == j.CustomerId)
+            .Select(other => new { other.OriginChannel, other.Status, other.CreatedAt })
+            .ToListAsync(cancellationToken);
+
+        var preferredChannel = journeyStats
+            .GroupBy(s => s.OriginChannel)
+            .OrderByDescending(g => g.Count())
+            .ThenByDescending(g => g.Max(s => s.CreatedAt))
+            .Select(g => g.Key)
+            .FirstOrDefault();
+
+        var journeyCounts = new JourneyCountsDto(
+            Total: journeyStats.Count,
+            Concluded: journeyStats.Count(s => s.Status == JourneyStatus.Concluded),
+            Abandoned: journeyStats.Count(s => s.Status == JourneyStatus.Abandoned),
+            Expired: journeyStats.Count(s => s.Status == JourneyStatus.Expired));
+
+        var customer = new CustomerSummaryDto(
+            j.Customer.Id, j.Customer.FullName, j.Customer.Cpf, phone, currentPlan,
+            j.Customer.CreatedAt, preferredChannel, journeyCounts);
+
+        return new JourneyDetailResponse(
+            j.Id, j.CustomerId, customer,
+            j.OriginChannel, j.Intent, j.CurrentStep, j.Payload, j.Status, j.CreatedAt, j.UpdatedAt, j.ClosedAt);
+    }
 }

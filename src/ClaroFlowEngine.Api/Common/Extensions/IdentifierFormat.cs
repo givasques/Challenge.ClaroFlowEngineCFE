@@ -5,7 +5,7 @@ namespace ClaroFlowEngine.Api.Common.Extensions;
 
 /// <summary>
 /// Validação de formato dos identificadores por canal, conforme spec-funcional §6.1 e §6.2.
-/// Não valida dígito verificador de CPF — os CPFs do seed são fictícios, só o formato importa.
+/// CPF é validado com dígitos verificadores reais (ETAPA 2, Passo 0, item 3.5) — não apenas formato.
 /// Vive em Common porque é usada por mais de um módulo (Identity e Handoff).
 /// </summary>
 public static partial class IdentifierFormat
@@ -18,8 +18,27 @@ public static partial class IdentifierFormat
     /// <summary>Remove pontos e traços, mantendo só os dígitos (uso interno de CPF).</summary>
     public static string SanitizeCpf(string rawCpf) => DigitsOnlyRegex().Replace(rawCpf, "");
 
-    public static bool IsValidCpf(string rawCpf) => DigitsOnlyRegex().Replace(rawCpf, "") is { Length: 11 } digits
-        && digits.All(char.IsDigit);
+    /// <summary>Valida formato (11 dígitos) e dígitos verificadores (algoritmo padrão brasileiro).</summary>
+    public static bool IsValidCpf(string rawCpf)
+    {
+        var digits = SanitizeCpf(rawCpf);
+        if (digits.Length != 11 || !digits.All(char.IsDigit)) return false;
+        if (digits.Distinct().Count() == 1) return false; // rejeita 00000000000, 11111111111 etc.
+
+        var d = digits.Select(c => c - '0').ToArray();
+
+        var sum1 = 0;
+        for (var i = 0; i < 9; i++) sum1 += d[i] * (10 - i);
+        var check1 = sum1 * 10 % 11;
+        if (check1 == 10) check1 = 0;
+        if (d[9] != check1) return false;
+
+        var sum2 = 0;
+        for (var i = 0; i < 10; i++) sum2 += d[i] * (11 - i);
+        var check2 = sum2 * 10 % 11;
+        if (check2 == 10) check2 = 0;
+        return d[10] == check2;
+    }
 
     public static bool IsValidIdentifier(string channel, string identifier)
     {

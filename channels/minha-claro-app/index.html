@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Minha Claro (simulado)</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="phone">
+    <div class="phone-notch" aria-hidden="true"></div>
+
+    <header class="app-header">
+      <div class="status-bar" aria-hidden="true">
+        <span class="status-time">9:41</span>
+        <div class="status-icons">
+          <svg viewBox="0 0 20 14" fill="currentColor" xmlns="http://www.w3.org/2000/svg" width="15" height="11">
+            <rect x="0" y="9" width="3" height="5" rx="0.5"/>
+            <rect x="5.5" y="6" width="3" height="8" rx="0.5"/>
+            <rect x="11" y="3" width="3" height="11" rx="0.5"/>
+            <rect x="16.5" y="0" width="3" height="14" rx="0.5"/>
+          </svg>
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="15" height="15">
+            <path d="M5 12.5C8.5 9 15.5 9 19 12.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            <path d="M8 15.5C10 13.7 14 13.7 16 15.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            <circle cx="12" cy="18.2" r="1.1" fill="currentColor"/>
+          </svg>
+          <svg viewBox="0 0 26 14" fill="none" xmlns="http://www.w3.org/2000/svg" width="22" height="12">
+            <rect x="0.5" y="0.5" width="21" height="13" rx="3" stroke="currentColor"/>
+            <rect x="2.2" y="2.2" width="15" height="9.6" rx="1.5" fill="currentColor"/>
+            <rect x="23" y="4.5" width="2.5" height="5" rx="1" fill="currentColor"/>
+          </svg>
+        </div>
+      </div>
+
+      <div class="header-main">
+        <div class="header-brand">
+          <div class="app-logo">claro</div>
+          <div class="app-subtitle">Minha Claro</div>
+        </div>
+        <div class="header-avatar" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="24" height="24">
+            <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.6"/>
+            <circle cx="12" cy="10" r="3.2" stroke="currentColor" stroke-width="1.6"/>
+            <path d="M5.5 19c1.4-2.6 4-4 6.5-4s5.1 1.4 6.5 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+          </svg>
+        </div>
+      </div>
+    </header>
+
+    <main class="app-content">
+
+      <!-- Sem token na URL -->
+      <section id="screen-no-token" class="screen hidden">
+        <div class="state-icon state-icon-neutral">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="32" height="32">
+            <path d="M9 15L15 9" stroke="white" stroke-width="2.2" stroke-linecap="round"/>
+            <path d="M11 7l1.5-1.5a3.5 3.5 0 015 5L16 12" stroke="white" stroke-width="2.2" stroke-linecap="round"/>
+            <path d="M13 17l-1.5 1.5a3.5 3.5 0 01-5-5L8 12" stroke="white" stroke-width="2.2" stroke-linecap="round"/>
+            <line x1="3" y1="3" x2="21" y2="21" stroke="white" stroke-width="2.2" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <h1>Link inválido</h1>
+        <p>Nenhum token de acesso foi encontrado nesta URL. Abra o App a partir do link enviado no WhatsApp.</p>
+      </section>
+
+      <!-- Login mockado -->
+      <section id="screen-login" class="screen hidden">
+        <div class="info-banner">
+          <div class="info-banner-icon">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="18" height="18">
+              <circle cx="12" cy="12" r="9.5" stroke="currentColor" stroke-width="1.8"/>
+              <line x1="12" y1="11" x2="12" y2="16.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+              <circle cx="12" cy="7.6" r="1.05" fill="currentColor"/>
+            </svg>
+          </div>
+          <div class="info-banner-text">
+            <strong>Ambiente de demonstração</strong>
+            <span>Suas credenciais não são verificadas contra base real.</span>
+          </div>
+        </div>
+
+        <h1>Entrar</h1>
+        <form id="login-form" class="form">
+          <label for="login-username">Usuário</label>
+          <div class="input-wrapper">
+            <span class="input-icon">
+              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="16" height="16">
+                <circle cx="12" cy="8" r="3.5" stroke="currentColor" stroke-width="1.8"/>
+                <path d="M4.5 20c1.6-3.6 4.6-5.5 7.5-5.5s5.9 1.9 7.5 5.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+              </svg>
+            </span>
+            <input id="login-username" type="text" autocomplete="username" placeholder="seu.usuario" />
+          </div>
+
+          <label for="login-password">Senha</label>
+          <div class="input-wrapper">
+            <span class="input-icon">
+              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="16" height="16">
+                <rect x="5" y="10.5" width="14" height="9.5" rx="2" stroke="currentColor" stroke-width="1.8"/>
+                <path d="M8 10.5V7.5a4 4 0 018 0v3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+              </svg>
+            </span>
+            <input id="login-password" type="password" autocomplete="current-password" placeholder="••••••••" />
+          </div>
+
+          <div id="login-error" class="error-message hidden"></div>
+
+          <button type="submit" class="primary-button">Entrar</button>
+          <a href="#" id="forgot-password-link" class="link-muted">Esqueci minha senha</a>
+        </form>
+      </section>
+
+      <!-- Resolvendo token -->
+      <section id="screen-resolving" class="screen hidden">
+        <div class="spinner"></div>
+        <p>Recuperando sua sessão...</p>
+      </section>
+
+      <!-- Confirmação -->
+      <section id="screen-confirmation" class="screen hidden">
+        <div class="cfe-banner">
+          <div class="cfe-banner-icon">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="18" height="18">
+              <path d="M12 15a3 3 0 100-6 3 3 0 000 6z" stroke="currentColor" stroke-width="1.6"/>
+              <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <div class="cfe-banner-text">
+            <strong>Contexto recuperado</strong>
+            <span>Continuando sua solicitação iniciada no WhatsApp.</span>
+          </div>
+        </div>
+
+        <h1>Confirmar troca de plano</h1>
+
+        <div class="data-card">
+          <div class="data-card-section">
+            <div class="data-card-section-title">Seus dados</div>
+            <div class="data-row">
+              <span class="data-label">Nome</span>
+              <span id="customer-name" class="data-value"></span>
+            </div>
+            <div class="data-row">
+              <span class="data-label">CPF</span>
+              <span id="customer-cpf" class="data-value"></span>
+            </div>
+          </div>
+
+          <div class="data-card-section">
+            <div class="data-card-section-title">Alteração de plano</div>
+            <div class="plan-change">
+              <div class="plan-box plan-box-current">
+                <span class="plan-box-label">Atual</span>
+                <span id="current-plan" class="plan-box-value"></span>
+              </div>
+              <div class="plan-arrow" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="18" height="18">
+                  <line x1="4" y1="12" x2="19" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                  <polyline points="13 6 19 12 13 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </div>
+              <div class="plan-box plan-box-new">
+                <span class="plan-box-label">Novo</span>
+                <span id="selected-plan" class="plan-box-value"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <button id="confirm-button" class="primary-button">
+          <span class="button-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="16" height="16">
+              <polyline points="4 12 9.5 17.5 20 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
+          Confirmar troca de plano
+        </button>
+        <button id="cancel-button" class="secondary-button">Cancelar</button>
+
+        <p class="fine-print">Ao confirmar, você aceita os termos da nova mensalidade a partir do próximo ciclo.</p>
+      </section>
+
+      <!-- Confirmação de contestação de cobrança (ETAPA 2, Passo C) -->
+      <section id="screen-dispute-confirmation" class="screen hidden">
+        <div class="cfe-banner">
+          <div class="cfe-banner-icon">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="18" height="18">
+              <path d="M12 15a3 3 0 100-6 3 3 0 000 6z" stroke="currentColor" stroke-width="1.6"/>
+              <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <div class="cfe-banner-text">
+            <strong>Contexto recuperado</strong>
+            <span>Continuando sua contestação iniciada no WhatsApp.</span>
+          </div>
+        </div>
+
+        <h1>Confirmar contestação de cobrança</h1>
+
+        <div class="data-card">
+          <div class="data-card-section">
+            <div class="data-card-section-title">Seus dados</div>
+            <div class="data-row">
+              <span class="data-label">Nome</span>
+              <span id="dispute-customer-name" class="data-value"></span>
+            </div>
+            <div class="data-row">
+              <span class="data-label">CPF</span>
+              <span id="dispute-customer-cpf" class="data-value"></span>
+            </div>
+          </div>
+
+          <div class="data-card-section">
+            <div class="data-card-section-title">Fatura</div>
+            <div class="data-row">
+              <span class="data-label">Referência</span>
+              <span id="dispute-invoice-label" class="data-value"></span>
+            </div>
+            <div class="data-row">
+              <span class="data-label">Vencimento</span>
+              <span id="dispute-invoice-due" class="data-value"></span>
+            </div>
+            <div class="data-row">
+              <span class="data-label">Total</span>
+              <span id="dispute-invoice-total" class="data-value"></span>
+            </div>
+          </div>
+
+          <div class="data-card-section">
+            <div class="data-card-section-title">Sua descrição</div>
+            <p id="dispute-description" class="dispute-description-box"></p>
+          </div>
+
+          <div class="data-card-section">
+            <div class="data-card-section-title">Itens da fatura — marque o que deseja contestar</div>
+            <div id="dispute-items-list" class="dispute-items-list"></div>
+          </div>
+        </div>
+
+        <button id="formalize-dispute-button" class="primary-button" disabled>
+          <span class="button-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="16" height="16">
+              <polyline points="4 12 9.5 17.5 20 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
+          Formalizar contestação
+        </button>
+        <button id="cancel-dispute-button" class="secondary-button">Cancelar contestação</button>
+
+        <p class="fine-print">Selecione pelo menos um item para formalizar a contestação.</p>
+      </section>
+
+      <!-- Encerrando jornada -->
+      <section id="screen-closing" class="screen hidden">
+        <div class="spinner"></div>
+        <p>Processando...</p>
+      </section>
+
+      <!-- Concluído -->
+      <section id="screen-completed" class="screen hidden">
+        <div class="state-icon state-icon-success">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="36" height="36">
+            <polyline points="5 13 10 18 19 7" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <h1 id="completed-title">Troca de plano confirmada!</h1>
+        <p id="completed-message">Sua solicitação foi concluída com sucesso.</p>
+        <p id="completed-protocol" class="fine-print hidden"></p>
+      </section>
+
+      <!-- Cancelado -->
+      <section id="screen-cancelled" class="screen hidden">
+        <div class="state-icon state-icon-neutral">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="32" height="32">
+            <path d="M9 15L4 10L9 5" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M4 10H15a5 5 0 015 5v2" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <h1>Solicitação cancelada</h1>
+        <p>Você pode iniciar uma nova solicitação a qualquer momento pelo WhatsApp.</p>
+      </section>
+
+      <!-- Sessão expirada / token inválido -->
+      <section id="screen-session-expired" class="screen hidden">
+        <div class="state-icon state-icon-warning">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="32" height="32">
+            <circle cx="12" cy="12" r="9.5" stroke="white" stroke-width="2.2"/>
+            <polyline points="12 7 12 12 16 14.5" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <h1 id="session-expired-title">Sessão expirada</h1>
+        <p id="session-expired-message"></p>
+        <a id="reopen-chat-link" class="primary-button" href="#">Abrir chat da Claro novamente</a>
+      </section>
+
+      <!-- CFE indisponível -->
+      <section id="screen-unavailable" class="screen hidden">
+        <div class="state-icon state-icon-error">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="32" height="32">
+            <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+            <line x1="12" y1="9" x2="12" y2="13" stroke="white" stroke-width="2.2" stroke-linecap="round"/>
+            <circle cx="12" cy="17" r="1.1" fill="white"/>
+          </svg>
+        </div>
+        <h1>Instabilidade temporária</h1>
+        <p>
+          Não conseguimos recuperar sua sessão neste momento. Você pode continuar acessando o App
+          normalmente, mas os dados da sua conversa anterior não estão disponíveis agora.
+          Tente novamente em alguns instantes.
+        </p>
+        <button id="retry-button" class="primary-button">Tentar novamente</button>
+      </section>
+
+    </main>
+
+    <footer class="app-footer">Ambiente simulado — dados fictícios</footer>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+  <script>
+    document.getElementById('reopen-chat-link').href = CFE_CONFIG.whatsappSimUrl;
+  </script>
+</body>
+</html>
