@@ -22,6 +22,8 @@ WORKDIR /app
 
 COPY --from=build /app/publish .
 
+# Cache-buster: força rebuild da camada de canais quando o .dockerignore muda
+ARG CACHE_BUST=1
 # Canais simulados (HTML/CSS/JS) — copiados para dentro da imagem para que a API
 # possa servi-los em /channels/* no modo "full" (ver Program.cs e docker-compose.full.yml).
 COPY channels/ ./channels/
