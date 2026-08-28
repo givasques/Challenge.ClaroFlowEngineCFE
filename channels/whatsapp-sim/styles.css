@@ -379,6 +379,81 @@ body {
   flex-shrink: 0;
 }
 
+/* ---------- Elementos interativos (botões e listas do bot) ---------- */
+
+.interactive-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.interactive-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.interactive-button,
+.interactive-list-item {
+  font: inherit;
+  cursor: pointer;
+  border: 1.5px solid var(--send-btn);
+  background: #ffffff;
+  color: var(--send-btn);
+  border-radius: 8px;
+  transition: background 0.15s ease, opacity 0.15s ease;
+}
+
+.interactive-button {
+  padding: 7px 14px;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.interactive-list-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 8px 12px;
+  text-align: left;
+  width: 100%;
+}
+
+.interactive-list-label {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.interactive-list-desc {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--meta-text);
+}
+
+.interactive-button:not(:disabled):hover,
+.interactive-list-item:not(:disabled):hover {
+  background: rgba(0, 168, 132, 0.08);
+}
+
+.interactive-button:disabled,
+.interactive-list-item:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.interactive-button.interactive-selected,
+.interactive-list-item.interactive-selected {
+  background: var(--send-btn);
+  color: #ffffff;
+}
+
+.interactive-list-item.interactive-selected .interactive-list-desc {
+  color: rgba(255, 255, 255, 0.85);
+}
+
 /* ---------- Badge do CFE (mensagem de sistema técnica) ---------- */
 
 .cfe-badge {

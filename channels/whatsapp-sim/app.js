@@ -133,7 +133,10 @@ async function loadOrInitSession() {
     showDegradedBanner(!!session.degraded);
   } else {
     session = createFreshSession();
-    await botSay('Olá! 👋 Sou o assistente virtual da Claro. Como posso te ajudar hoje?');
+    await botSay('Olá! 👋 Sou o assistente virtual da Claro. Como posso te ajudar hoje?', {
+      type: 'buttons',
+      options: [{ id: 'change_plan', label: 'Trocar de plano' }],
+    });
   }
   persistSession();
   scrollToBottom();
@@ -236,11 +239,11 @@ function randomBetween(minMs, maxMs) {
 }
 
 /** Indicador "bot digitando" — usado antes de mensagens do bot não ligadas a uma chamada de API. */
-async function botSay(text) {
+async function botSay(text, interactive) {
   showTyping(true);
   await sleep(randomBetween(800, 1500));
   showTyping(false);
-  addBotMessage(text);
+  addBotMessage(text, interactive);
 }
 
 /** Indicador "processando" — usado ao redor de chamadas à API, com texto contextual. */
@@ -254,10 +257,16 @@ async function withProcessing(text, fn) {
 }
 
 async function handleAwaitingIntent(text) {
+  // Camada oculta de heurística por texto livre — os botões são o caminho primário (Passo A da ETAPA 2),
+  // mas texto residual como "quero trocar de plano" ainda funciona.
   if (!detectsChangePlanIntent(text)) {
-    await botSay('No momento, só consigo ajudar com troca de plano. Digite algo como "quero trocar de plano" para continuarmos. 🙂');
+    await botSay('Por favor, use uma das opções acima. 🙂');
     return;
   }
+  await proceedToCpfCollection();
+}
+
+async function proceedToCpfCollection() {
   await botSay('Perfeito! Para continuar, preciso confirmar sua identidade. Pode me informar seu CPF (só números)?');
   session.state = BOT_STATES.AWAITING_CPF;
 }
@@ -357,21 +366,28 @@ async function presentPlans() {
 
   session.plans = plansResponse.plans;
 
-  const list = session.plans
-    .map(p => `• ${p.name} — ${formatCents(p.monthly_price_cents)}/mês`)
-    .join('\n');
-
-  await botSay(`Estes são os planos disponíveis:\n${list}\n\nQual você gostaria? Pode digitar o nome (ex: "60GB").`);
+  await botSay('Estes são os planos disponíveis:', {
+    type: 'list',
+    options: session.plans.map(p => ({
+      id: p.code,
+      label: p.name,
+      description: `${p.data_gb}GB — ${formatCents(p.monthly_price_cents)}/mês`,
+    })),
+  });
   session.state = BOT_STATES.AWAITING_PLAN_CHOICE;
 }
 
 async function handleAwaitingPlanChoice(text) {
+  // Camada oculta de heurística por texto livre — a lista é o caminho primário.
   const plan = matchPlan(text, session.plans);
   if (!plan) {
-    await botSay('Não reconheci esse plano. Pode escolher um da lista acima, digitando por exemplo "30GB" ou "100GB"?');
+    await botSay('Não reconheci esse plano. Use uma das opções da lista acima.');
     return;
   }
+  await proceedWithPlanSelection(plan);
+}
 
+async function proceedWithPlanSelection(plan) {
   try {
     await withProcessing('atualizando seus dados...', () =>
       apiCall(`/context/${session.journeyId}`, {
@@ -435,10 +451,43 @@ function addMessage(sender, text, extra) {
   scrollToBottom();
 }
 
-function addBotMessage(text)     { addMessage('bot', text); }
+function addBotMessage(text, interactive) {
+  addMessage('bot', text, interactive ? { interactive, answered: null } : undefined);
+}
 function addSystemMessage(text)  { addMessage('system', text); }
 function addCfeBadge(text)       { addMessage('badge', text); }
 function addLinkCard(url, expiresAt) { addMessage('link-card', url, { expiresAt }); }
+
+/** Chamado ao clicar num botão/item de lista de uma mensagem interativa do bot (Passo A da ETAPA 2). */
+async function handleInteractiveClick(msg, option, wrapEl) {
+  if (msg.answered) return; // evita duplo clique / reprocessamento de mensagens antigas já respondidas
+
+  msg.answered = option.id;
+  wrapEl.querySelectorAll('button').forEach(btn => {
+    btn.disabled = true;
+    if (btn.dataset.optionId === option.id) btn.classList.add('interactive-selected');
+  });
+
+  addMessage('user', option.label);
+  persistSession();
+
+  setInputEnabled(false);
+  try {
+    if (session.state === BOT_STATES.AWAITING_INTENT && option.id === 'change_plan') {
+      await proceedToCpfCollection();
+    } else if (session.state === BOT_STATES.AWAITING_PLAN_CHOICE) {
+      const plan = session.plans.find(p => p.code === option.id);
+      if (plan) await proceedWithPlanSelection(plan);
+    }
+  } catch (err) {
+    handleUnexpectedError(err);
+  } finally {
+    showTyping(false);
+    showProcessing(false);
+    setInputEnabled(true);
+    persistSession();
+  }
+}
 
 function renderMessage(msg, previous) {
   const container = document.getElementById('messages');
@@ -482,9 +531,42 @@ function renderMessage(msg, previous) {
         ${isUser ? SVG_CHECKS_READ : ''}
       </div>
     `;
+
+    if (msg.sender === 'bot' && msg.interactive) {
+      el.appendChild(renderInteractive(msg));
+    }
   }
 
   container.appendChild(el);
+}
+
+function renderInteractive(msg) {
+  const { type, options } = msg.interactive;
+  const wrap = document.createElement('div');
+  wrap.className = type === 'list' ? 'interactive-list' : 'interactive-buttons';
+
+  options.forEach(opt => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = type === 'list' ? 'interactive-list-item' : 'interactive-button';
+    btn.dataset.optionId = opt.id;
+    btn.disabled = !!msg.answered;
+    if (msg.answered === opt.id) btn.classList.add('interactive-selected');
+
+    if (type === 'list') {
+      btn.innerHTML = `
+        <span class="interactive-list-label">${escapeHtml(opt.label)}</span>
+        ${opt.description ? `<span class="interactive-list-desc">${escapeHtml(opt.description)}</span>` : ''}
+      `;
+    } else {
+      btn.textContent = opt.label;
+    }
+
+    btn.addEventListener('click', () => handleInteractiveClick(msg, opt, wrap));
+    wrap.appendChild(btn);
+  });
+
+  return wrap;
 }
 
 function escapeHtml(text) {
