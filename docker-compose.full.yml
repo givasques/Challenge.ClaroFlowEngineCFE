@@ -6,6 +6,7 @@
 # Para o dia a dia de desenvolvimento, use o docker-compose.yml normal (só o banco) + `dotnet run`.
 # Não rode os dois ao mesmo tempo sem ajustar portas — este arquivo sobe seu próprio Postgres,
 # independente do container do docker-compose.yml (volumes e nomes de container são distintos).
+name: claroflowengine-full
 services:
   postgres:
     image: postgres:16-alpine
