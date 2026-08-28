@@ -49,9 +49,9 @@ public static class DatabaseSeeder
     {
         var seedCustomers = new[]
         {
-            new Customer { Cpf = "12345678900", FullName = "Ana Silva" },
-            new Customer { Cpf = "98765432100", FullName = "Carlos Mendes" },
-            new Customer { Cpf = "45678912300", FullName = "Mariana Souza" },
+            new Customer { Cpf = "11144477735", FullName = "Ana Silva" },
+            new Customer { Cpf = "22255588846", FullName = "Carlos Mendes" },
+            new Customer { Cpf = "33366699957", FullName = "Mariana Souza" },
         };
 
         var existingCpfs = await db.Customers.Select(c => c.Cpf).ToListAsync(ct);
@@ -76,12 +76,12 @@ public static class DatabaseSeeder
         // simulando um cliente que já iniciou contato por telefone antes do protótipo.
         var seedLinks = new[]
         {
-            (Cpf: "12345678900", Channel: Channels.Cpf, Identifier: "12345678900"),
-            (Cpf: "12345678900", Channel: Channels.Whatsapp, Identifier: "5511999990001"),
-            (Cpf: "98765432100", Channel: Channels.Cpf, Identifier: "98765432100"),
-            (Cpf: "98765432100", Channel: Channels.Whatsapp, Identifier: "5511999990002"),
-            (Cpf: "45678912300", Channel: Channels.Cpf, Identifier: "45678912300"),
-            (Cpf: "45678912300", Channel: Channels.Whatsapp, Identifier: "5511999990003"),
+            (Cpf: "11144477735", Channel: Channels.Cpf, Identifier: "11144477735"),
+            (Cpf: "11144477735", Channel: Channels.Whatsapp, Identifier: "5511999990001"),
+            (Cpf: "22255588846", Channel: Channels.Cpf, Identifier: "22255588846"),
+            (Cpf: "22255588846", Channel: Channels.Whatsapp, Identifier: "5511999990002"),
+            (Cpf: "33366699957", Channel: Channels.Cpf, Identifier: "33366699957"),
+            (Cpf: "33366699957", Channel: Channels.Whatsapp, Identifier: "5511999990003"),
         };
 
         var existingLinks = await db.IdentityLinks
@@ -107,9 +107,9 @@ public static class DatabaseSeeder
     {
         var seedActivePlans = new[]
         {
-            (Cpf: "12345678900", PlanCode: "claro_15gb"),
-            (Cpf: "98765432100", PlanCode: "claro_30gb"),
-            (Cpf: "45678912300", PlanCode: "claro_15gb"),
+            (Cpf: "11144477735", PlanCode: "claro_15gb"),
+            (Cpf: "22255588846", PlanCode: "claro_30gb"),
+            (Cpf: "33366699957", PlanCode: "claro_15gb"),
         };
 
         var existingActivePlanCustomerIds = await db.CustomerPlans

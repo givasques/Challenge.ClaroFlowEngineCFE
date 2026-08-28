@@ -22,7 +22,7 @@ public class IdentityService : IIdentityService
     {
         ValidateChannelAndIdentifier(request.Channel, request.Identifier);
         if (request.CpfHint is not null && !IdentifierFormat.IsValidCpf(request.CpfHint))
-            throw new ValidationException("invalid_cpf_hint", "CPF informado como dica deve conter 11 dígitos numéricos.");
+            throw new ValidationException("invalid_cpf", "CPF inválido — verifique os dígitos digitados.");
 
         var existingLink = await FindLinkAsync(request.Channel, request.Identifier, cancellationToken);
         if (existingLink is not null)
@@ -122,6 +122,9 @@ public class IdentityService : IIdentityService
     {
         if (!IdentifierFormat.IsSupportedChannel(channel))
             throw new ValidationException("invalid_channel", $"Canal '{channel}' não é suportado.");
+
+        if (channel == Common.Contracts.Channels.Cpf && !IdentifierFormat.IsValidCpf(identifier))
+            throw new ValidationException("invalid_cpf", "CPF inválido — verifique os dígitos digitados.");
 
         if (!IdentifierFormat.IsValidIdentifier(channel, identifier))
             throw new ValidationException("invalid_identifier", $"Identificador em formato inválido para o canal '{channel}'.");
