@@ -788,16 +788,10 @@ body {
   color: var(--text-primary);
 }
 
-.mock-metric-trend {
+.mock-metric-period {
   font-size: 12px;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  gap: 4px;
+  color: var(--text-subtle);
 }
-
-.mock-metric-trend--up { color: #16a34a; }
-.mock-metric-trend--down { color: #b91c1c; }
 
 /* B.3.3 (FASE 3.1) — seções de Configurações com header próprio, ícone e cards separados */
 

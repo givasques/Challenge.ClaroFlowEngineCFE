@@ -96,6 +96,7 @@ const state = {
   lastUpdatedAt: null,
   currentView: 'consulta',
   activeJourneysPollHandle: null,
+  metricsPollHandle: null,
 };
 
 // ---------- Cliente HTTP (mesmo padrão dos outros canais — ver whatsapp-sim/app.js) ----------
@@ -784,7 +785,7 @@ function switchView(view) {
   document.getElementById('main-title').textContent = title;
   document.getElementById('main-subtitle').textContent = subtitle;
 
-  // Polling da tela Jornadas Ativas só roda enquanto o atendente está nela (FASE 3.2, item B.1) —
+  // Polling de cada tela só roda enquanto o atendente está nela (FASE 3.2, itens B.1/C.1) —
   // evita chamadas em background quando ele está em outra aba do menu lateral.
   if (view === 'jornadas-ativas') {
     fetchActiveJourneys();
@@ -793,12 +794,27 @@ function switchView(view) {
   } else if (previousView === 'jornadas-ativas') {
     stopActiveJourneysPolling();
   }
+
+  if (view === 'metricas') {
+    fetchMetricsSummary();
+    stopMetricsPolling();
+    state.metricsPollHandle = setInterval(fetchMetricsSummary, 60000);
+  } else if (previousView === 'metricas') {
+    stopMetricsPolling();
+  }
 }
 
 function stopActiveJourneysPolling() {
   if (state.activeJourneysPollHandle) {
     clearInterval(state.activeJourneysPollHandle);
     state.activeJourneysPollHandle = null;
+  }
+}
+
+function stopMetricsPolling() {
+  if (state.metricsPollHandle) {
+    clearInterval(state.metricsPollHandle);
+    state.metricsPollHandle = null;
   }
 }
 
@@ -881,6 +897,27 @@ function renderActiveJourneysTable(journeys) {
     });
     tbody.appendChild(tr);
   });
+}
+
+// ---------- Métricas — dados reais via GET /metrics/summary (FASE 3.2, Bloco C) ----------
+
+/** Busca GET /metrics/summary e atualiza os 4 cards. Falha silenciosa (mesmo padrão do polling de Jornadas Ativas). */
+async function fetchMetricsSummary() {
+  try {
+    const data = await apiCall('/metrics/summary');
+    renderMetricsSummary(data);
+  } catch (err) {
+    // Silencioso — mantém os últimos valores renderizados em vez de substituir os cards por um erro.
+  }
+}
+
+/** Campos ausentes ou null viram "—" (o backend omite a chave quando o valor é null — ver relatório do Bloco A). */
+function renderMetricsSummary(data) {
+  document.getElementById('metric-tma-value').textContent = data.tma_median_label ?? '—';
+  document.getElementById('metric-journeys-today-value').textContent = data.journeys_today ?? '—';
+  document.getElementById('metric-conclusion-rate-value').textContent =
+    data.conclusion_rate_percent != null ? `${data.conclusion_rate_percent}%` : '—';
+  document.getElementById('metric-channel-value').textContent = data.most_used_channel_label ?? '—';
 }
 
 // ---------- Relógio ao vivo (só visual — não afeta lógica de negócio) ----------
