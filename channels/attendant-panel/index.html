@@ -35,7 +35,7 @@
             <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="17" height="17"><line x1="4" y1="6" x2="20" y2="6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><line x1="4" y1="12" x2="20" y2="12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><line x1="4" y1="18" x2="14" y2="18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
           </span>
           Jornadas ativas
-          <span class="sidebar-nav-badge">12</span>
+          <span class="sidebar-nav-badge hidden" id="active-journeys-badge">0</span>
         </button>
         <button type="button" class="sidebar-nav-item" id="nav-metricas" data-view="metricas">
           <span class="sidebar-nav-icon">
@@ -281,10 +281,9 @@
 
       </div>
 
-      <!-- Jornadas Ativas (mockado — FASE 3, item C.5) -->
+      <!-- Jornadas Ativas — dados reais via GET /journeys/active (FASE 3.2, Bloco B) -->
       <div id="view-jornadas-ativas" class="main-view hidden">
-        <div class="mock-banner">Esta funcionalidade está em desenvolvimento. Dados abaixo são demonstrativos.</div>
-        <table class="mock-table">
+        <table class="mock-table" id="active-journeys-table">
           <thead>
             <tr>
               <th>Cliente</th>
@@ -293,47 +292,51 @@
               <th>Tempo desde início</th>
             </tr>
           </thead>
-          <tbody id="mock-active-journeys-body">
+          <tbody id="active-journeys-body">
             <!-- linhas geradas via JS, clicáveis -->
           </tbody>
         </table>
+        <div id="active-journeys-empty" class="active-journeys-empty hidden">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" class="active-journeys-empty-icon"><circle cx="12" cy="12" r="10"></circle><path d="M8 12.5l2.5 2.5 5.5-6"></path></svg>
+          <p class="active-journeys-empty-title">Nenhuma jornada em andamento no momento</p>
+          <p class="active-journeys-empty-subtitle">Todas as jornadas foram concluídas ou não há novas interações agora. Esta tela atualiza automaticamente.</p>
+        </div>
       </div>
 
-      <!-- Métricas (mockado — FASE 3, item C.5; ícones/gradiente/tendência na FASE 3.1, item B.3.2) -->
+      <!-- Métricas — dados reais via GET /metrics/summary (FASE 3.2, Bloco C) -->
       <div id="view-metricas" class="main-view hidden">
-        <div class="mock-banner">Esta funcionalidade está em desenvolvimento. Dados exibidos são demonstrativos.</div>
         <div class="mock-metrics-grid">
           <div class="mock-metric-card mock-metric-card--tma">
             <div class="mock-metric-icon">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 3"></path></svg>
             </div>
             <span class="mock-metric-label">TMA médio</span>
-            <span class="mock-metric-value">4m 12s</span>
-            <span class="mock-metric-trend mock-metric-trend--up">↗ +8% vs semana anterior</span>
+            <span class="mock-metric-value" id="metric-tma-value">—</span>
+            <span class="mock-metric-period">últimos 30 dias</span>
           </div>
           <div class="mock-metric-card mock-metric-card--volume">
             <div class="mock-metric-icon">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10"></path><path d="M12 20V4"></path><path d="M20 20v-7"></path></svg>
             </div>
             <span class="mock-metric-label">Jornadas hoje</span>
-            <span class="mock-metric-value">47</span>
-            <span class="mock-metric-trend mock-metric-trend--up">↗ +15% vs semana anterior</span>
+            <span class="mock-metric-value" id="metric-journeys-today-value">—</span>
+            <span class="mock-metric-period">desde 00:00</span>
           </div>
           <div class="mock-metric-card mock-metric-card--completion">
             <div class="mock-metric-icon">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M8.5 12.5l2.5 2.5 4.5-5"></path></svg>
             </div>
             <span class="mock-metric-label">Taxa de conclusão</span>
-            <span class="mock-metric-value">78%</span>
-            <span class="mock-metric-trend mock-metric-trend--down">↘ -3% vs semana anterior</span>
+            <span class="mock-metric-value" id="metric-conclusion-rate-value">—</span>
+            <span class="mock-metric-period">últimos 30 dias</span>
           </div>
           <div class="mock-metric-card mock-metric-card--channel">
             <div class="mock-metric-icon">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.5 8.5 0 01-12.3 7.6L4 20l1-4.5A8.5 8.5 0 1121 11.5z"></path></svg>
             </div>
             <span class="mock-metric-label">Canal mais usado</span>
-            <span class="mock-metric-value">WhatsApp</span>
-            <span class="mock-metric-trend mock-metric-trend--up">↗ +5% vs semana anterior</span>
+            <span class="mock-metric-value" id="metric-channel-value">—</span>
+            <span class="mock-metric-period">últimos 30 dias</span>
           </div>
         </div>
       </div>
