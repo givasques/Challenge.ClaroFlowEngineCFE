@@ -227,10 +227,39 @@
         Este cliente não tem jornadas em andamento no momento.
       </p>
 
-      <!-- Resumo de interações históricas do cliente (ETAPA 2, Passo B) -->
+      <!-- Resumo de interações históricas do cliente (ETAPA 2, Passo B; mini-stats visuais na FASE 3.1, item B.1) -->
       <section id="interactions-summary-block" class="panel-block hidden">
         <h2>Resumo de interações</h2>
-        <p id="interactions-summary-text" class="interactions-summary-text"></p>
+        <div id="interactions-summary-grid" class="interactions-summary-grid">
+          <div id="interactions-stat-total" class="interactions-stat">
+            <div class="interactions-stat-icon interactions-stat-icon--total">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="7" height="7" rx="1"></rect><rect x="13" y="4" width="7" height="7" rx="1"></rect><rect x="4" y="13" width="7" height="7" rx="1"></rect><rect x="13" y="13" width="7" height="7" rx="1"></rect></svg>
+            </div>
+            <div id="interactions-stat-total-value" class="interactions-stat-value">0</div>
+            <div class="interactions-stat-label">Total</div>
+          </div>
+          <div id="interactions-stat-concluded" class="interactions-stat">
+            <div class="interactions-stat-icon interactions-stat-icon--concluded">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"></path></svg>
+            </div>
+            <div id="interactions-stat-concluded-value" class="interactions-stat-value">0</div>
+            <div class="interactions-stat-label">Concluídas</div>
+          </div>
+          <div id="interactions-stat-abandoned" class="interactions-stat">
+            <div class="interactions-stat-icon interactions-stat-icon--abandoned">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"></path><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"></path></svg>
+            </div>
+            <div id="interactions-stat-abandoned-value" class="interactions-stat-value">0</div>
+            <div class="interactions-stat-label">Abandonadas</div>
+          </div>
+          <div id="interactions-stat-expired" class="interactions-stat">
+            <div class="interactions-stat-icon interactions-stat-icon--expired">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 3"></path></svg>
+            </div>
+            <div id="interactions-stat-expired-value" class="interactions-stat-value">0</div>
+            <div class="interactions-stat-label">Expiradas</div>
+          </div>
+        </div>
       </section>
 
       <!-- Histórico -->
@@ -270,47 +299,117 @@
         </table>
       </div>
 
-      <!-- Métricas (mockado — FASE 3, item C.5) -->
+      <!-- Métricas (mockado — FASE 3, item C.5; ícones/gradiente/tendência na FASE 3.1, item B.3.2) -->
       <div id="view-metricas" class="main-view hidden">
         <div class="mock-banner">Esta funcionalidade está em desenvolvimento. Dados exibidos são demonstrativos.</div>
         <div class="mock-metrics-grid">
-          <div class="mock-metric-card">
+          <div class="mock-metric-card mock-metric-card--tma">
+            <div class="mock-metric-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 3"></path></svg>
+            </div>
             <span class="mock-metric-label">TMA médio</span>
             <span class="mock-metric-value">4m 12s</span>
+            <span class="mock-metric-trend mock-metric-trend--up">↗ +8% vs semana anterior</span>
           </div>
-          <div class="mock-metric-card">
+          <div class="mock-metric-card mock-metric-card--volume">
+            <div class="mock-metric-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10"></path><path d="M12 20V4"></path><path d="M20 20v-7"></path></svg>
+            </div>
             <span class="mock-metric-label">Jornadas hoje</span>
             <span class="mock-metric-value">47</span>
+            <span class="mock-metric-trend mock-metric-trend--up">↗ +15% vs semana anterior</span>
           </div>
-          <div class="mock-metric-card">
+          <div class="mock-metric-card mock-metric-card--completion">
+            <div class="mock-metric-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M8.5 12.5l2.5 2.5 4.5-5"></path></svg>
+            </div>
             <span class="mock-metric-label">Taxa de conclusão</span>
             <span class="mock-metric-value">78%</span>
+            <span class="mock-metric-trend mock-metric-trend--down">↘ -3% vs semana anterior</span>
           </div>
-          <div class="mock-metric-card">
+          <div class="mock-metric-card mock-metric-card--channel">
+            <div class="mock-metric-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.5 8.5 0 01-12.3 7.6L4 20l1-4.5A8.5 8.5 0 1121 11.5z"></path></svg>
+            </div>
             <span class="mock-metric-label">Canal mais usado</span>
             <span class="mock-metric-value">WhatsApp</span>
+            <span class="mock-metric-trend mock-metric-trend--up">↗ +5% vs semana anterior</span>
           </div>
         </div>
       </div>
 
-      <!-- Configurações (mockado — FASE 3, item C.5) -->
+      <!-- Configurações (mockado — FASE 3, item C.5; seções na FASE 3.1, item B.3.3) -->
       <div id="view-configuracoes" class="main-view hidden">
         <div class="mock-banner">Esta funcionalidade está em desenvolvimento.</div>
-        <div class="mock-settings-form">
-          <label>
-            <span class="detail-label">Nome do atendente</span>
-            <input type="text" value="Júlia Souza" disabled />
-          </label>
-          <label class="mock-settings-checkbox">
-            <input type="checkbox" checked disabled />
-            <span>Receber notificações de novas jornadas</span>
-          </label>
-          <label>
-            <span class="detail-label">Tema</span>
-            <select disabled>
-              <option>Claro</option>
-            </select>
-          </label>
+        <div class="mock-settings-sections">
+          <div class="mock-settings-card">
+            <div class="mock-settings-card-header">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"></circle><path d="M4 20c0-3.3 3.6-6 8-6s8 2.7 8 6"></path></svg>
+              Perfil
+            </div>
+            <div class="mock-settings-form">
+              <label>
+                <span class="detail-label">Nome do atendente</span>
+                <input type="text" value="Júlia Souza" disabled />
+              </label>
+              <label>
+                <span class="detail-label">Email</span>
+                <input type="email" value="julia.souza@claro.com.br" disabled />
+              </label>
+              <label>
+                <span class="detail-label">Cargo</span>
+                <input type="text" value="Atendente Nível 2" disabled />
+              </label>
+            </div>
+          </div>
+
+          <div class="mock-settings-card">
+            <div class="mock-settings-card-header">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.7 21a2 2 0 01-3.4 0"></path></svg>
+              Notificações
+            </div>
+            <div class="mock-settings-form">
+              <label class="mock-settings-checkbox">
+                <input type="checkbox" checked disabled />
+                <span>Receber notificações de novas jornadas</span>
+              </label>
+              <label class="mock-settings-checkbox">
+                <input type="checkbox" checked disabled />
+                <span>Alertar quando cliente demorar mais de 5 min para responder</span>
+              </label>
+              <label class="mock-settings-checkbox">
+                <input type="checkbox" disabled />
+                <span>Notificar por email jornadas críticas</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="mock-settings-card">
+            <div class="mock-settings-card-header">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><circle cx="9" cy="10" r="1"></circle><circle cx="13" cy="8" r="1"></circle><circle cx="16" cy="12" r="1"></circle><path d="M12 21a3 3 0 01-3-3c0-1 1-1 1-2a2 2 0 00-2-2H6"></path></svg>
+              Aparência
+            </div>
+            <div class="mock-settings-form">
+              <label>
+                <span class="detail-label">Tema</span>
+                <select disabled>
+                  <option>Claro</option>
+                  <option>Escuro</option>
+                  <option>Automático</option>
+                </select>
+              </label>
+              <label>
+                <span class="detail-label">Idioma</span>
+                <select disabled>
+                  <option>Português</option>
+                  <option>English</option>
+                  <option>Español</option>
+                </select>
+              </label>
+            </div>
+          </div>
+
+          <button type="button" class="mock-settings-save" disabled>Salvar alterações</button>
         </div>
       </div>
     </main>

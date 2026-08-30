@@ -90,6 +90,7 @@ const state = {
   customerId: null,
   journeyId: null,
   journeyPayload: null,
+  currentPlan: null,
   pollingHandle: null,
   degraded: false,
   lastUpdatedAt: null,
@@ -164,6 +165,47 @@ function formatCents(cents) {
 
 function formatCpf(cpf) {
   return cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+}
+
+function truncate(text, maxLength) {
+  return text.length > maxLength ? `${text.slice(0, maxLength)}...` : text;
+}
+
+// ---------- Enriquecimento de descrições da timeline (FASE 3.1, item B.2) ----------
+// Catálogo de planos e detalhes de fatura são buscados sob demanda e cacheados — a timeline não
+// tem esses dados prontos localmente, só os códigos/ids que vêm no payload da jornada.
+
+let plansCatalogPromise = null;
+function loadPlansCatalog() {
+  if (!plansCatalogPromise) {
+    plansCatalogPromise = apiCall('/plans')
+      .then(data => Object.fromEntries(data.plans.map(p => [p.code, p])))
+      .catch(() => ({}));
+  }
+  return plansCatalogPromise;
+}
+
+const invoiceDetailsCache = {};
+async function getInvoiceDetails(invoiceId) {
+  if (invoiceId in invoiceDetailsCache) return invoiceDetailsCache[invoiceId];
+  try {
+    invoiceDetailsCache[invoiceId] = await apiCall(`/invoices/${invoiceId}`);
+  } catch (err) {
+    invoiceDetailsCache[invoiceId] = null;
+  }
+  return invoiceDetailsCache[invoiceId];
+}
+
+/** Monta o contexto auxiliar (catálogo de planos, fatura, intenção, início da jornada) uma vez por render da timeline. */
+async function buildDescriptionContext(transitions, journeyPayload) {
+  const startedTransition = transitions.find(t => t.event_type === 'journey_started');
+
+  return {
+    plansCatalog: await loadPlansCatalog(),
+    invoice: journeyPayload && journeyPayload.invoice_id ? await getInvoiceDetails(journeyPayload.invoice_id) : null,
+    intent: startedTransition && startedTransition.metadata ? startedTransition.metadata.intent : null,
+    journeyStartedAt: startedTransition ? startedTransition.occurred_at : null,
+  };
 }
 
 function formatPhone(digits) {
@@ -331,7 +373,7 @@ async function pollJourney() {
 async function refreshTransitions() {
   try {
     const data = await apiCall(`/context/${state.journeyId}/transitions`);
-    renderTimeline(data.transitions, state.journeyPayload);
+    await renderTimeline(data.transitions, state.journeyPayload);
   } catch (err) {
     if (err instanceof CfeUnavailableError) {
       state.degraded = true;
@@ -365,6 +407,8 @@ function clearMessage() {
 
 function renderCustomerBlock(customer) {
   const block = document.getElementById('customer-block');
+  state.currentPlan = customer ? customer.current_plan || null : null;
+
   if (!customer) {
     block.classList.add('hidden');
     renderInteractionsSummary(null);
@@ -399,6 +443,8 @@ function renderCustomerBlock(customer) {
   renderInteractionsSummary(customer.journey_counts);
 }
 
+/** Mini-stats visuais do resumo de interações (FASE 3.1, item B.1) — um card por categoria, com
+ * opacidade reduzida quando o contador é zero, para indicar "nenhum evento deste tipo" sem texto extra. */
 function renderInteractionsSummary(counts) {
   const block = document.getElementById('interactions-summary-block');
   if (!counts || counts.total === 0) {
@@ -406,11 +452,17 @@ function renderInteractionsSummary(counts) {
     return;
   }
 
-  document.getElementById('interactions-summary-text').textContent =
-    `${counts.total} jornada${counts.total === 1 ? '' : 's'} no total — ` +
-    `${counts.concluded} concluída${counts.concluded === 1 ? '' : 's'}, ` +
-    `${counts.abandoned} abandonada${counts.abandoned === 1 ? '' : 's'}, ` +
-    `${counts.expired} expirada${counts.expired === 1 ? '' : 's'}.`;
+  const stats = [
+    ['total', counts.total],
+    ['concluded', counts.concluded],
+    ['abandoned', counts.abandoned],
+    ['expired', counts.expired],
+  ];
+
+  for (const [key, value] of stats) {
+    document.getElementById(`interactions-stat-${key}-value`).textContent = value;
+    document.getElementById(`interactions-stat-${key}`).classList.toggle('interactions-stat--zero', value === 0);
+  }
 
   block.classList.remove('hidden');
 }
@@ -455,7 +507,7 @@ function renderJourneyStatus(journey) {
   block.classList.remove('hidden');
 }
 
-function renderTimeline(transitions, journeyPayload) {
+async function renderTimeline(transitions, journeyPayload) {
   const block = document.getElementById('history-block');
   const list = document.getElementById('history-list');
   list.innerHTML = '';
@@ -471,38 +523,61 @@ function renderTimeline(transitions, journeyPayload) {
     document.getElementById('journey-current-channel-chip').classList.toggle('hidden', current === origin);
   }
 
-  appendTimelineItems(list, transitions, journeyPayload);
+  await appendTimelineItems(list, transitions, journeyPayload);
 
   block.classList.remove('hidden');
 }
 
 /**
- * Descrição contextualizada de uma transição (FASE 3, item C.4) — cruza `event_type`/`metadata` da
- * transição com o `payload` da jornada para dar ao atendente uma frase legível, sem precisar conhecer
- * o backend. Sem mudança de backend: os dados já estão disponíveis em `payload` e `metadata`.
+ * Descrição contextualizada de uma transição (FASE 3, item C.4; enriquecida na FASE 3.1, item B.2) —
+ * cruza `event_type`/`metadata` da transição com o `payload` da jornada e um `context` auxiliar
+ * (catálogo de planos, detalhe da fatura, intenção, início da jornada) para dar ao atendente uma frase
+ * autoexplicativa, sem precisar consultar outra parte da tela. Sem mudança de backend.
  */
-function buildTransitionDescription(transition, journeyPayload) {
+function buildTransitionDescription(transition, journeyPayload, context) {
   const payload = journeyPayload || {};
   const metadata = transition.metadata || {};
+  const ctx = context || {};
+  const channelLabel = CHANNEL_LABELS[transition.channel] || transition.channel;
 
   switch (transition.event_type) {
-    case 'journey_started':
-      return `Jornada iniciada — ${INTENT_LABELS[metadata.intent] || metadata.intent || 'intenção não informada'}`;
+    case 'journey_started': {
+      const intentLabel = INTENT_LABELS[metadata.intent] || metadata.intent || 'intenção não informada';
+      return `Jornada iniciada — ${intentLabel} (canal ${channelLabel})`;
+    }
 
     case 'step_updated': {
       const step = metadata.current_step;
+
       if (step === 'plan_selected' && payload.selected_plan_code) {
-        return `Plano selecionado: ${payload.selected_plan_code}`;
+        const catalog = ctx.plansCatalog || {};
+        const selected = catalog[payload.selected_plan_code];
+        const selectedLabel = selected
+          ? `${selected.name} — ${formatCents(selected.monthly_price_cents)}/mês`
+          : payload.selected_plan_code;
+        const current = state.currentPlan;
+        const previousLabel = current ? ` (anterior: ${current.name} — ${formatCents(current.monthly_price_cents)}/mês)` : '';
+        return `Plano selecionado: ${selectedLabel}${previousLabel}`;
       }
+
       if (step === 'invoice_selected') {
+        if (ctx.invoice) {
+          return `Fatura selecionada: ${ctx.invoice.reference_label} — ${formatCents(ctx.invoice.total_cents)} ` +
+            `(vencimento ${formatDateShort(ctx.invoice.due_date)})`;
+        }
         return 'Fatura selecionada';
       }
+
       if (step === 'dispute_reason_selected' && payload.dispute_reason) {
-        return `Motivo informado: ${DISPUTE_REASON_LABELS[payload.dispute_reason] || payload.dispute_reason}`;
+        return `Motivo da contestação: ${DISPUTE_REASON_LABELS[payload.dispute_reason] || payload.dispute_reason}`;
       }
+
       if (step === 'description_provided') {
-        return payload.customer_description ? 'Descrição do problema informada' : 'Etapa concluída sem descrição adicional';
+        return payload.customer_description
+          ? `Descrição do cliente: "${truncate(payload.customer_description, 80)}"`
+          : 'Etapa concluída sem descrição adicional';
       }
+
       return CURRENT_STEP_LABELS[step] ? `Etapa atualizada: ${CURRENT_STEP_LABELS[step]}` : 'Etapa atualizada';
     }
 
@@ -510,26 +585,41 @@ function buildTransitionDescription(transition, journeyPayload) {
       const targetLabel = CHANNEL_LABELS[metadata.target_channel] || metadata.target_channel || 'outro canal';
       const expiresAt = metadata.token_expires_at ? formatMessageTime(metadata.token_expires_at) : null;
       return expiresAt
-        ? `Deep link gerado para ${targetLabel} — válido até ${expiresAt}`
-        : `Deep link gerado para ${targetLabel}`;
+        ? `Deep link enviado ao cliente para retomar no ${targetLabel} (válido até ${expiresAt})`
+        : `Deep link enviado ao cliente para retomar no ${targetLabel}`;
     }
 
-    case 'journey_resumed':
-      return `Jornada retomada em ${CHANNEL_LABELS[transition.channel] || transition.channel}`;
+    case 'journey_resumed': {
+      if (ctx.journeyStartedAt) {
+        const minutes = Math.round((new Date(transition.occurred_at) - new Date(ctx.journeyStartedAt)) / 60000);
+        if (minutes >= 0) {
+          return `Cliente retomou a jornada no ${channelLabel} (após ${minutes} ${minutes === 1 ? 'minuto' : 'minutos'} no WhatsApp)`;
+        }
+      }
+      return `Jornada retomada em ${channelLabel}`;
+    }
 
     case 'journey_closed': {
       const outcome = metadata.outcome;
       if (outcome === 'concluded') {
-        return `Jornada concluída em ${CHANNEL_LABELS[transition.channel] || transition.channel}`;
+        if (ctx.intent === 'dispute_charge' && payload.protocol_number) {
+          return `Contestação formalizada (protocolo ${payload.protocol_number}) no ${channelLabel}`;
+        }
+        if (ctx.intent === 'change_plan') {
+          return `Troca de plano confirmada pelo cliente no ${channelLabel}`;
+        }
+        return `Jornada concluída em ${channelLabel}`;
       }
       if (outcome === 'abandoned') {
-        return metadata.reason ? `Jornada abandonada — motivo: ${metadata.reason}` : 'Jornada abandonada';
+        return metadata.reason
+          ? `Jornada abandonada pelo cliente (motivo: ${metadata.reason} no ${channelLabel})`
+          : `Jornada abandonada pelo cliente no ${channelLabel}`;
       }
       return transition.description || 'Jornada encerrada';
     }
 
     case 'journey_expired':
-      return 'Jornada expirada por inatividade (24h+)';
+      return 'Jornada expirada — cliente sem interação há mais de 24 horas';
 
     case 'panel_accessed':
       return 'Painel consultado por atendente';
@@ -549,7 +639,9 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
-function appendTimelineItems(list, transitions, journeyPayload) {
+async function appendTimelineItems(list, transitions, journeyPayload) {
+  const context = await buildDescriptionContext(transitions, journeyPayload);
+
   for (const t of transitions) {
     const li = document.createElement('li');
     li.className = 'history-item';
@@ -626,7 +718,7 @@ function buildPreviousJourneyItem(journey) {
         detail.innerHTML = '';
         const ul = document.createElement('ul');
         ul.className = 'history-list';
-        appendTimelineItems(ul, data.transitions, journey.payload);
+        await appendTimelineItems(ul, data.transitions, journey.payload);
         detail.appendChild(ul);
         loaded = true;
       } catch (err) {
@@ -690,10 +782,30 @@ function switchView(view) {
 
 // Dados demonstrativos — clientes reais do seed, para a linha clicável levar a uma consulta que funciona de verdade.
 const MOCK_ACTIVE_JOURNEYS = [
-  { name: 'Ana Silva', cpf: '11144477735', intent: 'change_plan', channel: 'whatsapp', started: 'há 3 min' },
-  { name: 'Carlos Mendes', cpf: '22255588846', intent: 'dispute_charge', channel: 'app', started: 'há 12 min' },
-  { name: 'Mariana Souza', cpf: '33366699957', intent: 'change_plan', channel: 'whatsapp', started: 'há 27 min' },
+  { name: 'Ana Silva', cpf: '11144477735', intent: 'change_plan', channel: 'whatsapp', minutesAgo: 3 },
+  { name: 'Carlos Mendes', cpf: '22255588846', intent: 'dispute_charge', channel: 'app', minutesAgo: 12 },
+  { name: 'Mariana Souza', cpf: '33366699957', intent: 'change_plan', channel: 'whatsapp', minutesAgo: 27 },
 ];
+
+const MOCK_INTENT_ICONS = {
+  change_plan: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2l4 4-4 4"></path><path d="M3 11V9a4 4 0 014-4h14"></path><path d="M7 22l-4-4 4-4"></path><path d="M21 13v2a4 4 0 01-4 4H3"></path></svg>',
+  dispute_charge: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4"></path><path d="M12 17h.01"></path><path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"></path></svg>',
+};
+
+const MOCK_CHANNEL_ICONS = {
+  whatsapp: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M21 11.5a8.5 8.5 0 01-12.3 7.6L4 20l1-4.5A8.5 8.5 0 1121 11.5z"></path></svg>',
+  app: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="7" y="2" width="10" height="20" rx="2"></rect><line x1="11" y1="18.5" x2="13" y2="18.5" stroke-linecap="round"></line></svg>',
+};
+
+const MOCK_CLOCK_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 3"></path></svg>';
+
+/** Urgência por tempo desde o início (FASE 3.1, item B.3.1): quanto mais tempo parado, mais quente a cor. */
+function mockTimeUrgencyClass(minutes) {
+  if (minutes > 30) return 'mock-time--urgent';
+  if (minutes > 15) return 'mock-time--warning';
+  if (minutes > 5) return 'mock-time--normal';
+  return 'mock-time--low';
+}
 
 function renderMockActiveJourneys() {
   const tbody = document.getElementById('mock-active-journeys-body');
@@ -701,11 +813,19 @@ function renderMockActiveJourneys() {
 
   MOCK_ACTIVE_JOURNEYS.forEach(row => {
     const tr = document.createElement('tr');
+    const intentLabel = INTENT_LABELS[row.intent] || row.intent;
+    const channelLabel = CHANNEL_LABELS[row.channel] || row.channel;
+    const urgencyClass = mockTimeUrgencyClass(row.minutesAgo);
     tr.innerHTML = `
-      <td>${escapeHtml(row.name)}</td>
-      <td>${INTENT_LABELS[row.intent] || row.intent}</td>
-      <td>${CHANNEL_LABELS[row.channel] || row.channel}</td>
-      <td>${escapeHtml(row.started)}</td>
+      <td>
+        <div class="mock-table-client">
+          <div class="mock-table-avatar">${escapeHtml(getInitials(row.name))}</div>
+          <span class="mock-table-client-name">${escapeHtml(row.name)}</span>
+        </div>
+      </td>
+      <td><span class="mock-badge mock-badge--intent-${row.intent}">${MOCK_INTENT_ICONS[row.intent] || ''}${intentLabel}</span></td>
+      <td><span class="mock-badge mock-badge--channel-${row.channel}">${MOCK_CHANNEL_ICONS[row.channel] || ''}${channelLabel}</span></td>
+      <td><span class="mock-time ${urgencyClass}">${MOCK_CLOCK_ICON}há ${row.minutesAgo} min</span></td>
     `;
     tr.addEventListener('click', () => {
       switchView('consulta');

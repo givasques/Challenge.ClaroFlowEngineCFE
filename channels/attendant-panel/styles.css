@@ -446,10 +446,62 @@ body {
   color: var(--text-secondary);
 }
 
-.interactions-summary-text {
-  font-size: 13px;
-  color: var(--text-secondary);
-  margin: 0;
+.interactions-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+@media (max-width: 600px) {
+  .interactions-summary-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.interactions-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 14px 8px;
+  background: var(--surface-muted);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  transition: opacity 0.15s ease;
+}
+
+.interactions-stat--zero {
+  opacity: 0.5;
+}
+
+.interactions-stat-icon {
+  width: 20px;
+  height: 20px;
+}
+
+.interactions-stat-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.interactions-stat-icon--total { color: var(--text-muted); }
+.interactions-stat-icon--concluded { color: #16a34a; }
+.interactions-stat-icon--abandoned { color: var(--text-muted); }
+.interactions-stat-icon--expired { color: #d97706; }
+
+.interactions-stat-value {
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--text-primary);
+}
+
+.interactions-stat-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-subtle);
 }
 
 /* ---------- Jornadas anteriores (ETAPA 2, Passo B) ---------- */
@@ -572,6 +624,87 @@ body {
   background: var(--surface-muted);
 }
 
+/* B.3.1 (FASE 3.1) — cliente com avatar, badges de intenção/canal, tempo por urgência */
+
+.mock-table-client {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.mock-table-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--claro-red-subtle);
+  color: var(--claro-red-dark);
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.mock-table-client-name {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.mock-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.mock-badge svg {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+}
+
+.mock-badge--intent-change_plan {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.mock-badge--intent-dispute_charge {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.mock-badge--channel-whatsapp {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.mock-badge--channel-app {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.mock-time {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
+
+.mock-time svg {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+}
+
+.mock-time--low { color: #15803d; }
+.mock-time--normal { color: var(--text-muted); }
+.mock-time--warning { color: #d97706; }
+.mock-time--urgent { color: #b91c1c; }
+
 .mock-metrics-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
@@ -579,15 +712,34 @@ body {
 }
 
 .mock-metric-card {
-  background: var(--surface);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
   padding: 18px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  box-shadow: var(--shadow-sm);
+  gap: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
+
+.mock-metric-card--tma { background: linear-gradient(160deg, #eff6ff 0%, var(--surface) 65%); }
+.mock-metric-card--volume { background: linear-gradient(160deg, #f5f3ff 0%, var(--surface) 65%); }
+.mock-metric-card--completion { background: linear-gradient(160deg, #f0fdf4 0%, var(--surface) 65%); }
+.mock-metric-card--channel { background: linear-gradient(160deg, #f1f5f9 0%, var(--surface) 65%); }
+
+.mock-metric-icon {
+  width: 32px;
+  height: 32px;
+}
+
+.mock-metric-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.mock-metric-card--tma .mock-metric-icon { color: #2563eb; }
+.mock-metric-card--volume .mock-metric-icon { color: #7c3aed; }
+.mock-metric-card--completion .mock-metric-icon { color: #16a34a; }
+.mock-metric-card--channel .mock-metric-icon { color: #475569; }
 
 .mock-metric-label {
   font-size: 11px;
@@ -602,15 +754,54 @@ body {
   color: var(--text-primary);
 }
 
-.mock-settings-form {
+.mock-metric-trend {
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.mock-metric-trend--up { color: #16a34a; }
+.mock-metric-trend--down { color: #b91c1c; }
+
+/* B.3.3 (FASE 3.1) — seções de Configurações com header próprio, ícone e cards separados */
+
+.mock-settings-sections {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  max-width: 360px;
+  max-width: 420px;
+}
+
+.mock-settings-card {
   background: var(--surface);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
   padding: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.mock-settings-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.mock-settings-card-header svg {
+  width: 16px;
+  height: 16px;
+  color: var(--claro-red-dark);
+}
+
+.mock-settings-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
 
 .mock-settings-form label {
@@ -620,6 +811,7 @@ body {
 }
 
 .mock-settings-form input[type="text"],
+.mock-settings-form input[type="email"],
 .mock-settings-form select {
   padding: 8px 10px;
   border: 1px solid var(--border-subtle);
@@ -633,6 +825,18 @@ body {
   flex-direction: row !important;
   align-items: center;
   gap: 8px !important;
+}
+
+.mock-settings-save {
+  align-self: flex-start;
+  padding: 9px 18px;
+  border-radius: var(--radius-md);
+  border: none;
+  background: var(--border-medium);
+  color: var(--surface);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: not-allowed;
 }
 
 /* ---------- Dados do Cliente (hero) ---------- */
