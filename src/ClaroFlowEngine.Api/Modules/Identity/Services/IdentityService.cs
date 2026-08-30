@@ -29,7 +29,7 @@ public class IdentityService : IIdentityService
         {
             _logger.LogInformation(
                 "Identity resolved via existing link for channel {Channel}", request.Channel);
-            return ToResponse(existingLink.Customer, wasCreated: false, request.Channel, request.Identifier);
+            return await ToResponseAsync(existingLink.Customer, wasCreated: false, request.Channel, request.Identifier, cancellationToken);
         }
 
         // Canal "cpf": o próprio identificador é o CPF a ser buscado/vinculado.
@@ -66,7 +66,7 @@ public class IdentityService : IIdentityService
         var link = await FindLinkAsync(channel, identifier, cancellationToken)
             ?? throw new NotFoundException("identity_not_found", "Identidade não encontrada para o canal e identificador informados.");
 
-        return ToResponse(link.Customer, wasCreated: false, channel, identifier);
+        return await ToResponseAsync(link.Customer, wasCreated: false, channel, identifier, cancellationToken);
     }
 
     /// <summary>
@@ -109,7 +109,7 @@ public class IdentityService : IIdentityService
 
         await transaction.CommitAsync(cancellationToken);
 
-        return ToResponse(customer, wasCreated, linkChannel, linkIdentifier);
+        return await ToResponseAsync(customer, wasCreated, linkChannel, linkIdentifier, cancellationToken);
     }
 
     private Task<IdentityLink?> FindLinkAsync(string channel, string identifier, CancellationToken cancellationToken)
@@ -130,9 +130,20 @@ public class IdentityService : IIdentityService
             throw new ValidationException("invalid_identifier", $"Identificador em formato inválido para o canal '{channel}'.");
     }
 
-    private static ResolveIdentityResponse ToResponse(Customer customer, bool wasCreated, string channel, string identifier) => new(
-        UnifiedCustomerId: customer.Id,
-        Customer: new CustomerSummaryDto(customer.Id, customer.FullName, customer.Cpf),
-        WasCreated: wasCreated,
-        ResolvedLink: new ResolvedLinkDto(channel, identifier));
+    /// <summary>Embute o plano ativo do cliente (FASE 3, item B.1) — usado pelo bot para informar o plano atual antes da lista de troca.</summary>
+    private async Task<ResolveIdentityResponse> ToResponseAsync(
+        Customer customer, bool wasCreated, string channel, string identifier, CancellationToken cancellationToken)
+    {
+        var currentPlan = await _db.CustomerPlans
+            .AsNoTracking()
+            .Where(cp => cp.CustomerId == customer.Id && cp.Active)
+            .Select(cp => new PlanInfoDto(cp.Plan.Code, cp.Plan.Name, cp.Plan.MonthlyPriceCents))
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return new ResolveIdentityResponse(
+            UnifiedCustomerId: customer.Id,
+            Customer: new CustomerSummaryDto(customer.Id, customer.FullName, customer.Cpf, currentPlan),
+            WasCreated: wasCreated,
+            ResolvedLink: new ResolvedLinkDto(channel, identifier));
+    }
 }

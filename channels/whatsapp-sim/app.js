@@ -133,6 +133,7 @@ function createFreshSession() {
     customerName: null,
     journeyId: null,
     intent: null,
+    currentPlan: null,
     plans: null,
     invoices: null,
     disputeReason: null,
@@ -393,6 +394,7 @@ async function handleAwaitingName(text) {
 async function onIdentityResolved(identity) {
   session.customerId = identity.unified_customer_id;
   session.customerName = identity.customer.full_name;
+  session.currentPlan = identity.customer.current_plan || null;
 
   addCfeBadge('Identidade resolvida — cliente vinculado');
 
@@ -436,9 +438,16 @@ async function presentPlans() {
     return handleDomainError(err);
   }
 
-  session.plans = plansResponse.plans;
+  // Plano atual não entra na lista de opções — evita o cliente "trocar" para o mesmo plano (FASE 3, item B.1).
+  session.plans = session.currentPlan
+    ? plansResponse.plans.filter(p => p.code !== session.currentPlan.code)
+    : plansResponse.plans;
 
-  await botSay('Estes são os planos disponíveis:', {
+  if (session.currentPlan) {
+    await botSay(`Seu plano atual é o ${session.currentPlan.name} — ${formatCents(session.currentPlan.monthly_price_cents)}/mês.`);
+  }
+
+  await botSay('Estes são os planos que você pode escolher:', {
     type: 'list',
     options: session.plans.map(p => ({
       id: p.code,
