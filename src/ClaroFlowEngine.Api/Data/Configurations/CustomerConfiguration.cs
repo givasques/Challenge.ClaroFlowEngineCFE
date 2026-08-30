@@ -18,6 +18,12 @@ public class CustomerConfiguration : IEntityTypeConfiguration<Customer>
         builder.Property(c => c.FullName).HasMaxLength(200).IsRequired();
         builder.Property(c => c.CreatedAt).HasDefaultValueSql("NOW()");
 
-        builder.ToTable(t => t.HasCheckConstraint("ck_customers_cpf_format", "cpf ~ '^\\d{11}$'"));
+        builder.Property(c => c.Segment).HasMaxLength(50);
+
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("ck_customers_cpf_format", "cpf ~ '^\\d{11}$'");
+            t.HasCheckConstraint("ck_customers_billing_due_day", "billing_due_day IS NULL OR billing_due_day BETWEEN 1 AND 28");
+        });
     }
 }

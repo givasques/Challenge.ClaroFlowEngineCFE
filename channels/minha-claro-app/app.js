@@ -100,6 +100,19 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
+// Rótulos amigáveis dos motivos de contestação (FASE 3, Bloco A) — ids espelham Common/Contracts/DisputeReason.cs.
+const DISPUTE_REASON_LABELS = {
+  service_not_contracted: 'Cobrança de serviço que não contratei',
+  higher_than_expected: 'Valor cobrado maior que o esperado',
+  duplicate_charge: 'Cobrança em duplicidade',
+  cancelled_service_still_charged: 'Serviço cancelado ainda sendo cobrado',
+  after_portability: 'Cobrança após portabilidade',
+  other: 'Outro motivo',
+};
+
+// Categorias exibidas antes do divisor (serviços) vs. depois (impostos/taxas) — FASE 3, item A.6.
+const SERVICE_CATEGORIES = ['subscription', 'add_on'];
+
 // ---------- Fluxo ----------
 
 function handleLoginSubmit(event) {
@@ -173,10 +186,11 @@ function renderConfirmation(data) {
     : 'Não informado';
 }
 
-// ---------- Tela de contestação de cobrança (ETAPA 2, Passo C) ----------
+// ---------- Tela de contestação de cobrança (ETAPA 2 Passo C / FASE 3 Bloco A) ----------
 
 function renderDisputeConfirmation(data) {
   const { customer, journey_context: journeyContext, invoice_details: invoiceDetails } = data;
+  const payload = journeyContext.payload || {};
 
   document.getElementById('dispute-customer-name').textContent = customer.full_name;
   document.getElementById('dispute-customer-cpf').textContent = formatCpf(customer.cpf);
@@ -185,33 +199,48 @@ function renderDisputeConfirmation(data) {
   document.getElementById('dispute-invoice-due').textContent = invoiceDetails ? formatDateShort(invoiceDetails.due_date) : '—';
   document.getElementById('dispute-invoice-total').textContent = invoiceDetails ? formatCents(invoiceDetails.total_cents) : '—';
 
-  document.getElementById('dispute-description').textContent =
-    (journeyContext.payload && journeyContext.payload.customer_description) || 'Não informado';
+  // Motivo + descrição em destaque — a fatura é só visualização, o cliente não seleciona itens (item A.6).
+  document.getElementById('dispute-reason-text').textContent =
+    DISPUTE_REASON_LABELS[payload.dispute_reason] || 'Motivo não informado';
 
-  const itemsList = document.getElementById('dispute-items-list');
-  itemsList.innerHTML = '';
-
-  const items = (invoiceDetails && invoiceDetails.items) || [];
-  for (const item of items) {
-    const row = document.createElement('label');
-    row.className = 'dispute-item-row';
-    row.innerHTML = `
-      <input type="checkbox" class="dispute-item-checkbox" data-item-id="${escapeHtml(item.id)}" />
-      <span class="dispute-item-desc">${escapeHtml(item.description)}</span>
-      <span class="dispute-item-amount">${formatCents(item.amount_cents)}</span>
-    `;
-    itemsList.appendChild(row);
+  const descriptionEl = document.getElementById('dispute-description');
+  if (payload.customer_description) {
+    descriptionEl.textContent = `"${payload.customer_description}"`;
+    descriptionEl.classList.remove('hidden');
+  } else {
+    descriptionEl.classList.add('hidden');
   }
 
-  itemsList.querySelectorAll('.dispute-item-checkbox').forEach(cb => {
-    cb.addEventListener('change', updateFormalizeButtonState);
-  });
-  updateFormalizeButtonState();
+  renderDisputeItemsView((invoiceDetails && invoiceDetails.items) || [], invoiceDetails ? invoiceDetails.total_cents : 0);
 }
 
-function updateFormalizeButtonState() {
-  const anyChecked = document.querySelectorAll('.dispute-item-checkbox:checked').length > 0;
-  document.getElementById('formalize-dispute-button').disabled = !anyChecked;
+function renderDisputeItemsView(items, totalCents) {
+  const container = document.getElementById('dispute-items-list');
+  container.innerHTML = '';
+
+  const serviceItems = items.filter(item => SERVICE_CATEGORIES.includes(item.category));
+  const taxItems = items.filter(item => !SERVICE_CATEGORIES.includes(item.category));
+
+  const appendRow = item => {
+    const row = document.createElement('div');
+    row.className = 'dispute-item-view-row';
+    row.innerHTML = `
+      <span class="dispute-item-view-desc">${escapeHtml(item.description)}</span>
+      <span class="dispute-item-view-amount">${formatCents(item.amount_cents)}</span>
+    `;
+    container.appendChild(row);
+  };
+
+  serviceItems.forEach(appendRow);
+  if (serviceItems.length > 0 && taxItems.length > 0) {
+    container.appendChild(document.createElement('hr')).className = 'dispute-items-divider';
+  }
+  taxItems.forEach(appendRow);
+
+  const totalRow = document.createElement('div');
+  totalRow.className = 'dispute-items-total-row';
+  totalRow.innerHTML = `<span>Total</span><span>${formatCents(totalCents)}</span>`;
+  container.appendChild(totalRow);
 }
 
 function generateProtocolNumber() {
@@ -221,10 +250,6 @@ function generateProtocolNumber() {
 }
 
 async function formalizeDispute() {
-  const contestedItemIds = Array.from(document.querySelectorAll('.dispute-item-checkbox:checked'))
-    .map(cb => cb.dataset.itemId);
-  if (contestedItemIds.length === 0) return;
-
   const protocolNumber = generateProtocolNumber();
   state.lastFailedAction = formalizeDispute;
   showScreen('closing');
@@ -234,7 +259,7 @@ async function formalizeDispute() {
       method: 'PATCH',
       body: {
         current_step: 'dispute_formalized',
-        payload_merge: { contested_item_ids: contestedItemIds, protocol_number: protocolNumber },
+        payload_merge: { protocol_number: protocolNumber },
       },
     });
     await apiCall(`/context/${state.journeyId}/close`, { method: 'POST', body: { outcome: 'concluded', channel: 'app' } });
@@ -253,18 +278,25 @@ async function formalizeDispute() {
 }
 
 function renderCompletedScreen(protocolNumber) {
-  const protocolEl = document.getElementById('completed-protocol');
+  const detailsEl = document.getElementById('completed-dispute-details');
 
   if (state.intent === 'dispute_charge') {
     document.getElementById('completed-title').textContent = 'Contestação registrada!';
     document.getElementById('completed-message').textContent =
-      'Um analista vai revisar em até 5 dias úteis. Você será notificado por WhatsApp.';
-    protocolEl.textContent = `Protocolo: ${protocolNumber}`;
-    protocolEl.classList.remove('hidden');
+      'Retornaremos em até 5 dias úteis com uma resposta pelo canal de sua preferência.';
+
+    const reasonText = document.getElementById('dispute-reason-text').textContent;
+    const invoiceLabel = document.getElementById('dispute-invoice-label').textContent;
+    const invoiceTotal = document.getElementById('dispute-invoice-total').textContent;
+
+    document.getElementById('completed-protocol-value').textContent = protocolNumber;
+    document.getElementById('completed-reason-value').textContent = reasonText;
+    document.getElementById('completed-invoice-value').textContent = `${invoiceLabel} — ${invoiceTotal}`;
+    detailsEl.classList.remove('hidden');
   } else {
     document.getElementById('completed-title').textContent = 'Troca de plano confirmada!';
     document.getElementById('completed-message').textContent = 'Sua solicitação foi concluída com sucesso.';
-    protocolEl.classList.add('hidden');
+    detailsEl.classList.add('hidden');
   }
 }
 

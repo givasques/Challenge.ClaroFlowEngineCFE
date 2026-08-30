@@ -149,12 +149,10 @@ public class ContextService : IContextService
     public async Task<ActiveJourneyResponse> GetActiveByCustomerAsync(
         Guid customerId, bool includeHistory, int historyLimit, CancellationToken cancellationToken)
     {
-        var customerExists = await _db.Customers.AsNoTracking().AnyAsync(c => c.Id == customerId, cancellationToken);
-        if (!customerExists)
-            throw new NotFoundException("customer_not_found", $"Cliente {customerId} não encontrado.");
+        var customer = await _db.Customers.AsNoTracking().FirstOrDefaultAsync(c => c.Id == customerId, cancellationToken)
+            ?? throw new NotFoundException("customer_not_found", $"Cliente {customerId} não encontrado.");
 
         var active = await _db.JourneyContexts
-            .Include(j => j.Customer)
             .FirstOrDefaultAsync(j => j.CustomerId == customerId && j.Status == JourneyStatus.Open, cancellationToken);
 
         if (active is not null && _expirationService.TryExpireIfInactive(active))
@@ -207,7 +205,15 @@ public class ContextService : IContextService
             }
         }
 
-        return new ActiveJourneyResponse(active is null ? null : await ToDetailAsync(active, cancellationToken), recentJourneys);
+        var customerSummary = await BuildCustomerSummaryAsync(customer, cancellationToken);
+        JourneyDetailResponse? journeyDetail = active is null
+            ? null
+            : new JourneyDetailResponse(
+                active.Id, active.CustomerId, customerSummary,
+                active.OriginChannel, active.Intent, active.CurrentStep, active.Payload, active.Status,
+                active.CreatedAt, active.UpdatedAt, active.ClosedAt);
+
+        return new ActiveJourneyResponse(customerSummary, journeyDetail, recentJourneys);
     }
 
     public async Task<TransitionsResponse> GetTransitionsAsync(Guid journeyId, CancellationToken cancellationToken)
@@ -288,29 +294,39 @@ public class ContextService : IContextService
     private static JourneySummaryResponse ToSummary(JourneyContext j) => new(
         j.Id, j.CustomerId, j.OriginChannel, j.Intent, j.CurrentStep, j.Payload, j.Status, j.CreatedAt, j.UpdatedAt, j.ClosedAt);
 
-    /// <summary>
-    /// Monta o DTO de detalhe, enriquecendo o cliente com telefone (via identity_links, canal whatsapp)
-    /// e plano ativo (via customer_plans) — dados usados pelo Painel do Atendente (Fase 8).
-    /// </summary>
+    /// <summary>Monta o DTO de detalhe, com o cliente enriquecido via <see cref="BuildCustomerSummaryAsync"/>.</summary>
     private async Task<JourneyDetailResponse> ToDetailAsync(JourneyContext j, CancellationToken cancellationToken)
+    {
+        var customer = await BuildCustomerSummaryAsync(j.Customer, cancellationToken);
+
+        return new JourneyDetailResponse(
+            j.Id, j.CustomerId, customer,
+            j.OriginChannel, j.Intent, j.CurrentStep, j.Payload, j.Status, j.CreatedAt, j.UpdatedAt, j.ClosedAt);
+    }
+
+    /// <summary>
+    /// Enriquece o cliente com telefone (via identity_links, canal whatsapp), plano ativo (via customer_plans)
+    /// e agregados de jornadas (ETAPA 2, Passo B) — independente de uma jornada específica, para que o bloco
+    /// de dados do cliente no painel apareça mesmo sem jornada ativa (FASE 3, item C.2).
+    /// </summary>
+    private async Task<CustomerSummaryDto> BuildCustomerSummaryAsync(Customer customer, CancellationToken cancellationToken)
     {
         var phone = await _db.IdentityLinks
             .AsNoTracking()
-            .Where(l => l.CustomerId == j.CustomerId && l.Channel == Channels.Whatsapp)
+            .Where(l => l.CustomerId == customer.Id && l.Channel == Channels.Whatsapp)
             .Select(l => l.Identifier)
             .FirstOrDefaultAsync(cancellationToken);
 
         var currentPlan = await _db.CustomerPlans
             .AsNoTracking()
-            .Where(cp => cp.CustomerId == j.CustomerId && cp.Active)
+            .Where(cp => cp.CustomerId == customer.Id && cp.Active)
             .Select(cp => new PlanInfoDto(cp.Plan.Code, cp.Plan.Name, cp.Plan.MonthlyPriceCents))
             .FirstOrDefaultAsync(cancellationToken);
 
-        // Agregados do cliente (ETAPA 2, Passo B, item 5.2) — dataset pequeno no protótipo, agregado em memória
-        // em vez de várias queries GROUP BY separadas.
+        // Dataset pequeno no protótipo, agregado em memória em vez de várias queries GROUP BY separadas.
         var journeyStats = await _db.JourneyContexts
             .AsNoTracking()
-            .Where(other => other.CustomerId == j.CustomerId)
+            .Where(other => other.CustomerId == customer.Id)
             .Select(other => new { other.OriginChannel, other.Status, other.CreatedAt })
             .ToListAsync(cancellationToken);
 
@@ -327,12 +343,8 @@ public class ContextService : IContextService
             Abandoned: journeyStats.Count(s => s.Status == JourneyStatus.Abandoned),
             Expired: journeyStats.Count(s => s.Status == JourneyStatus.Expired));
 
-        var customer = new CustomerSummaryDto(
-            j.Customer.Id, j.Customer.FullName, j.Customer.Cpf, phone, currentPlan,
-            j.Customer.CreatedAt, preferredChannel, journeyCounts);
-
-        return new JourneyDetailResponse(
-            j.Id, j.CustomerId, customer,
-            j.OriginChannel, j.Intent, j.CurrentStep, j.Payload, j.Status, j.CreatedAt, j.UpdatedAt, j.ClosedAt);
+        return new CustomerSummaryDto(
+            customer.Id, customer.FullName, customer.Cpf, phone, currentPlan,
+            customer.CreatedAt, preferredChannel, journeyCounts, customer.BillingDueDay, customer.Segment);
     }
 }

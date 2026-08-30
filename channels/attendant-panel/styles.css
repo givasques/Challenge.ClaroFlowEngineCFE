@@ -179,8 +179,15 @@ body {
   font-size: 13px;
   color: var(--sidebar-text-muted);
   border-left: 3px solid transparent;
-  cursor: default;
+  cursor: pointer;
   transition: background 0.2s ease;
+  width: 100%;
+  background: none;
+  border-top: none;
+  border-right: none;
+  border-bottom: none;
+  font-family: inherit;
+  text-align: left;
 }
 
 .sidebar-nav-icon {
@@ -260,25 +267,6 @@ body {
   box-shadow: var(--shadow-xs);
   white-space: nowrap;
   text-transform: capitalize;
-}
-
-.readonly-notice {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  background: #eff6ff;
-  color: #1e40af;
-  border-radius: var(--radius-md);
-  padding: 10px 14px;
-  font-size: 12px;
-  line-height: 1.5;
-  margin-bottom: 20px;
-}
-
-.readonly-notice-icon {
-  flex-shrink: 0;
-  margin-top: 1px;
-  color: #3b82f6;
 }
 
 .degraded-banner {
@@ -533,6 +521,120 @@ body {
   margin: 0;
 }
 
+/* ---------- Telas mockadas do menu lateral (FASE 3, item C.5) ---------- */
+
+.mock-banner {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  color: #92400e;
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  font-size: 12.5px;
+  margin-bottom: 20px;
+}
+
+.mock-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  font-size: 13px;
+}
+
+.mock-table th {
+  text-align: left;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-subtle);
+  padding: 10px 14px;
+  background: var(--surface-muted);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.mock-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+}
+
+.mock-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.mock-table tbody tr {
+  cursor: pointer;
+}
+
+.mock-table tbody tr:hover {
+  background: var(--surface-muted);
+}
+
+.mock-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 16px;
+}
+
+.mock-metric-card {
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  box-shadow: var(--shadow-sm);
+}
+
+.mock-metric-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-subtle);
+}
+
+.mock-metric-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.mock-settings-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 360px;
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+}
+
+.mock-settings-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mock-settings-form input[type="text"],
+.mock-settings-form select {
+  padding: 8px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  color: var(--text-secondary);
+  background: var(--surface-muted);
+}
+
+.mock-settings-checkbox {
+  flex-direction: row !important;
+  align-items: center;
+  gap: 8px !important;
+}
+
 /* ---------- Dados do Cliente (hero) ---------- */
 
 .customer-hero {
@@ -587,14 +689,11 @@ body {
   margin-top: 2px;
 }
 
+/* Texto simples, não mais um pill de fundo/borda — evita parecer um botão clicável (FASE 3, item D.1). */
 .customer-tenure-badge {
-  font-size: 11px;
+  font-size: 11.5px;
   font-weight: 600;
-  color: var(--text-secondary);
-  background: var(--surface-muted);
-  border: 1px solid var(--border-subtle);
-  border-radius: 999px;
-  padding: 5px 12px;
+  color: var(--text-muted);
   white-space: nowrap;
 }
 
@@ -661,7 +760,12 @@ body {
   border-top: 1px solid var(--border-subtle);
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 10px;
+}
+
+.customer-description-block .col-label {
+  display: block;
+  margin-bottom: 4px;
 }
 
 .customer-description-text {
@@ -686,6 +790,13 @@ body {
   color: var(--text-subtle);
   text-transform: uppercase;
   letter-spacing: 0.04em;
+}
+
+.no-active-journey-message {
+  font-size: 13px;
+  color: var(--text-muted);
+  font-style: italic;
+  margin: 0 0 20px;
 }
 
 .status-badge {

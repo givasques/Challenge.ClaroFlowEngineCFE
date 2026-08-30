@@ -513,7 +513,23 @@ body {
   display: flex;
 }
 
-/* ---------- Contestação de cobrança (ETAPA 2, Passo C) ---------- */
+/* ---------- Contestação de cobrança (ETAPA 2 Passo C / FASE 3 Bloco A) ---------- */
+
+.dispute-reason-box {
+  background: #fef2f3;
+  border: 1px solid var(--claro-red);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dispute-reason-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--claro-red);
+}
 
 .dispute-description-box {
   background: var(--app-bg);
@@ -526,42 +542,58 @@ body {
   margin: 0;
 }
 
-.dispute-items-list {
+/* Fatura em modo somente-visualização (sem checkboxes) — cliente vê os itens, não seleciona nenhum. */
+.dispute-items-view {
   display: flex;
   flex-direction: column;
-  gap: 4px;
 }
 
-.dispute-item-row {
+.dispute-item-view-row {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 10px;
-  padding: 8px 4px;
-  cursor: pointer;
-  border-bottom: 1px solid var(--border-subtle);
+  padding: 7px 2px;
 }
 
-.dispute-item-row:last-child {
-  border-bottom: none;
-}
-
-.dispute-item-checkbox {
-  width: 18px;
-  height: 18px;
-  accent-color: var(--claro-red);
-  flex-shrink: 0;
-}
-
-.dispute-item-desc {
-  flex: 1;
+.dispute-item-view-desc {
   font-size: 13px;
   color: var(--text-primary);
 }
 
-.dispute-item-amount {
+.dispute-item-view-amount {
   font-size: 13px;
   font-weight: 600;
   color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.dispute-items-divider {
+  border: none;
+  border-top: 1px solid var(--border-subtle);
+  margin: 4px 0;
+}
+
+.dispute-items-total-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 2px 2px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.completed-dispute-details {
+  background: var(--surface-muted);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  margin: 12px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
 }
 
 .fine-print {

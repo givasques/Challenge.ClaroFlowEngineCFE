@@ -71,13 +71,25 @@ const CURRENT_STEP_LABELS = {
   identity_resolved: 'Identidade resolvida',
   plan_selected: 'Plano selecionado',
   invoice_selected: 'Fatura selecionada',
+  dispute_reason_selected: 'Motivo informado',
   description_provided: 'Descrição do problema enviada',
   dispute_formalized: 'Contestação formalizada',
+};
+
+// Rótulos amigáveis dos motivos de contestação (FASE 3, Bloco A) — ids espelham Common/Contracts/DisputeReason.cs.
+const DISPUTE_REASON_LABELS = {
+  service_not_contracted: 'Cobrança de serviço que não contratei',
+  higher_than_expected: 'Valor cobrado maior que o esperado',
+  duplicate_charge: 'Cobrança em duplicidade',
+  cancelled_service_still_charged: 'Serviço cancelado ainda sendo cobrado',
+  after_portability: 'Cobrança após portabilidade',
+  other: 'Outro motivo',
 };
 
 const state = {
   customerId: null,
   journeyId: null,
+  journeyPayload: null,
   pollingHandle: null,
   degraded: false,
   lastUpdatedAt: null,
@@ -182,7 +194,9 @@ function formatTenure(isoString) {
   let months = (now.getFullYear() - since.getFullYear()) * 12 + (now.getMonth() - since.getMonth());
   if (now.getDate() < since.getDate()) months--;
 
-  if (months < 1) return 'Cliente novo';
+  // Evita o texto "Cliente novo" (FASE 3, item D.1) — junto com o estilo de pill do badge,
+  // podia ser confundido com um botão de ação (ex: "cadastrar cliente novo"), não uma informação de tempo de casa.
+  if (months < 1) return 'Cadastrado há menos de 1 mês';
   if (months < 12) return `Cliente há ${months} ${months === 1 ? 'mês' : 'meses'}`;
   const years = Math.floor(months / 12);
   return `Cliente há ${years} ${years === 1 ? 'ano' : 'anos'}`;
@@ -254,16 +268,19 @@ async function loadCustomerJourney() {
 
   clearMessage();
 
+  // Card de dados do cliente é sobre o cliente, não sobre a jornada — aparece sempre (FASE 3, item C.2).
+  renderCustomerBlock(data.customer);
   renderPreviousJourneys(data.recent_journeys || []);
 
+  const noActiveJourneyMessage = document.getElementById('no-active-journey-message');
+
   if (!data.journey) {
-    renderCustomerBlock(null);
-    showMessage('Sem jornadas em andamento para este cliente.', 'info');
+    noActiveJourneyMessage.classList.remove('hidden');
     return;
   }
 
+  noActiveJourneyMessage.classList.add('hidden');
   state.journeyId = data.journey.id;
-  renderCustomerBlock(data.journey.customer);
   renderJourneyStatus(data.journey);
 
   await refreshTransitions();
@@ -314,7 +331,7 @@ async function pollJourney() {
 async function refreshTransitions() {
   try {
     const data = await apiCall(`/context/${state.journeyId}/transitions`);
-    renderTimeline(data.transitions);
+    renderTimeline(data.transitions, state.journeyPayload);
   } catch (err) {
     if (err instanceof CfeUnavailableError) {
       state.degraded = true;
@@ -331,6 +348,7 @@ function hideAllResultBlocks() {
   document.getElementById('history-block').classList.add('hidden');
   document.getElementById('interactions-summary-block').classList.add('hidden');
   document.getElementById('previous-journeys-block').classList.add('hidden');
+  document.getElementById('no-active-journey-message').classList.add('hidden');
   clearMessage();
 }
 
@@ -368,6 +386,15 @@ function renderCustomerBlock(customer) {
     ? (CHANNEL_LABELS[customer.preferred_channel] || customer.preferred_channel)
     : 'Não informado';
 
+  // Campos mockados de faturamento/segmento (FASE 3, item C.3) — placeholders visuais até então.
+  const dueDayEl = document.getElementById('customer-billing-due-day');
+  dueDayEl.textContent = customer.billing_due_day ? `Todo dia ${customer.billing_due_day}` : 'Não informado';
+  dueDayEl.classList.toggle('detail-value-muted', !customer.billing_due_day);
+
+  const segmentEl = document.getElementById('customer-segment');
+  segmentEl.textContent = customer.segment || 'Não informado';
+  segmentEl.classList.toggle('detail-value-muted', !customer.segment);
+
   block.classList.remove('hidden');
   renderInteractionsSummary(customer.journey_counts);
 }
@@ -389,6 +416,7 @@ function renderInteractionsSummary(counts) {
 }
 
 function renderJourneyStatus(journey) {
+  state.journeyPayload = journey.payload || {};
   const block = document.getElementById('status-block');
 
   const badge = document.getElementById('journey-status-badge');
@@ -400,20 +428,34 @@ function renderJourneyStatus(journey) {
   document.getElementById('journey-intent').textContent = INTENT_LABELS[journey.intent] || journey.intent;
   document.getElementById('journey-last-update').textContent = relativeTime(journey.updated_at);
 
-  // Descrição do cliente em destaque, quando presente (ex: contestação de cobrança — ETAPA 2, Passo C).
+  // Motivo + descrição do cliente em destaque, quando presentes (contestação de cobrança — FASE 3, Bloco A).
   const descriptionBlock = document.getElementById('customer-description-block');
-  const description = journey.payload && journey.payload.customer_description;
+  const payload = journey.payload || {};
+  const reason = payload.dispute_reason;
+  const description = payload.customer_description;
+
+  const reasonRow = document.getElementById('customer-dispute-reason-row');
+  if (reason) {
+    document.getElementById('customer-dispute-reason-text').textContent = DISPUTE_REASON_LABELS[reason] || reason;
+    reasonRow.classList.remove('hidden');
+  } else {
+    reasonRow.classList.add('hidden');
+  }
+
+  const descriptionRow = document.getElementById('customer-description-row');
   if (description) {
     document.getElementById('customer-description-text').textContent = description;
-    descriptionBlock.classList.remove('hidden');
+    descriptionRow.classList.remove('hidden');
   } else {
-    descriptionBlock.classList.add('hidden');
+    descriptionRow.classList.add('hidden');
   }
+
+  descriptionBlock.classList.toggle('hidden', !reason && !description);
 
   block.classList.remove('hidden');
 }
 
-function renderTimeline(transitions) {
+function renderTimeline(transitions, journeyPayload) {
   const block = document.getElementById('history-block');
   const list = document.getElementById('history-list');
   list.innerHTML = '';
@@ -429,12 +471,85 @@ function renderTimeline(transitions) {
     document.getElementById('journey-current-channel-chip').classList.toggle('hidden', current === origin);
   }
 
-  appendTimelineItems(list, transitions);
+  appendTimelineItems(list, transitions, journeyPayload);
 
   block.classList.remove('hidden');
 }
 
-function appendTimelineItems(list, transitions) {
+/**
+ * Descrição contextualizada de uma transição (FASE 3, item C.4) — cruza `event_type`/`metadata` da
+ * transição com o `payload` da jornada para dar ao atendente uma frase legível, sem precisar conhecer
+ * o backend. Sem mudança de backend: os dados já estão disponíveis em `payload` e `metadata`.
+ */
+function buildTransitionDescription(transition, journeyPayload) {
+  const payload = journeyPayload || {};
+  const metadata = transition.metadata || {};
+
+  switch (transition.event_type) {
+    case 'journey_started':
+      return `Jornada iniciada — ${INTENT_LABELS[metadata.intent] || metadata.intent || 'intenção não informada'}`;
+
+    case 'step_updated': {
+      const step = metadata.current_step;
+      if (step === 'plan_selected' && payload.selected_plan_code) {
+        return `Plano selecionado: ${payload.selected_plan_code}`;
+      }
+      if (step === 'invoice_selected') {
+        return 'Fatura selecionada';
+      }
+      if (step === 'dispute_reason_selected' && payload.dispute_reason) {
+        return `Motivo informado: ${DISPUTE_REASON_LABELS[payload.dispute_reason] || payload.dispute_reason}`;
+      }
+      if (step === 'description_provided') {
+        return payload.customer_description ? 'Descrição do problema informada' : 'Etapa concluída sem descrição adicional';
+      }
+      return CURRENT_STEP_LABELS[step] ? `Etapa atualizada: ${CURRENT_STEP_LABELS[step]}` : 'Etapa atualizada';
+    }
+
+    case 'deep_link_generated': {
+      const targetLabel = CHANNEL_LABELS[metadata.target_channel] || metadata.target_channel || 'outro canal';
+      const expiresAt = metadata.token_expires_at ? formatMessageTime(metadata.token_expires_at) : null;
+      return expiresAt
+        ? `Deep link gerado para ${targetLabel} — válido até ${expiresAt}`
+        : `Deep link gerado para ${targetLabel}`;
+    }
+
+    case 'journey_resumed':
+      return `Jornada retomada em ${CHANNEL_LABELS[transition.channel] || transition.channel}`;
+
+    case 'journey_closed': {
+      const outcome = metadata.outcome;
+      if (outcome === 'concluded') {
+        return `Jornada concluída em ${CHANNEL_LABELS[transition.channel] || transition.channel}`;
+      }
+      if (outcome === 'abandoned') {
+        return metadata.reason ? `Jornada abandonada — motivo: ${metadata.reason}` : 'Jornada abandonada';
+      }
+      return transition.description || 'Jornada encerrada';
+    }
+
+    case 'journey_expired':
+      return 'Jornada expirada por inatividade (24h+)';
+
+    case 'panel_accessed':
+      return 'Painel consultado por atendente';
+
+    default:
+      return transition.description || EVENT_LABELS[transition.event_type] || transition.event_type;
+  }
+}
+
+function formatMessageTime(isoString) {
+  return new Date(isoString).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+}
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+function appendTimelineItems(list, transitions, journeyPayload) {
   for (const t of transitions) {
     const li = document.createElement('li');
     li.className = 'history-item';
@@ -443,7 +558,7 @@ function appendTimelineItems(list, transitions) {
       <div class="history-icon history-icon--${colorClass}">${EVENT_ICONS[t.event_type] || '•'}</div>
       <div class="history-body">
         <div class="history-title">${EVENT_LABELS[t.event_type] || t.event_type}</div>
-        <div class="history-description">${t.description || ''}</div>
+        <div class="history-description">${escapeHtml(buildTransitionDescription(t, journeyPayload))}</div>
         <div class="history-meta">${CHANNEL_ICONS[t.channel] || CHANNEL_ICON_DEFAULT} ${t.channel} · ${relativeTime(t.occurred_at)}</div>
       </div>
     `;
@@ -511,7 +626,7 @@ function buildPreviousJourneyItem(journey) {
         detail.innerHTML = '';
         const ul = document.createElement('ul');
         ul.className = 'history-list';
-        appendTimelineItems(ul, data.transitions);
+        appendTimelineItems(ul, data.transitions, journey.payload);
         detail.appendChild(ul);
         loaded = true;
       } catch (err) {
@@ -550,6 +665,57 @@ function updatePollingFooter(degraded) {
   }
 }
 
+// ---------- Navegação do menu lateral (FASE 3, item C.5) ----------
+
+const VIEW_HEADERS = {
+  consulta: ['Consulta de Jornada', 'Consulte o contexto completo de qualquer cliente em atendimento'],
+  'jornadas-ativas': ['Jornadas Ativas', 'Jornadas em andamento no momento, em todos os canais'],
+  metricas: ['Métricas', 'Indicadores operacionais do atendimento'],
+  configuracoes: ['Configurações', 'Preferências do atendente'],
+};
+
+function switchView(view) {
+  document.querySelectorAll('.main-view').forEach(el => el.classList.add('hidden'));
+  const target = document.getElementById(`view-${view}`);
+  if (target) target.classList.remove('hidden');
+
+  document.querySelectorAll('.sidebar-nav-item').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.view === view);
+  });
+
+  const [title, subtitle] = VIEW_HEADERS[view] || VIEW_HEADERS.consulta;
+  document.getElementById('main-title').textContent = title;
+  document.getElementById('main-subtitle').textContent = subtitle;
+}
+
+// Dados demonstrativos — clientes reais do seed, para a linha clicável levar a uma consulta que funciona de verdade.
+const MOCK_ACTIVE_JOURNEYS = [
+  { name: 'Ana Silva', cpf: '11144477735', intent: 'change_plan', channel: 'whatsapp', started: 'há 3 min' },
+  { name: 'Carlos Mendes', cpf: '22255588846', intent: 'dispute_charge', channel: 'app', started: 'há 12 min' },
+  { name: 'Mariana Souza', cpf: '33366699957', intent: 'change_plan', channel: 'whatsapp', started: 'há 27 min' },
+];
+
+function renderMockActiveJourneys() {
+  const tbody = document.getElementById('mock-active-journeys-body');
+  tbody.innerHTML = '';
+
+  MOCK_ACTIVE_JOURNEYS.forEach(row => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${escapeHtml(row.name)}</td>
+      <td>${INTENT_LABELS[row.intent] || row.intent}</td>
+      <td>${CHANNEL_LABELS[row.channel] || row.channel}</td>
+      <td>${escapeHtml(row.started)}</td>
+    `;
+    tr.addEventListener('click', () => {
+      switchView('consulta');
+      document.getElementById('search-input').value = row.cpf;
+      document.getElementById('search-form').requestSubmit();
+    });
+    tbody.appendChild(tr);
+  });
+}
+
 // ---------- Relógio ao vivo (só visual — não afeta lógica de negócio) ----------
 
 function updateHeaderClock() {
@@ -563,6 +729,11 @@ function updateHeaderClock() {
 
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('search-form').addEventListener('submit', handleSearch);
+
+  document.querySelectorAll('.sidebar-nav-item').forEach(btn => {
+    btn.addEventListener('click', () => switchView(btn.dataset.view));
+  });
+  renderMockActiveJourneys();
 
   updateHeaderClock();
   setInterval(updateHeaderClock, 60000);

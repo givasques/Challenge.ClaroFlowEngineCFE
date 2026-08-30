@@ -41,15 +41,22 @@ public record CustomerSummaryDto(
     PlanInfoDto? CurrentPlan,
     DateTime CustomerSince,
     string? PreferredChannel,
-    JourneyCountsDto JourneyCounts);
+    JourneyCountsDto JourneyCounts,
+    int? BillingDueDay,
+    string? Segment);
 
 public record PlanInfoDto(string Code, string Name, int MonthlyPriceCents);
 
 /// <summary>Contagem de jornadas do cliente por desfecho (ETAPA 2, Passo B, item 5.2).</summary>
 public record JourneyCountsDto(int Total, int Concluded, int Abandoned, int Expired);
 
-/// <summary>Resposta de GET /context/customer/{customerId}: jornada ativa (se houver) + histórico opcional.</summary>
+/// <summary>
+/// Resposta de GET /context/customer/{customerId}: dados do cliente (sempre presentes, se o cliente existir),
+/// jornada ativa (se houver) e histórico opcional. O bloco de dados do cliente no painel não depende de
+/// jornada ativa (FASE 3, item C.2) — por isso `Customer` é um campo de topo, não só aninhado em `Journey`.
+/// </summary>
 public record ActiveJourneyResponse(
+    CustomerSummaryDto Customer,
     JourneyDetailResponse? Journey,
     List<JourneySummaryResponse>? RecentJourneys);
 

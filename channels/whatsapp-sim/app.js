@@ -11,6 +11,7 @@ const BOT_STATES = {
   AWAITING_NAME: 'awaiting_name',
   AWAITING_PLAN_CHOICE: 'awaiting_plan_choice',
   AWAITING_INVOICE_CHOICE: 'awaiting_invoice_choice',
+  AWAITING_DISPUTE_REASON: 'awaiting_dispute_reason',
   AWAITING_PROBLEM_DESCRIPTION: 'awaiting_problem_description',
   COMPLETED: 'completed',
 };
@@ -19,6 +20,16 @@ const INTENTS = {
   CHANGE_PLAN: 'change_plan',
   DISPUTE_CHARGE: 'dispute_charge',
 };
+
+// Motivos pré-definidos de contestação (FASE 3, Bloco A) — ids espelham Common/Contracts/DisputeReason.cs.
+const DISPUTE_REASONS = [
+  { id: 'service_not_contracted', label: 'Cobrança de serviço que não contratei' },
+  { id: 'higher_than_expected', label: 'Valor cobrado maior que o esperado' },
+  { id: 'duplicate_charge', label: 'Cobrança em duplicidade' },
+  { id: 'cancelled_service_still_charged', label: 'Serviço cancelado ainda sendo cobrado' },
+  { id: 'after_portability', label: 'Cobrança após portabilidade' },
+  { id: 'other', label: 'Outro motivo' },
+];
 
 // SVGs reutilizados na renderização
 const SVG_CHECKS_READ = `<svg class="bubble-checks" viewBox="0 0 16 15" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M15.01 3.316l-.478-.372a.365.365 0 0 0-.51.063L8.666 9.879a.32.32 0 0 1-.484.033l-.358-.325a.319.319 0 0 0-.484.032l-.378.483a.418.418 0 0 0 .036.541l1.32 1.266c.143.14.361.125.484-.033l6.272-8.048a.366.366 0 0 0-.064-.512zm-4.1 0l-.478-.372a.365.365 0 0 0-.51.063L4.566 9.879a.32.32 0 0 1-.484.033L1.891 7.769a.366.366 0 0 0-.515.006l-.423.433a.364.364 0 0 0 .006.514l3.258 3.185c.143.14.361.125.484-.033l6.272-8.048a.365.365 0 0 0-.063-.51z"/></svg>`;
@@ -122,8 +133,10 @@ function createFreshSession() {
     customerName: null,
     journeyId: null,
     intent: null,
+    currentPlan: null,
     plans: null,
     invoices: null,
+    disputeReason: null,
     degraded: false,
   };
 }
@@ -214,6 +227,18 @@ function matchInvoice(text, invoices) {
   return (invoices || []).find(inv => t.includes(inv.reference_label.split('/')[0].toLowerCase()));
 }
 
+function matchDisputeReason(text) {
+  const t = text.toLowerCase();
+  const byId = id => DISPUTE_REASONS.find(r => r.id === id);
+  if (t.includes('nao contratei') || t.includes('não contratei') || t.includes('nunca contratei')) return byId('service_not_contracted');
+  if (t.includes('maior') || t.includes('valor cobrado') || t.includes('cobraram mais')) return byId('higher_than_expected');
+  if (t.includes('duplicid') || t.includes('duplicad') || t.includes('duas vezes')) return byId('duplicate_charge');
+  if (t.includes('cancel')) return byId('cancelled_service_still_charged');
+  if (t.includes('portabilidade')) return byId('after_portability');
+  if (t.includes('outro')) return byId('other');
+  return null;
+}
+
 function formatCents(cents) {
   return (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
@@ -250,6 +275,9 @@ async function handleUserMessage(text) {
         break;
       case BOT_STATES.AWAITING_INVOICE_CHOICE:
         await handleAwaitingInvoiceChoice(text);
+        break;
+      case BOT_STATES.AWAITING_DISPUTE_REASON:
+        await handleAwaitingDisputeReason(text);
         break;
       case BOT_STATES.AWAITING_PROBLEM_DESCRIPTION:
         await handleAwaitingProblemDescription(text);
@@ -366,6 +394,7 @@ async function handleAwaitingName(text) {
 async function onIdentityResolved(identity) {
   session.customerId = identity.unified_customer_id;
   session.customerName = identity.customer.full_name;
+  session.currentPlan = identity.customer.current_plan || null;
 
   addCfeBadge('Identidade resolvida — cliente vinculado');
 
@@ -409,9 +438,16 @@ async function presentPlans() {
     return handleDomainError(err);
   }
 
-  session.plans = plansResponse.plans;
+  // Plano atual não entra na lista de opções — evita o cliente "trocar" para o mesmo plano (FASE 3, item B.1).
+  session.plans = session.currentPlan
+    ? plansResponse.plans.filter(p => p.code !== session.currentPlan.code)
+    : plansResponse.plans;
 
-  await botSay('Estes são os planos disponíveis:', {
+  if (session.currentPlan) {
+    await botSay(`Seu plano atual é o ${session.currentPlan.name} — ${formatCents(session.currentPlan.monthly_price_cents)}/mês.`);
+  }
+
+  await botSay('Estes são os planos que você pode escolher:', {
     type: 'list',
     options: session.plans.map(p => ({
       id: p.code,
@@ -521,15 +557,67 @@ async function proceedWithInvoiceSelection(invoice) {
 
   addCfeBadge(`Contexto atualizado — fatura selecionada: ${invoice.reference_label}`);
 
-  await botSay('Descreva rapidamente o que está errado nessa fatura (pode escrever à vontade).');
+  await presentDisputeReasons();
+}
+
+async function presentDisputeReasons() {
+  await botSay('Qual desses motivos melhor descreve o problema?', {
+    type: 'list',
+    options: DISPUTE_REASONS.map(r => ({ id: r.id, label: r.label })),
+  });
+  session.state = BOT_STATES.AWAITING_DISPUTE_REASON;
+}
+
+async function handleAwaitingDisputeReason(text) {
+  // Camada oculta de heurística por texto livre — a lista é o caminho primário.
+  const reason = matchDisputeReason(text);
+  if (!reason) {
+    await botSay('Não reconheci esse motivo. Use uma das opções da lista acima.');
+    return;
+  }
+  await proceedWithDisputeReason(reason);
+}
+
+async function proceedWithDisputeReason(reason) {
+  try {
+    await withProcessing('atualizando seus dados...', () =>
+      apiCall(`/context/${session.journeyId}`, {
+        method: 'PATCH',
+        body: { current_step: 'dispute_reason_selected', payload_merge: { dispute_reason: reason.id } },
+      }));
+  } catch (err) {
+    if (err instanceof CfeUnavailableError) return showDegraded(err);
+    return handleDomainError(err);
+  }
+
+  addCfeBadge(`Contexto atualizado — motivo selecionado: ${reason.label}`);
+
+  session.disputeReason = reason.id;
+
+  if (reason.id === 'other') {
+    await botSay('Por favor, descreva o que aconteceu — nesse caso a descrição é obrigatória.');
+  } else {
+    await botSay('Se quiser, descreva mais detalhes sobre o problema. Ou digite "pular" para continuar sem descrição.');
+  }
   session.state = BOT_STATES.AWAITING_PROBLEM_DESCRIPTION;
 }
 
 async function handleAwaitingProblemDescription(text) {
-  const description = text.trim();
-  if (description.length < 5) {
-    await botSay('Pode descrever com um pouco mais de detalhe o que você notou de errado?');
-    return;
+  const raw = text.trim();
+  const isOtherReason = session.disputeReason === 'other';
+  const wantsToSkip = !isOtherReason && raw.toLowerCase() === 'pular';
+
+  let description = null;
+  if (!wantsToSkip) {
+    if (raw.length < 5) {
+      await botSay(
+        isOtherReason
+          ? 'Pode descrever com um pouco mais de detalhe o que aconteceu? Esse campo é obrigatório para "Outro motivo".'
+          : 'Pode descrever com um pouco mais de detalhe, ou digitar "pular" para continuar sem descrição?'
+      );
+      return;
+    }
+    description = raw;
   }
 
   try {
@@ -543,7 +631,7 @@ async function handleAwaitingProblemDescription(text) {
     return handleDomainError(err);
   }
 
-  addCfeBadge('Contexto atualizado — descrição do problema registrada');
+  addCfeBadge(description ? 'Contexto atualizado — descrição do problema registrada' : 'Contexto atualizado — sem descrição adicional');
 
   let handoff;
   try {
@@ -627,6 +715,9 @@ async function handleInteractiveClick(msg, option, wrapEl) {
     } else if (session.state === BOT_STATES.AWAITING_INVOICE_CHOICE) {
       const invoice = session.invoices.find(inv => inv.id === option.id);
       if (invoice) await proceedWithInvoiceSelection(invoice);
+    } else if (session.state === BOT_STATES.AWAITING_DISPUTE_REASON) {
+      const reason = DISPUTE_REASONS.find(r => r.id === option.id);
+      if (reason) await proceedWithDisputeReason(reason);
     }
   } catch (err) {
     handleUnexpectedError(err);

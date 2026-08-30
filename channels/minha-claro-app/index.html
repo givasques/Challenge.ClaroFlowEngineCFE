@@ -196,7 +196,7 @@
           </div>
         </div>
 
-        <h1>Confirmar contestação de cobrança</h1>
+        <h1>Contestação de cobrança</h1>
 
         <div class="data-card">
           <div class="data-card-section">
@@ -227,18 +227,19 @@
             </div>
           </div>
 
-          <div class="data-card-section">
-            <div class="data-card-section-title">Sua descrição</div>
-            <p id="dispute-description" class="dispute-description-box"></p>
+          <!-- Motivo + descrição em destaque (FASE 3, item A.6) -->
+          <div class="dispute-reason-box">
+            <div class="dispute-reason-label" id="dispute-reason-text"></div>
+            <p id="dispute-description" class="dispute-description-box hidden"></p>
           </div>
 
           <div class="data-card-section">
-            <div class="data-card-section-title">Itens da fatura — marque o que deseja contestar</div>
-            <div id="dispute-items-list" class="dispute-items-list"></div>
+            <div class="data-card-section-title">Itens desta fatura</div>
+            <div id="dispute-items-list" class="dispute-items-view"></div>
           </div>
         </div>
 
-        <button id="formalize-dispute-button" class="primary-button" disabled>
+        <button id="formalize-dispute-button" class="primary-button">
           <span class="button-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="16" height="16">
               <polyline points="4 12 9.5 17.5 20 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
@@ -246,9 +247,7 @@
           </span>
           Formalizar contestação
         </button>
-        <button id="cancel-dispute-button" class="secondary-button">Cancelar contestação</button>
-
-        <p class="fine-print">Selecione pelo menos um item para formalizar a contestação.</p>
+        <button id="cancel-dispute-button" class="secondary-button">Cancelar</button>
       </section>
 
       <!-- Encerrando jornada -->
@@ -266,7 +265,21 @@
         </div>
         <h1 id="completed-title">Troca de plano confirmada!</h1>
         <p id="completed-message">Sua solicitação foi concluída com sucesso.</p>
-        <p id="completed-protocol" class="fine-print hidden"></p>
+
+        <div id="completed-dispute-details" class="completed-dispute-details hidden">
+          <div class="data-row">
+            <span class="data-label">Protocolo</span>
+            <span id="completed-protocol-value" class="data-value"></span>
+          </div>
+          <div class="data-row">
+            <span class="data-label">Motivo</span>
+            <span id="completed-reason-value" class="data-value"></span>
+          </div>
+          <div class="data-row">
+            <span class="data-label">Fatura</span>
+            <span id="completed-invoice-value" class="data-value"></span>
+          </div>
+        </div>
       </section>
 
       <!-- Cancelado -->
