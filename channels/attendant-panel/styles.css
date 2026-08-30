@@ -689,14 +689,11 @@ body {
   margin-top: 2px;
 }
 
+/* Texto simples, não mais um pill de fundo/borda — evita parecer um botão clicável (FASE 3, item D.1). */
 .customer-tenure-badge {
-  font-size: 11px;
+  font-size: 11.5px;
   font-weight: 600;
-  color: var(--text-secondary);
-  background: var(--surface-muted);
-  border: 1px solid var(--border-subtle);
-  border-radius: 999px;
-  padding: 5px 12px;
+  color: var(--text-muted);
   white-space: nowrap;
 }
 

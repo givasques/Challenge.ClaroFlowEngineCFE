@@ -194,7 +194,9 @@ function formatTenure(isoString) {
   let months = (now.getFullYear() - since.getFullYear()) * 12 + (now.getMonth() - since.getMonth());
   if (now.getDate() < since.getDate()) months--;
 
-  if (months < 1) return 'Cliente novo';
+  // Evita o texto "Cliente novo" (FASE 3, item D.1) — junto com o estilo de pill do badge,
+  // podia ser confundido com um botão de ação (ex: "cadastrar cliente novo"), não uma informação de tempo de casa.
+  if (months < 1) return 'Cadastrado há menos de 1 mês';
   if (months < 12) return `Cliente há ${months} ${months === 1 ? 'mês' : 'meses'}`;
   const years = Math.floor(months / 12);
   return `Cliente há ${years} ${years === 1 ? 'ano' : 'anos'}`;
