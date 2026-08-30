@@ -94,6 +94,8 @@ const state = {
   pollingHandle: null,
   degraded: false,
   lastUpdatedAt: null,
+  currentView: 'consulta',
+  activeJourneysPollHandle: null,
 };
 
 // ---------- Cliente HTTP (mesmo padrão dos outros canais — ver whatsapp-sim/app.js) ----------
@@ -767,6 +769,9 @@ const VIEW_HEADERS = {
 };
 
 function switchView(view) {
+  const previousView = state.currentView;
+  state.currentView = view;
+
   document.querySelectorAll('.main-view').forEach(el => el.classList.add('hidden'));
   const target = document.getElementById(`view-${view}`);
   if (target) target.classList.remove('hidden');
@@ -778,58 +783,100 @@ function switchView(view) {
   const [title, subtitle] = VIEW_HEADERS[view] || VIEW_HEADERS.consulta;
   document.getElementById('main-title').textContent = title;
   document.getElementById('main-subtitle').textContent = subtitle;
+
+  // Polling da tela Jornadas Ativas só roda enquanto o atendente está nela (FASE 3.2, item B.1) —
+  // evita chamadas em background quando ele está em outra aba do menu lateral.
+  if (view === 'jornadas-ativas') {
+    fetchActiveJourneys();
+    stopActiveJourneysPolling();
+    state.activeJourneysPollHandle = setInterval(fetchActiveJourneys, 30000);
+  } else if (previousView === 'jornadas-ativas') {
+    stopActiveJourneysPolling();
+  }
 }
 
-// Dados demonstrativos — clientes reais do seed, para a linha clicável levar a uma consulta que funciona de verdade.
-const MOCK_ACTIVE_JOURNEYS = [
-  { name: 'Ana Silva', cpf: '11144477735', intent: 'change_plan', channel: 'whatsapp', minutesAgo: 3 },
-  { name: 'Carlos Mendes', cpf: '22255588846', intent: 'dispute_charge', channel: 'app', minutesAgo: 12 },
-  { name: 'Mariana Souza', cpf: '33366699957', intent: 'change_plan', channel: 'whatsapp', minutesAgo: 27 },
-];
+function stopActiveJourneysPolling() {
+  if (state.activeJourneysPollHandle) {
+    clearInterval(state.activeJourneysPollHandle);
+    state.activeJourneysPollHandle = null;
+  }
+}
 
-const MOCK_INTENT_ICONS = {
+// ---------- Jornadas Ativas — dados reais via GET /journeys/active (FASE 3.2, Bloco B) ----------
+
+const ACTIVE_JOURNEYS_INTENT_ICONS = {
   change_plan: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2l4 4-4 4"></path><path d="M3 11V9a4 4 0 014-4h14"></path><path d="M7 22l-4-4 4-4"></path><path d="M21 13v2a4 4 0 01-4 4H3"></path></svg>',
   dispute_charge: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4"></path><path d="M12 17h.01"></path><path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"></path></svg>',
 };
 
-const MOCK_CHANNEL_ICONS = {
+const ACTIVE_JOURNEYS_CHANNEL_ICONS = {
   whatsapp: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M21 11.5a8.5 8.5 0 01-12.3 7.6L4 20l1-4.5A8.5 8.5 0 1121 11.5z"></path></svg>',
   app: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="7" y="2" width="10" height="20" rx="2"></rect><line x1="11" y1="18.5" x2="13" y2="18.5" stroke-linecap="round"></line></svg>',
 };
 
-const MOCK_CLOCK_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 3"></path></svg>';
+const ACTIVE_JOURNEYS_CLOCK_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 3"></path></svg>';
 
 /** Urgência por tempo desde o início (FASE 3.1, item B.3.1): quanto mais tempo parado, mais quente a cor. */
-function mockTimeUrgencyClass(minutes) {
+function activeJourneyTimeUrgencyClass(minutes) {
   if (minutes > 30) return 'mock-time--urgent';
   if (minutes > 15) return 'mock-time--warning';
   if (minutes > 5) return 'mock-time--normal';
   return 'mock-time--low';
 }
 
-function renderMockActiveJourneys() {
-  const tbody = document.getElementById('mock-active-journeys-body');
+/** Busca GET /journeys/active — atualiza o badge do menu lateral sempre, e a tabela só se ela estiver visível. */
+async function fetchActiveJourneys() {
+  try {
+    const data = await apiCall('/journeys/active');
+    renderActiveJourneysBadge(data.total);
+    if (state.currentView === 'jornadas-ativas') {
+      renderActiveJourneysTable(data.journeys);
+    }
+  } catch (err) {
+    // Falha silenciosa (FASE 3.2, item B.1: polling "silencioso, sem indicador visual") — mantém
+    // o último estado renderizado em vez de substituir a tela por uma mensagem de erro a cada 30s.
+  }
+}
+
+/** "Jornadas ativas (N)" — badge escondido quando N é 0, conforme critério de aceite do item B.1. */
+function renderActiveJourneysBadge(total) {
+  const badge = document.getElementById('active-journeys-badge');
+  badge.textContent = total;
+  badge.classList.toggle('hidden', total === 0);
+}
+
+function renderActiveJourneysTable(journeys) {
+  const table = document.getElementById('active-journeys-table');
+  const empty = document.getElementById('active-journeys-empty');
+  const tbody = document.getElementById('active-journeys-body');
+
+  if (journeys.length === 0) {
+    table.classList.add('hidden');
+    empty.classList.remove('hidden');
+    return;
+  }
+
+  table.classList.remove('hidden');
+  empty.classList.add('hidden');
   tbody.innerHTML = '';
 
-  MOCK_ACTIVE_JOURNEYS.forEach(row => {
+  journeys.forEach(journey => {
     const tr = document.createElement('tr');
-    const intentLabel = INTENT_LABELS[row.intent] || row.intent;
-    const channelLabel = CHANNEL_LABELS[row.channel] || row.channel;
-    const urgencyClass = mockTimeUrgencyClass(row.minutesAgo);
+    const urgencyClass = activeJourneyTimeUrgencyClass(journey.minutes_since_start);
     tr.innerHTML = `
       <td>
         <div class="mock-table-client">
-          <div class="mock-table-avatar">${escapeHtml(getInitials(row.name))}</div>
-          <span class="mock-table-client-name">${escapeHtml(row.name)}</span>
+          <div class="mock-table-avatar">${escapeHtml(getInitials(journey.customer.full_name))}</div>
+          <span class="mock-table-client-name">${escapeHtml(journey.customer.full_name)}</span>
         </div>
       </td>
-      <td><span class="mock-badge mock-badge--intent-${row.intent}">${MOCK_INTENT_ICONS[row.intent] || ''}${intentLabel}</span></td>
-      <td><span class="mock-badge mock-badge--channel-${row.channel}">${MOCK_CHANNEL_ICONS[row.channel] || ''}${channelLabel}</span></td>
-      <td><span class="mock-time ${urgencyClass}">${MOCK_CLOCK_ICON}há ${row.minutesAgo} min</span></td>
+      <td><span class="mock-badge mock-badge--intent-${journey.intent}">${ACTIVE_JOURNEYS_INTENT_ICONS[journey.intent] || ''}${escapeHtml(journey.intent_label)}</span></td>
+      <td><span class="mock-badge mock-badge--channel-${journey.current_channel}">${ACTIVE_JOURNEYS_CHANNEL_ICONS[journey.current_channel] || ''}${escapeHtml(journey.current_channel_label)}</span></td>
+      <td><span class="mock-time ${urgencyClass}">${ACTIVE_JOURNEYS_CLOCK_ICON}há ${journey.minutes_since_start} min</span></td>
     `;
     tr.addEventListener('click', () => {
       switchView('consulta');
-      document.getElementById('search-input').value = row.cpf;
+      document.getElementById('search-input').value = journey.customer.cpf;
       document.getElementById('search-form').requestSubmit();
     });
     tbody.appendChild(tr);
@@ -853,7 +900,10 @@ document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('.sidebar-nav-item').forEach(btn => {
     btn.addEventListener('click', () => switchView(btn.dataset.view));
   });
-  renderMockActiveJourneys();
+
+  // Busca uma vez no carregamento pra popular o badge do menu lateral mesmo antes do atendente
+  // entrar na tela Jornadas Ativas (ela só reflete um valor real a partir do primeiro fetch).
+  fetchActiveJourneys();
 
   updateHeaderClock();
   setInterval(updateHeaderClock, 60000);

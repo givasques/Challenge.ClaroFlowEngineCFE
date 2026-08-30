@@ -632,6 +632,40 @@ body {
   gap: 10px;
 }
 
+/* B.1 (FASE 3.2) — empty state da tela Jornadas Ativas quando não há jornadas com status 'open' */
+
+.active-journeys-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+  padding: 64px 24px;
+  color: var(--text-muted);
+}
+
+.active-journeys-empty-icon {
+  width: 48px;
+  height: 48px;
+  color: #16a34a;
+  margin-bottom: 8px;
+}
+
+.active-journeys-empty-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.active-journeys-empty-subtitle {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 0;
+  max-width: 360px;
+  line-height: 1.5;
+}
+
 .mock-table-avatar {
   width: 28px;
   height: 28px;

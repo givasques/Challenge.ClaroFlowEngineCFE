@@ -35,7 +35,7 @@
             <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="17" height="17"><line x1="4" y1="6" x2="20" y2="6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><line x1="4" y1="12" x2="20" y2="12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><line x1="4" y1="18" x2="14" y2="18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
           </span>
           Jornadas ativas
-          <span class="sidebar-nav-badge">12</span>
+          <span class="sidebar-nav-badge hidden" id="active-journeys-badge">0</span>
         </button>
         <button type="button" class="sidebar-nav-item" id="nav-metricas" data-view="metricas">
           <span class="sidebar-nav-icon">
@@ -281,10 +281,9 @@
 
       </div>
 
-      <!-- Jornadas Ativas (mockado — FASE 3, item C.5) -->
+      <!-- Jornadas Ativas — dados reais via GET /journeys/active (FASE 3.2, Bloco B) -->
       <div id="view-jornadas-ativas" class="main-view hidden">
-        <div class="mock-banner">Esta funcionalidade está em desenvolvimento. Dados abaixo são demonstrativos.</div>
-        <table class="mock-table">
+        <table class="mock-table" id="active-journeys-table">
           <thead>
             <tr>
               <th>Cliente</th>
@@ -293,10 +292,15 @@
               <th>Tempo desde início</th>
             </tr>
           </thead>
-          <tbody id="mock-active-journeys-body">
+          <tbody id="active-journeys-body">
             <!-- linhas geradas via JS, clicáveis -->
           </tbody>
         </table>
+        <div id="active-journeys-empty" class="active-journeys-empty hidden">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" class="active-journeys-empty-icon"><circle cx="12" cy="12" r="10"></circle><path d="M8 12.5l2.5 2.5 5.5-6"></path></svg>
+          <p class="active-journeys-empty-title">Nenhuma jornada em andamento no momento</p>
+          <p class="active-journeys-empty-subtitle">Todas as jornadas foram concluídas ou não há novas interações agora. Esta tela atualiza automaticamente.</p>
+        </div>
       </div>
 
       <!-- Métricas (mockado — FASE 3, item C.5; ícones/gradiente/tendência na FASE 3.1, item B.3.2) -->
