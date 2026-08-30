@@ -164,6 +164,16 @@ body {
   display: none;
 }
 
+/*
+ * Utilitário genérico (FASE 3.1, item A.2) — faltava aqui, diferente de whatsapp-sim/attendant-panel
+ * que já têm essa regra. Sem ela, `.hidden` só funcionava em elementos `.screen`; qualquer outro
+ * elemento com `display` próprio (ex: #completed-dispute-details, #login-error, #dispute-description)
+ * nunca era escondido de fato, mesmo com a classe aplicada via JS.
+ */
+.hidden {
+  display: none !important;
+}
+
 @keyframes fade-in {
   from { opacity: 0; transform: translateY(4px); }
   to { opacity: 1; transform: translateY(0); }

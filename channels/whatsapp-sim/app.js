@@ -605,7 +605,16 @@ async function proceedWithDisputeReason(reason) {
 async function handleAwaitingProblemDescription(text) {
   const raw = text.trim();
   const isOtherReason = session.disputeReason === 'other';
-  const wantsToSkip = !isOtherReason && raw.toLowerCase() === 'pular';
+  const saidPular = raw.toLowerCase() === 'pular';
+
+  // FASE 3.1, item A.1: "pular" nunca é uma descrição válida para o motivo "Outro" — mesmo tendo
+  // 5+ caracteres, precisa ser rejeitado explicitamente antes da checagem de tamanho mínimo.
+  if (isOtherReason && saidPular) {
+    await botSay('Para o motivo "Outro motivo", preciso de uma descrição real do problema (mínimo 5 caracteres).');
+    return;
+  }
+
+  const wantsToSkip = !isOtherReason && saidPular;
 
   let description = null;
   if (!wantsToSkip) {
