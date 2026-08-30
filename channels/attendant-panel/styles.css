@@ -661,7 +661,12 @@ body {
   border-top: 1px solid var(--border-subtle);
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 10px;
+}
+
+.customer-description-block .col-label {
+  display: block;
+  margin-bottom: 4px;
 }
 
 .customer-description-text {

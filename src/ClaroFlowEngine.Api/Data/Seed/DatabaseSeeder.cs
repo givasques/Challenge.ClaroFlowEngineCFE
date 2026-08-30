@@ -134,10 +134,10 @@ public static class DatabaseSeeder
     }
 
     /// <summary>
-    /// Popula 3 faturas por cliente do seed (últimos 3 meses), cada uma com 5 itens de linha —
-    /// dados usados pela intenção "contestação de cobrança indevida" (ETAPA 2, Passo C).
-    /// A fatura mais recente de cada cliente ganha um item de valor estranho, para dar o que
-    /// "descobrir" durante a demonstração da contestação.
+    /// Popula 3 faturas por cliente do seed (últimos 3 meses), cada uma com itens de linha —
+    /// dados usados pela intenção "contestação de cobrança indevida" (ETAPA 2 Passo C / FASE 3 Bloco A).
+    /// A fatura mais recente de cada cliente ganha um item de assinatura "gancho" mais plausível
+    /// (streaming/TV/SMS premium) e um adicional pequeno, para dar o que "descobrir" na demonstração.
     /// </summary>
     private static async Task SeedInvoicesAsync(
         CfeDbContext db, Dictionary<string, Customer> customers, Dictionary<string, Plan> plans, CancellationToken ct)
@@ -147,6 +147,15 @@ public static class DatabaseSeeder
             (Cpf: "11144477735", PlanCode: "claro_15gb"),
             (Cpf: "22255588846", PlanCode: "claro_30gb"),
             (Cpf: "33366699957", PlanCode: "claro_15gb"),
+        };
+
+        // Item "gancho" mais plausível por cliente (FASE 3, item A.5) — cada um contestável como
+        // "assinatura que eu não contratei", cenário real de reclamação de cobrança indevida.
+        var hookItemByCpf = new Dictionary<string, (string Description, int AmountCents)>
+        {
+            ["11144477735"] = ("Assinatura Premiere Torcedor", 4990),
+            ["22255588846"] = ("Pacote Netflix Premium", 3990),
+            ["33366699957"] = ("Aluguel Decodificador Claro TV+", 2490),
         };
 
         var existingCustomerIdsWithInvoices = await db.Invoices
@@ -162,25 +171,28 @@ public static class DatabaseSeeder
             if (!plans.TryGetValue(planCode, out var plan)) continue;
             if (existingCustomerIdsWithInvoices.Contains(customer.Id)) continue;
 
+            var hookItem = hookItemByCpf[cpf];
+
             for (var monthsAgo = 2; monthsAgo >= 0; monthsAgo--)
             {
                 var referenceMonth = firstOfThisMonth.AddMonths(-monthsAgo);
+                var isMostRecent = monthsAgo == 0;
 
                 var items = new List<(string Description, string Category, int AmountCents)>
                 {
                     ($"Mensalidade {plan.Name}", InvoiceItemCategory.Subscription, plan.MonthlyPriceCents),
-                    ("Franquia adicional 2GB", InvoiceItemCategory.AddOn, 1990),
-                    ("ICMS", InvoiceItemCategory.Tax, 3600),
-                    ("PIS/COFINS", InvoiceItemCategory.Tax, 1200),
-                    ("Taxa de conveniência", InvoiceItemCategory.Fee, 3210),
                 };
 
-                // Fatura mais recente (issued): item estranho para a demo de contestação.
-                var isMostRecent = monthsAgo == 0;
+                // Fatura mais recente (issued): assinatura "gancho" + adicional pequeno, para a demo de contestação.
                 if (isMostRecent)
                 {
-                    items[1] = ("Serviço de valor adicionado não reconhecido", InvoiceItemCategory.Fee, 4990);
+                    items.Add((hookItem.Description, InvoiceItemCategory.Subscription, hookItem.AmountCents));
+                    items.Add(("SMS internacional", InvoiceItemCategory.AddOn, 350));
                 }
+
+                items.Add(("ICMS", InvoiceItemCategory.Tax, 3600));
+                items.Add(("PIS/COFINS", InvoiceItemCategory.Tax, 1200));
+                items.Add(("Taxa de conveniência", InvoiceItemCategory.Fee, 3210));
 
                 var invoice = new Invoice
                 {

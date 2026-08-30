@@ -71,8 +71,19 @@ const CURRENT_STEP_LABELS = {
   identity_resolved: 'Identidade resolvida',
   plan_selected: 'Plano selecionado',
   invoice_selected: 'Fatura selecionada',
+  dispute_reason_selected: 'Motivo informado',
   description_provided: 'Descrição do problema enviada',
   dispute_formalized: 'Contestação formalizada',
+};
+
+// Rótulos amigáveis dos motivos de contestação (FASE 3, Bloco A) — ids espelham Common/Contracts/DisputeReason.cs.
+const DISPUTE_REASON_LABELS = {
+  service_not_contracted: 'Cobrança de serviço que não contratei',
+  higher_than_expected: 'Valor cobrado maior que o esperado',
+  duplicate_charge: 'Cobrança em duplicidade',
+  cancelled_service_still_charged: 'Serviço cancelado ainda sendo cobrado',
+  after_portability: 'Cobrança após portabilidade',
+  other: 'Outro motivo',
 };
 
 const state = {
@@ -400,15 +411,29 @@ function renderJourneyStatus(journey) {
   document.getElementById('journey-intent').textContent = INTENT_LABELS[journey.intent] || journey.intent;
   document.getElementById('journey-last-update').textContent = relativeTime(journey.updated_at);
 
-  // Descrição do cliente em destaque, quando presente (ex: contestação de cobrança — ETAPA 2, Passo C).
+  // Motivo + descrição do cliente em destaque, quando presentes (contestação de cobrança — FASE 3, Bloco A).
   const descriptionBlock = document.getElementById('customer-description-block');
-  const description = journey.payload && journey.payload.customer_description;
+  const payload = journey.payload || {};
+  const reason = payload.dispute_reason;
+  const description = payload.customer_description;
+
+  const reasonRow = document.getElementById('customer-dispute-reason-row');
+  if (reason) {
+    document.getElementById('customer-dispute-reason-text').textContent = DISPUTE_REASON_LABELS[reason] || reason;
+    reasonRow.classList.remove('hidden');
+  } else {
+    reasonRow.classList.add('hidden');
+  }
+
+  const descriptionRow = document.getElementById('customer-description-row');
   if (description) {
     document.getElementById('customer-description-text').textContent = description;
-    descriptionBlock.classList.remove('hidden');
+    descriptionRow.classList.remove('hidden');
   } else {
-    descriptionBlock.classList.add('hidden');
+    descriptionRow.classList.add('hidden');
   }
+
+  descriptionBlock.classList.toggle('hidden', !reason && !description);
 
   block.classList.remove('hidden');
 }
