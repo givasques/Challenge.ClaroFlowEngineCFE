@@ -48,24 +48,35 @@ public static class DatabaseSeeder
 
     private static async Task<Dictionary<string, Customer>> SeedCustomersAsync(CfeDbContext db, CancellationToken ct)
     {
+        // billing_due_day/segment são placeholders mockados (FASE 3, item C.3) — sem correspondência real,
+        // só para o card do cliente no painel não exibir "—" em campos sem dado nenhum.
         var seedCustomers = new[]
         {
-            new Customer { Cpf = "11144477735", FullName = "Ana Silva" },
-            new Customer { Cpf = "22255588846", FullName = "Carlos Mendes" },
-            new Customer { Cpf = "33366699957", FullName = "Mariana Souza" },
+            new Customer { Cpf = "11144477735", FullName = "Ana Silva", BillingDueDay = 15, Segment = "Pessoa Física" },
+            new Customer { Cpf = "22255588846", FullName = "Carlos Mendes", BillingDueDay = 5, Segment = "Premium" },
+            new Customer { Cpf = "33366699957", FullName = "Mariana Souza", BillingDueDay = 20, Segment = "Controle" },
         };
 
-        var existingCpfs = await db.Customers.Select(c => c.Cpf).ToListAsync(ct);
+        var existingCustomers = await db.Customers.ToListAsync(ct);
+        var existingCpfs = existingCustomers.Select(c => c.Cpf).ToHashSet();
 
         foreach (var customer in seedCustomers.Where(c => !existingCpfs.Contains(c.Cpf)))
         {
             db.Customers.Add(customer);
         }
 
-        if (seedCustomers.Any(c => !existingCpfs.Contains(c.Cpf)))
+        // Backfill: bancos já seedados antes do item C.3 não têm billing_due_day/segment ainda.
+        foreach (var seedCustomer in seedCustomers)
         {
-            await db.SaveChangesAsync(ct);
+            var existing = existingCustomers.FirstOrDefault(c => c.Cpf == seedCustomer.Cpf);
+            if (existing is not null && existing.BillingDueDay is null)
+            {
+                existing.BillingDueDay = seedCustomer.BillingDueDay;
+                existing.Segment = seedCustomer.Segment;
+            }
         }
+
+        await db.SaveChangesAsync(ct);
 
         return await db.Customers.ToDictionaryAsync(c => c.Cpf, ct);
     }

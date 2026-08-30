@@ -24,31 +24,31 @@
       </div>
 
       <nav class="sidebar-nav">
-        <div class="sidebar-nav-item active">
+        <button type="button" class="sidebar-nav-item active" id="nav-consulta" data-view="consulta">
           <span class="sidebar-nav-icon">
             <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="17" height="17"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.8"/><line x1="21" y1="21" x2="16.5" y2="16.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
           </span>
           Consulta de jornada
-        </div>
-        <div class="sidebar-nav-item disabled">
+        </button>
+        <button type="button" class="sidebar-nav-item" id="nav-jornadas-ativas" data-view="jornadas-ativas">
           <span class="sidebar-nav-icon">
             <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="17" height="17"><line x1="4" y1="6" x2="20" y2="6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><line x1="4" y1="12" x2="20" y2="12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><line x1="4" y1="18" x2="14" y2="18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
           </span>
           Jornadas ativas
           <span class="sidebar-nav-badge">12</span>
-        </div>
-        <div class="sidebar-nav-item disabled" title="Em breve">
+        </button>
+        <button type="button" class="sidebar-nav-item" id="nav-metricas" data-view="metricas">
           <span class="sidebar-nav-icon">
             <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="17" height="17"><line x1="5" y1="20" x2="5" y2="12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><line x1="12" y1="20" x2="12" y2="6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><line x1="19" y1="20" x2="19" y2="15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
           </span>
           Métricas
-        </div>
-        <div class="sidebar-nav-item disabled">
+        </button>
+        <button type="button" class="sidebar-nav-item" id="nav-configuracoes" data-view="configuracoes">
           <span class="sidebar-nav-icon">
             <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="17" height="17"><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.7"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </span>
           Configurações
-        </div>
+        </button>
       </nav>
 
       <div class="sidebar-footer">CFE v1.0 — Modo simulação</div>
@@ -57,19 +57,13 @@
     <main class="main">
       <header class="main-header">
         <div>
-          <h1>Consulta de Jornada</h1>
-          <p class="main-subtitle">Consulte o contexto completo de qualquer cliente em atendimento</p>
+          <h1 id="main-title">Consulta de Jornada</h1>
+          <p class="main-subtitle" id="main-subtitle">Consulte o contexto completo de qualquer cliente em atendimento</p>
         </div>
         <div class="header-clock" id="header-clock" aria-live="off"></div>
       </header>
 
-      <div class="readonly-notice">
-        <span class="readonly-notice-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="16" height="16"><circle cx="12" cy="12" r="9.5" stroke="currentColor" stroke-width="1.8"/><line x1="12" y1="11" x2="12" y2="16.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="7.6" r="1.05" fill="currentColor"/></svg>
-        </span>
-        <span>Este painel exibe o contexto de jornada em modo somente leitura. Nenhuma alteração pode ser
-        feita aqui. Para atualizar dados do cliente, utilize o sistema CRM.</span>
-      </div>
+      <div id="view-consulta" class="main-view">
 
       <div id="degraded-banner" class="degraded-banner hidden">
         <span id="degraded-banner-text"></span>
@@ -151,7 +145,7 @@
             </span>
             <div>
               <span class="detail-label">Vencimento</span>
-              <span class="detail-value detail-value-muted">—</span>
+              <span id="customer-billing-due-day" class="detail-value detail-value-muted">—</span>
             </div>
           </div>
           <div class="detail-item">
@@ -160,7 +154,7 @@
             </span>
             <div>
               <span class="detail-label">Segmento</span>
-              <span class="detail-value detail-value-muted">—</span>
+              <span id="customer-segment" class="detail-value detail-value-muted">—</span>
             </div>
           </div>
           <div class="detail-item">
@@ -228,6 +222,11 @@
         </div>
       </section>
 
+      <!-- Sem jornada ativa — o card de dados do cliente acima continua visível (FASE 3, item C.2) -->
+      <p id="no-active-journey-message" class="no-active-journey-message hidden">
+        Este cliente não tem jornadas em andamento no momento.
+      </p>
+
       <!-- Resumo de interações históricas do cliente (ETAPA 2, Passo B) -->
       <section id="interactions-summary-block" class="panel-block hidden">
         <h2>Resumo de interações</h2>
@@ -250,6 +249,70 @@
         <span class="polling-dot" id="polling-dot" aria-hidden="true"></span>
         <span id="polling-footer-text">Atualização automática ativa · a cada 4 segundos</span>
       </footer>
+
+      </div>
+
+      <!-- Jornadas Ativas (mockado — FASE 3, item C.5) -->
+      <div id="view-jornadas-ativas" class="main-view hidden">
+        <div class="mock-banner">Esta funcionalidade está em desenvolvimento. Dados abaixo são demonstrativos.</div>
+        <table class="mock-table">
+          <thead>
+            <tr>
+              <th>Cliente</th>
+              <th>Intenção</th>
+              <th>Canal</th>
+              <th>Tempo desde início</th>
+            </tr>
+          </thead>
+          <tbody id="mock-active-journeys-body">
+            <!-- linhas geradas via JS, clicáveis -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Métricas (mockado — FASE 3, item C.5) -->
+      <div id="view-metricas" class="main-view hidden">
+        <div class="mock-banner">Esta funcionalidade está em desenvolvimento. Dados exibidos são demonstrativos.</div>
+        <div class="mock-metrics-grid">
+          <div class="mock-metric-card">
+            <span class="mock-metric-label">TMA médio</span>
+            <span class="mock-metric-value">4m 12s</span>
+          </div>
+          <div class="mock-metric-card">
+            <span class="mock-metric-label">Jornadas hoje</span>
+            <span class="mock-metric-value">47</span>
+          </div>
+          <div class="mock-metric-card">
+            <span class="mock-metric-label">Taxa de conclusão</span>
+            <span class="mock-metric-value">78%</span>
+          </div>
+          <div class="mock-metric-card">
+            <span class="mock-metric-label">Canal mais usado</span>
+            <span class="mock-metric-value">WhatsApp</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Configurações (mockado — FASE 3, item C.5) -->
+      <div id="view-configuracoes" class="main-view hidden">
+        <div class="mock-banner">Esta funcionalidade está em desenvolvimento.</div>
+        <div class="mock-settings-form">
+          <label>
+            <span class="detail-label">Nome do atendente</span>
+            <input type="text" value="Júlia Souza" disabled />
+          </label>
+          <label class="mock-settings-checkbox">
+            <input type="checkbox" checked disabled />
+            <span>Receber notificações de novas jornadas</span>
+          </label>
+          <label>
+            <span class="detail-label">Tema</span>
+            <select disabled>
+              <option>Claro</option>
+            </select>
+          </label>
+        </div>
+      </div>
     </main>
 
   </div>
