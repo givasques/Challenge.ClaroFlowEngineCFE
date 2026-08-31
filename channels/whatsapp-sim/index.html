@@ -59,71 +59,74 @@
       </div>
     </header>
 
-    <div id="degraded-banner" class="degraded-banner hidden">
-      <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="14" height="14" style="flex-shrink:0;">
-        <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-        <line x1="12" y1="9" x2="12" y2="13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-        <line x1="12" y1="17" x2="12.01" y2="17" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-      </svg>
-      <span>Modo degradado — CFE indisponível</span>
-    </div>
+    <!-- FASE 3.3, item B.2.4: conteúdo principal do chat (mensagens + composer) em elemento semântico main, não em div solta. -->
+    <main class="chat-main">
+      <div id="degraded-banner" class="degraded-banner hidden">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="14" height="14" style="flex-shrink:0;">
+          <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <line x1="12" y1="9" x2="12" y2="13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <line x1="12" y1="17" x2="12.01" y2="17" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        <span>Modo degradado — CFE indisponível</span>
+      </div>
 
-    <div class="messages-wrapper">
-      <div id="messages" class="messages">
-        <div class="day-separator">
-          <span>HOJE</span>
+      <div class="messages-wrapper">
+        <div id="messages" class="messages">
+          <div class="day-separator">
+            <span>HOJE</span>
+          </div>
+        </div>
+
+        <div id="typing-indicator" class="typing-indicator hidden">
+          <span></span><span></span><span></span>
+        </div>
+
+        <div id="processing-indicator" class="processing-indicator hidden">
+          <span class="processing-dot"></span><span class="processing-dot"></span><span class="processing-dot"></span>
+          <span id="processing-text" class="processing-text"></span>
         </div>
       </div>
 
-      <div id="typing-indicator" class="typing-indicator hidden">
-        <span></span><span></span><span></span>
-      </div>
+      <form id="chat-form" class="chat-form">
+        <button type="button" class="input-icon-btn" title="Emoji" aria-label="Emoji">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
+            <path d="M8 14C8 14 9.5 16 12 16C14.5 16 16 14 16 14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <line x1="9" y1="9" x2="9.01" y2="9" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+            <line x1="15" y1="9" x2="15.01" y2="9" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+          </svg>
+        </button>
+        <button type="button" class="input-icon-btn" title="Anexar" aria-label="Anexar">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M21.44 11.05L12.25 20.24C11.1242 21.3658 9.59712 21.9983 8.005 21.9983C6.41288 21.9983 4.88581 21.3658 3.76 20.24C2.63419 19.1142 2.00171 17.5871 2.00171 15.995C2.00171 14.4029 2.63419 12.8758 3.76 11.75L12.95 2.56C13.7006 1.80942 14.7186 1.38777 15.78 1.38777C16.8414 1.38777 17.8594 1.80942 18.61 2.56C19.3606 3.31058 19.7822 4.32862 19.7822 5.39C19.7822 6.45138 19.3606 7.46942 18.61 8.22L9.41 17.41C9.03472 17.7853 8.52573 17.9961 7.995 17.9961C7.46427 17.9961 6.95528 17.7853 6.58 17.41C6.20472 17.0347 5.99389 16.5257 5.99389 15.995C5.99389 15.4643 6.20472 14.9553 6.58 14.58L15.07 6.1" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+        <input
+          id="message-input"
+          class="message-input"
+          type="text"
+          placeholder="Digite uma mensagem"
+          autocomplete="off"
+        />
+        <button type="button" class="input-icon-btn" title="Gravar áudio" aria-label="Gravar áudio">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 1C10.9391 1 9.92172 1.42143 9.17157 2.17157C8.42143 2.92172 8 3.93913 8 5V12C8 13.0609 8.42143 14.0783 9.17157 14.8284C9.92172 15.5786 10.9391 16 12 16C13.0609 16 14.0783 15.5786 14.8284 14.8284C15.5786 14.0783 16 13.0609 16 12V5C16 3.93913 15.5786 2.92172 14.8284 2.17157C14.0783 1.42143 13.0609 1 12 1Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M19 10V12C19 13.8565 18.2625 15.637 16.9497 16.9497C15.637 18.2625 13.8565 19 12 19C10.1435 19 8.36301 18.2625 7.05025 16.9497C5.7375 15.637 5 13.8565 5 12V10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <line x1="12" y1="19" x2="12" y2="23" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <line x1="8" y1="23" x2="16" y2="23" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </button>
+        <button id="send-button" class="send-button" type="submit" aria-label="Enviar mensagem" title="Enviar">
+          <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+            <path d="M1.101 21.757L23.8 12.028 1.101 2.3l.011 7.912 13.623 1.816-13.623 1.817-.011 7.912z"/>
+          </svg>
+        </button>
+      </form>
+    </main>
 
-      <div id="processing-indicator" class="processing-indicator hidden">
-        <span class="processing-dot"></span><span class="processing-dot"></span><span class="processing-dot"></span>
-        <span id="processing-text" class="processing-text"></span>
-      </div>
-    </div>
-
-    <form id="chat-form" class="chat-form">
-      <button type="button" class="input-icon-btn" title="Emoji" aria-label="Emoji">
-        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
-          <path d="M8 14C8 14 9.5 16 12 16C14.5 16 16 14 16 14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-          <line x1="9" y1="9" x2="9.01" y2="9" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
-          <line x1="15" y1="9" x2="15.01" y2="9" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
-        </svg>
-      </button>
-      <button type="button" class="input-icon-btn" title="Anexar" aria-label="Anexar">
-        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M21.44 11.05L12.25 20.24C11.1242 21.3658 9.59712 21.9983 8.005 21.9983C6.41288 21.9983 4.88581 21.3658 3.76 20.24C2.63419 19.1142 2.00171 17.5871 2.00171 15.995C2.00171 14.4029 2.63419 12.8758 3.76 11.75L12.95 2.56C13.7006 1.80942 14.7186 1.38777 15.78 1.38777C16.8414 1.38777 17.8594 1.80942 18.61 2.56C19.3606 3.31058 19.7822 4.32862 19.7822 5.39C19.7822 6.45138 19.3606 7.46942 18.61 8.22L9.41 17.41C9.03472 17.7853 8.52573 17.9961 7.995 17.9961C7.46427 17.9961 6.95528 17.7853 6.58 17.41C6.20472 17.0347 5.99389 16.5257 5.99389 15.995C5.99389 15.4643 6.20472 14.9553 6.58 14.58L15.07 6.1" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-      </button>
-      <input
-        id="message-input"
-        class="message-input"
-        type="text"
-        placeholder="Digite uma mensagem"
-        autocomplete="off"
-      />
-      <button type="button" class="input-icon-btn" title="Gravar áudio" aria-label="Gravar áudio">
-        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M12 1C10.9391 1 9.92172 1.42143 9.17157 2.17157C8.42143 2.92172 8 3.93913 8 5V12C8 13.0609 8.42143 14.0783 9.17157 14.8284C9.92172 15.5786 10.9391 16 12 16C13.0609 16 14.0783 15.5786 14.8284 14.8284C15.5786 14.0783 16 13.0609 16 12V5C16 3.93913 15.5786 2.92172 14.8284 2.17157C14.0783 1.42143 13.0609 1 12 1Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M19 10V12C19 13.8565 18.2625 15.637 16.9497 16.9497C15.637 18.2625 13.8565 19 12 19C10.1435 19 8.36301 18.2625 7.05025 16.9497C5.7375 15.637 5 13.8565 5 12V10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          <line x1="12" y1="19" x2="12" y2="23" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-          <line x1="8" y1="23" x2="16" y2="23" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-        </svg>
-      </button>
-      <button id="send-button" class="send-button" type="submit" aria-label="Enviar mensagem" title="Enviar">
-        <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-          <path d="M1.101 21.757L23.8 12.028 1.101 2.3l.011 7.912 13.623 1.816-13.623 1.817-.011 7.912z"/>
-        </svg>
-      </button>
-    </form>
-
-    <div class="simulation-footer">
+    <footer class="simulation-footer">
       Canal simulado para demonstração
-    </div>
+    </footer>
 
   </div>
 

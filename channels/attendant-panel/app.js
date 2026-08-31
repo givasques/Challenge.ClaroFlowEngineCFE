@@ -890,11 +890,26 @@ function renderActiveJourneysTable(journeys) {
       <td><span class="mock-badge mock-badge--channel-${journey.current_channel}">${ACTIVE_JOURNEYS_CHANNEL_ICONS[journey.current_channel] || ''}${escapeHtml(journey.current_channel_label)}</span></td>
       <td><span class="mock-time ${urgencyClass}">${ACTIVE_JOURNEYS_CLOCK_ICON}há ${journey.minutes_since_start} min</span></td>
     `;
-    tr.addEventListener('click', () => {
+
+    // FASE 3.3, item B.2.4: linha clicável precisa ser operável por teclado (tabindex + Enter/Espaço),
+    // já que <tr> não é focável nem ativável nativamente como um <button> seria.
+    tr.tabIndex = 0;
+    tr.setAttribute('role', 'button');
+    tr.setAttribute('aria-label', `Consultar jornada de ${journey.customer.full_name}`);
+
+    const openJourney = () => {
       switchView('consulta');
       document.getElementById('search-input').value = journey.customer.cpf;
       document.getElementById('search-form').requestSubmit();
+    };
+    tr.addEventListener('click', openJourney);
+    tr.addEventListener('keydown', event => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        openJourney();
+      }
     });
+
     tbody.appendChild(tr);
   });
 }

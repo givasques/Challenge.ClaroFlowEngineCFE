@@ -51,6 +51,12 @@
   box-sizing: border-box;
 }
 
+/* Foco de teclado visível (FASE 3.3, item B.2.5) — garante que quem navega via Tab enxerga onde está. */
+*:focus-visible {
+  outline: 2px solid var(--claro-red, #e30613);
+  outline-offset: 2px;
+}
+
 body {
   margin: 0;
   font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;
@@ -262,6 +268,16 @@ body {
 }
 
 /* ---------- Área das mensagens ---------- */
+
+/* Wrapper semântico <main> introduzido na FASE 3.3, item B.2.4 — precisa herdar o mesmo
+   comportamento de flex column + flex:1 que .messages-wrapper tinha diretamente em .chat-window,
+   senão a área de mensagens para de esticar para preencher o espaço disponível. */
+.chat-main {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
 
 .messages-wrapper {
   flex: 1;
@@ -683,7 +699,6 @@ body {
   border: none;
   background: var(--input-field-bg);
   font-size: 14.5px;
-  outline: none;
   color: #111b21;
   font-family: inherit;
   min-width: 0;
