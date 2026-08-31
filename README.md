@@ -285,35 +285,11 @@ A spec funcional deste projeto organiza os requisitos como casos de uso (UC01–
 
 ## Roadmap de evolução
 
-### ETAPA 2: Refinamentos pós-MVP ✅
+O protótipo evoluiu em ondas sucessivas a partir do MVP inicial: ETAPA 2 (interatividade do bot, painel enriquecido, contestação de cobrança), FASE 3 (fluxo de contestação ponta a ponta nos 3 canais), FASE 3.1 (polimento do painel) e FASE 3.2 (menu lateral do painel com dados reais em vez de mock). Todas concluídas — o [histórico de commits e PRs](https://github.com/givasques/Challenge.ClaroFlowEngineCFE/pulls?q=is%3Apr) documenta o detalhe de cada etapa.
 
-Refinamento do protótipo em quatro frentes:
+### Próximo passo em avaliação
 
-- **(0) Housekeeping** ✅: correção de bugs conhecidos e limpezas pontuais (validação real de CPF, indicadores de processamento, deduplicação, nomes explícitos do Docker Compose, entre outros).
-- **(A) Bot com interativos** ✅: chat simulado passou a suportar botões e listas, além do texto livre.
-- **(B) Painel enriquecido** ✅: dados agregados do cliente (cliente desde, canal preferido, total de interações) e histórico de jornadas anteriores no painel do atendente.
-- **(C) Intenção "contestação de cobrança indevida"** ✅: segunda intenção suportada pelo CFE (`intent: dispute_charge`), com faturas e itens de linha, validando a genericidade da arquitetura de contexto.
-
-### FASE 3: Contestação de cobrança ponta a ponta e painel enriquecido ✅
-
-Quatro blocos, cobrindo o fluxo completo de contestação nos 3 canais e melhorias de contexto no painel:
-
-- **(A) Contestação** ✅: fluxo completo do bot (coleta de motivo + descrição) até o App (revisão da fatura, itens marcáveis, protocolo).
-- **(B) Chat** ✅: elementos interativos reaproveitados para o seletor de motivo de contestação.
-- **(C) Painel** ✅: dados agregados do cliente sempre visíveis (independente de jornada ativa) e timeline com descrições contextualizadas por tipo de evento.
-- **(D) UI** ✅: polimento visual e revisão de nomenclatura (ex: badge "cliente desde").
-
-### FASE 3.1: Correções e polimento pós-testes ✅
-
-Dois bugs funcionais encontrados em validação real no Render (aceitação indevida de "pular" como descrição de contestação; vazamento de labels vazios na tela de sucesso do App) e três melhorias de polimento visual do painel: resumo de interações com mini-stats, timeline com descrições mais ricas, e as telas mockadas do menu lateral com o mesmo nível visual da tela principal.
-
-### FASE 3.2: Menu lateral com dados reais ✅
-
-As telas "Jornadas Ativas" e "Métricas" do painel, antes mockadas, passaram a consultar dados reais do banco: `GET /journeys/active` (jornadas em andamento, contador dinâmico no menu, polling de 30s) e `GET /metrics/summary` (TMA mediano, jornadas hoje, taxa de conclusão, canal mais usado, polling de 60s). Configurações permanece mockada — não há sistema de usuários no CFE ainda.
-
-### Depois da FASE 3.2
-
-**Modo Explicação**: um painel de orquestração que pausa a execução do CFE em pontos-chave e exibe, em tempo real, qual componente está processando o quê. Pensado para tornar a demonstração didática, já que o protótipo em operação normal executa em menos de um segundo por requisição. Em avaliação, ainda não implementado.
+**Modo Explicação**: um painel de orquestração que pausa a execução do CFE em pontos-chave e exibe, em tempo real, qual componente está processando o quê. Pensado para tornar a demonstração didática, já que o protótipo em operação normal executa em menos de um segundo por requisição. Ainda não implementado.
 
 ### Evoluções futuras possíveis
 
