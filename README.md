@@ -32,23 +32,21 @@ Este repositório contém um **protótipo funcional**, não um produto de produ�
 
 ## Integrantes: Equipe Horizon, Turma 4SIS FIAP
 
-<!-- preencher com integrantes do time -->
-
 | Nome | RM | GitHub | LinkedIn |
 |---|---|---|---|
-| | | | |
-| | | | |
-| | | | |
+| Caua Fernandes | 551765 | [CauaFernandess](https://github.com/CauaFernandess) | [LinkedIn](https://www.linkedin.com/in/caua-fernandes-02a877293/) |
+| Gabriel Dias Santiago | 551406 | [Gabriel-Dias-Santiago](https://github.com/Gabriel-Dias-Santiago) | [LinkedIn](https://www.linkedin.com/in/gabriel-dias-santiago-/) |
+| Giovanna Vasques Alexandre | 99884 | [givasques](https://github.com/givasques) | [LinkedIn](https://www.linkedin.com/in/giovanna-vasques-718b3a1a3/) |
+| Rick Alves Domingues | 552438 | [riqinho](https://github.com/riqinho) | [LinkedIn](https://www.linkedin.com/in/rickalvesdomingues/) |
+| Wemilli Nataly Lima de Oliveira | 552301 | [Wemilli](https://github.com/Wemilli) | [LinkedIn](https://www.linkedin.com/in/wemilli-lima-482989203/) |
 
 ---
 
 ## Screenshots
 
-<!-- ![Chat WhatsApp simulado](docs/screenshots/chat.png) -->
-<!-- ![App Minha Claro simulado](docs/screenshots/app.png) -->
-<!-- ![Painel do Atendente](docs/screenshots/painel.png) -->
-
-*(prints ainda não adicionados, ver [`docs/screenshots/`](docs/screenshots/))*
+| Chat WhatsApp simulado | App Minha Claro simulado | Painel do Atendente |
+|---|---|---|
+| ![Chat WhatsApp simulado](docs/screenshots/chat.png) | ![App Minha Claro simulado](docs/screenshots/app.png) | ![Painel do Atendente](docs/screenshots/painel.png) |
 
 ---
 
@@ -64,25 +62,39 @@ Este repositório contém um **protótipo funcional**, não um produto de produ�
       │      HTTP/JSON - header X-Channel-Token  │
       └───────────────────┼──────────────────────┘
                            ▼
-            ┌──────────────────────────┐
-            │   Claro Flow Engine API   │
-            │  ┌─────────┬───────────┐  │
-            │  │Identity │ Context   │  │
-            │  ├─────────┼───────────┤  │
-            │  │      Handoff        │  │
-            │  └──────────────────────┘  │
-            └────────────┬──────────────┘
-                           ▼
-                  ┌─────────────────┐
-                  │   PostgreSQL 16  │
-                  └─────────────────┘
+            ┌────────────────────────────────────┐
+            │      Claro Flow Engine API          │
+            │  ┌─────────┬─────────┬───────────┐  │
+            │  │Identity │ Context │ Invoices  │  │
+            │  ├─────────┴─────────┴───────────┤  │
+            │  │      Handoff      │   Panel   │  │
+            │  └────────────────────────────────┘  │
+            └────────────────┬───────────────────┘
+                              ▼
+                     ┌─────────────────┐
+                     │   PostgreSQL 16  │
+                     └─────────────────┘
 ```
 
 - **Identity**: resolve a identidade unificada do cliente a partir de qualquer identificador (CPF, telefone, login).
 - **Context**: mantém o ciclo de vida da jornada (abertura, atualização, expiração, encerramento) e o histórico de transições.
 - **Handoff**: gera e resolve os tokens de deep link que transferem uma jornada entre canais.
+- **Invoices**: expõe as faturas do cliente (com itens de linha), consumidas pelo fluxo de contestação de cobrança.
+- **Panel**: dados agregados para o menu lateral do painel do atendente — jornadas ativas em tempo real e métricas operacionais (TMA, taxa de conclusão, canal mais usado).
 
-Os três módulos rodam num único processo (monolito modular); ver [Decisões arquiteturais](#decisões-arquiteturais).
+Os cinco módulos rodam num único processo (monolito modular); ver [Decisões arquiteturais](#decisões-arquiteturais).
+
+---
+
+## Modos de execução
+
+O projeto tem 2 formas de rodar via Docker Compose:
+
+**Modo dev** (`docker-compose.yml`) — sobe apenas o Postgres. Ideal para desenvolvimento: você roda a API com `dotnet run` e os canais como estáticos, com hot reload e debug nativo do editor.
+
+**Modo full** (`docker-compose.full.yml`) — sobe tudo (Postgres + API + canais servidos pela API). Ideal para demonstração ou teste ponta a ponta com um único comando.
+
+Os dois modos são isolados (nomes de projeto e portas de Postgres diferentes) e podem coexistir sem conflito. Os comandos exatos de cada modo estão em [Setup detalhado](#setup-detalhado) logo abaixo.
 
 ---
 
@@ -149,7 +161,7 @@ Challenge.ClaroFlowEngineCFE/
 ├── src/
 │   └── ClaroFlowEngine.Api/
 │       ├── Dockerfile
-│       ├── Modules/           # Identity, Context, Handoff (feature folders)
+│       ├── Modules/           # Identity, Context, Handoff, Invoices, Panel (feature folders)
 │       ├── Data/               # entidades, migrations, seed
 │       └── Common/             # middleware, erros, serviços compartilhados
 ├── channels/
@@ -215,6 +227,13 @@ Os três clientes de teste já vêm no seed automático. Com a stack rodando, ab
 8. Confira o número de protocolo exibido na tela final.
 9. Verifique no painel (buscando `11144477735`) que a intenção aparece como "Contestação de cobrança" e a descrição do cliente fica em destaque.
 
+### Cenário 6: Jornadas ativas e métricas em tempo real (painel) · ~2 min
+
+1. Repita os passos 1-3 do cenário 1 com qualquer CPF do seed, mas não conclua.
+2. No painel, clique em "Jornadas ativas" no menu lateral: a jornada recém-aberta deve aparecer na tabela, com badge de canal/intenção e tempo decorrido.
+3. Clique em "Métricas": os 4 cards devem mostrar valores calculados a partir do banco (não mais dados fictícios).
+4. Volte para "Jornadas ativas" e aguarde ~30s: a tabela deve se atualizar sozinha (visível na aba Network do navegador).
+
 ---
 
 ## Mapeamento de requisitos
@@ -232,14 +251,16 @@ A spec funcional deste projeto organiza os requisitos como casos de uso (UC01–
 | UC07 | Encerrar jornada | `POST /context/{id}/close` |
 | UC08 | Expirar jornada por inatividade | Verificação reativa em todo acesso a uma jornada aberta (`IJourneyExpirationService`) |
 | UC09 | Consultar histórico de jornada (painel) | `GET /context/customer/{id}` + `GET /context/{id}/transitions`, com polling |
-| UC10 | Contestar cobrança indevida (ETAPA 2, Passo C) | `GET /invoices/customer/{id}` + fluxo dedicado nos 3 canais, `intent: dispute_charge` |
+| UC10 | Contestar cobrança indevida (ETAPA 2/FASE 3, Passo C) | `GET /invoices/customer/{id}` + `GET /invoices/{id}` + fluxo dedicado nos 3 canais, `intent: dispute_charge` |
 | RNF003 | Operação em modo degradado quando o CFE está indisponível | Timeout + retry + banner de indisponibilidade nos 3 canais |
+| — | Jornadas ativas em tempo real (painel, FASE 3.2) | `GET /journeys/active` |
+| — | Métricas operacionais (painel, FASE 3.2) | `GET /metrics/summary` (TMA mediano, jornadas hoje, taxa de conclusão, canal mais usado) |
 
 ---
 
 ## Decisões arquiteturais
 
-**Monolito modular em vez de microsserviços.** Para o protótipo, um único processo com módulos isolados (Identity, Context, Handoff) entrega a mesma separação de responsabilidades sem o custo operacional de orquestrar múltiplos serviços, rede entre eles e deploy distribuído, desnecessário para validar a proposta de valor.
+**Monolito modular em vez de microsserviços.** Para o protótipo, um único processo com módulos isolados (Identity, Context, Handoff, Invoices, Panel) entrega a mesma separação de responsabilidades sem o custo operacional de orquestrar múltiplos serviços, rede entre eles e deploy distribuído, desnecessário para validar a proposta de valor.
 
 **PostgreSQL.** Suporte robusto a `JSONB` (usado para o payload flexível da jornada, que varia por intenção), maturidade, e zero custo de licenciamento: adequado tanto ao protótipo quanto a uma eventual evolução para produção.
 
@@ -256,38 +277,55 @@ A spec funcional deste projeto organiza os requisitos como casos de uso (UC01–
 - O login do App é mock: aceita qualquer credencial que atenda a um formato mínimo, sem verificação contra base real.
 - Não há cobertura de testes automatizados; a validação é manual e estruturada, uma fase por vez.
 - A regra de expiração de jornada é reativa (verificada no momento do acesso), não um job agendado em background.
-- Campos do painel do atendente como "segmento" e "vencimento" são placeholders visuais: não há dado real correspondente no modelo atual.
+- Campos do painel do atendente como "segmento" e "vencimento" são colunas reais no banco, mas preenchidas com dado mockado via seed — não refletem um sistema de billing real.
+- A tela "Configurações" do painel é mockada (campos desabilitados): não há sistema de usuários/autenticação de atendente no CFE ainda.
 - Os três canais simulados não têm build step nem framework de frontend: HTML/CSS/JS puro, sem testes de UI automatizados.
 
 ---
 
 ## Roadmap de evolução
 
-### ETAPA 2: Refinamentos pós-MVP (em finalização)
+### ETAPA 2: Refinamentos pós-MVP ✅
 
-Refinamento do protótipo em quatro frentes, desenvolvido na branch `feat/etapa2-feedback-claro`:
+Refinamento do protótipo em quatro frentes:
 
-- **(0) Housekeeping** ✅: correção de bugs conhecidos e limpezas pontuais identificadas ao longo do desenvolvimento (validação real de CPF, indicadores de processamento, deduplicação, nomes explícitos do Docker Compose, entre outros).
+- **(0) Housekeeping** ✅: correção de bugs conhecidos e limpezas pontuais (validação real de CPF, indicadores de processamento, deduplicação, nomes explícitos do Docker Compose, entre outros).
 - **(A) Bot com interativos** ✅: chat simulado passou a suportar botões e listas, além do texto livre.
 - **(B) Painel enriquecido** ✅: dados agregados do cliente (cliente desde, canal preferido, total de interações) e histórico de jornadas anteriores no painel do atendente.
 - **(C) Intenção "contestação de cobrança indevida"** ✅: segunda intenção suportada pelo CFE (`intent: dispute_charge`), com faturas e itens de linha, validando a genericidade da arquitetura de contexto.
 
-Os 4 passos estão implementados e testados manualmente via `curl`; falta o merge para `main`, a tag `v2.0-etapa2-completa` e a validação em navegador real.
+### FASE 3: Contestação de cobrança ponta a ponta e painel enriquecido ✅
 
-### Depois da ETAPA 2
+Quatro blocos, cobrindo o fluxo completo de contestação nos 3 canais e melhorias de contexto no painel:
 
-**Modo Explicação**: um painel de orquestração que pausa a execução do CFE em pontos-chave e exibe, em tempo real, qual componente está processando o quê. Pensado para tornar a demonstração didática, já que o protótipo em operação normal executa em menos de um segundo por requisição. Ainda não implementado.
+- **(A) Contestação** ✅: fluxo completo do bot (coleta de motivo + descrição) até o App (revisão da fatura, itens marcáveis, protocolo).
+- **(B) Chat** ✅: elementos interativos reaproveitados para o seletor de motivo de contestação.
+- **(C) Painel** ✅: dados agregados do cliente sempre visíveis (independente de jornada ativa) e timeline com descrições contextualizadas por tipo de evento.
+- **(D) UI** ✅: polimento visual e revisão de nomenclatura (ex: badge "cliente desde").
+
+### FASE 3.1: Correções e polimento pós-testes ✅
+
+Dois bugs funcionais encontrados em validação real no Render (aceitação indevida de "pular" como descrição de contestação; vazamento de labels vazios na tela de sucesso do App) e três melhorias de polimento visual do painel: resumo de interações com mini-stats, timeline com descrições mais ricas, e as telas mockadas do menu lateral com o mesmo nível visual da tela principal.
+
+### FASE 3.2: Menu lateral com dados reais ✅
+
+As telas "Jornadas Ativas" e "Métricas" do painel, antes mockadas, passaram a consultar dados reais do banco: `GET /journeys/active` (jornadas em andamento, contador dinâmico no menu, polling de 30s) e `GET /metrics/summary` (TMA mediano, jornadas hoje, taxa de conclusão, canal mais usado, polling de 60s). Configurações permanece mockada — não há sistema de usuários no CFE ainda.
+
+### Depois da FASE 3.2
+
+**Modo Explicação**: um painel de orquestração que pausa a execução do CFE em pontos-chave e exibe, em tempo real, qual componente está processando o quê. Pensado para tornar a demonstração didática, já que o protótipo em operação normal executa em menos de um segundo por requisição. Em avaliação, ainda não implementado.
 
 ### Evoluções futuras possíveis
 
 Sem compromisso de prazo; dependem de uma eventual evolução do protótipo para produto:
 
 - Autenticação real entre canais e API (JWT/OAuth2), substituindo o header mockado.
-- Expansão para outros canais (Alexa, RCS, SMS, USSD, totem) e outras intenções além de troca de plano.
+- Expansão para outros canais (Alexa, RCS, SMS, USSD, totem) e outras intenções além de troca de plano e contestação de cobrança.
 - Notificação automática ao time técnico em caso de indisponibilidade prolongada.
 - Acessibilidade (WCAG 2.1 AA, integração com VLibras).
 - Extração dos módulos internos para microsserviços independentes, se a escala justificar.
-- Painel do atendente com métricas operacionais (TMA, taxa de abandono) e reescrita em stack moderno (React/Vue).
+- Sistema de usuários/autenticação para atendentes, habilitando a tela de Configurações do painel a deixar de ser mockada.
+- Reescrita dos canais simulados em stack moderna (React/Vue).
 - Cobertura ampliada de LGPD (exercício de direitos do titular, anonimização automática).
 - Integração real com WhatsApp Business API.
 
