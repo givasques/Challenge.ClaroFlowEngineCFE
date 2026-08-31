@@ -87,6 +87,13 @@ body {
     max-height: none;
     border-radius: 0;
   }
+
+  /* VLibras (FASE 3.3, item A.4): nesta largura o chat ocupa a tela inteira e o botão flutuante
+     padrão (canto inferior direito) cairia sobre o botão de enviar mensagem. Sobe o suficiente
+     para ficar acima da barra de input + rodapé "Canal simulado para demonstração". */
+  [vw-access-button] {
+    bottom: 85px !important;
+  }
 }
 
 /* ---------- Header ---------- */

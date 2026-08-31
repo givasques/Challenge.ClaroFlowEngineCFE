@@ -335,5 +335,17 @@
   <script>
     document.getElementById('reopen-chat-link').href = CFE_CONFIG.whatsappSimUrl;
   </script>
+
+  <!-- Widget VLibras (Governo Federal) — FASE 3.3, Bloco A. Traduz conteúdo selecionado para Libras. -->
+  <div vw class="enabled">
+    <div vw-access-button class="active"></div>
+    <div vw-plugin-wrapper>
+      <div class="vw-plugin-top-wrapper"></div>
+    </div>
+  </div>
+  <script src="https://vlibras.gov.br/app/vlibras-plugin.js"></script>
+  <script>
+    new window.VLibras.Widget('https://vlibras.gov.br/app');
+  </script>
 </body>
 </html>

@@ -643,4 +643,11 @@ body {
   .phone-notch {
     display: none;
   }
+
+  /* VLibras (FASE 3.3, item A.4): nesta largura o App ocupa a tela inteira e o botão flutuante
+     padrão (canto inferior direito) cairia sobre o rodapé "Ambiente simulado — dados fictícios"
+     e sobre botões de ação primários quando a tela rola até o fim. Sobe acima do rodapé. */
+  [vw-access-button] {
+    bottom: 45px !important;
+  }
 }
