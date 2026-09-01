@@ -42,6 +42,12 @@
   box-sizing: border-box;
 }
 
+/* Foco de teclado visível (FASE 3.3, item B.2.5) — garante que quem navega via Tab enxerga onde está. */
+*:focus-visible {
+  outline: 2px solid var(--claro-red, #e30613);
+  outline-offset: 2px;
+}
+
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
@@ -642,5 +648,12 @@ body {
 
   .phone-notch {
     display: none;
+  }
+
+  /* VLibras (FASE 3.3, item A.4): nesta largura o App ocupa a tela inteira e o botão flutuante
+     padrão (canto inferior direito) cairia sobre o rodapé "Ambiente simulado — dados fictícios"
+     e sobre botões de ação primários quando a tela rola até o fim. Sobe acima do rodapé. */
+  [vw-access-button] {
+    bottom: 45px !important;
   }
 }
