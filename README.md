@@ -59,7 +59,7 @@ Este repositório contém um **protótipo funcional**, não um produto de produ�
 │  (simulado)   │   │  (simulado)   │   │  (simulado)       │
 └──────┬───────┘   └──────┬───────┘   └─────────┬─────────┘
       │                   │                      │
-      │      HTTP/JSON - header X-Channel-Token  │
+      │   HTTP/JSON (header X-Channel-Token)      │
       └───────────────────┼──────────────────────┘
                            ▼
             ┌────────────────────────────────────┐
@@ -80,7 +80,7 @@ Este repositório contém um **protótipo funcional**, não um produto de produ�
 - **Context**: mantém o ciclo de vida da jornada (abertura, atualização, expiração, encerramento) e o histórico de transições.
 - **Handoff**: gera e resolve os tokens de deep link que transferem uma jornada entre canais.
 - **Invoices**: expõe as faturas do cliente (com itens de linha), consumidas pelo fluxo de contestação de cobrança.
-- **Panel**: dados agregados para o menu lateral do painel do atendente — jornadas ativas em tempo real e métricas operacionais (TMA, taxa de conclusão, canal mais usado).
+- **Panel**: dados agregados para o menu lateral do painel do atendente, cobrindo jornadas ativas em tempo real e métricas operacionais (TMA, taxa de conclusão, canal mais usado).
 
 Os cinco módulos rodam num único processo (monolito modular); ver [Decisões arquiteturais](#decisões-arquiteturais).
 
@@ -90,9 +90,9 @@ Os cinco módulos rodam num único processo (monolito modular); ver [Decisões a
 
 O projeto tem 2 formas de rodar via Docker Compose:
 
-**Modo dev** (`docker-compose.yml`) — sobe apenas o Postgres. Ideal para desenvolvimento: você roda a API com `dotnet run` e os canais como estáticos, com hot reload e debug nativo do editor.
+**Modo dev** (`docker-compose.yml`) sobe apenas o Postgres. Ideal para desenvolvimento: você roda a API com `dotnet run` e os canais como estáticos, com hot reload e debug nativo do editor.
 
-**Modo full** (`docker-compose.full.yml`) — sobe tudo (Postgres + API + canais servidos pela API). Ideal para demonstração ou teste ponta a ponta com um único comando.
+**Modo full** (`docker-compose.full.yml`) sobe tudo (Postgres, API e canais servidos pela API). Ideal para demonstração ou teste ponta a ponta com um único comando.
 
 Os dois modos são isolados (nomes de projeto e portas de Postgres diferentes) e podem coexistir sem conflito. Os comandos exatos de cada modo estão em [Setup detalhado](#setup-detalhado) logo abaixo.
 
@@ -146,7 +146,7 @@ docker compose -f docker-compose.full.yml down
 docker compose -f docker-compose.full.yml down -v
 ```
 
-Os dois arquivos declaram nomes de projeto Docker Compose explícitos (`claroflowengine-dev` e `claroflowengine-full`) e usam portas de Postgres distintas (5433 e 5434): os dois modos podem coexistir sem risco de um substituir containers do outro (ver ETAPA 2, Passo 0, item 3.10).
+Os dois arquivos declaram nomes de projeto Docker Compose explícitos (`claroflowengine-dev` e `claroflowengine-full`) e usam portas de Postgres distintas (5433 e 5434): os dois modos podem coexistir sem risco de um substituir containers do outro.
 
 ### Testes
 
@@ -251,10 +251,10 @@ A spec funcional deste projeto organiza os requisitos como casos de uso (UC01–
 | UC07 | Encerrar jornada | `POST /context/{id}/close` |
 | UC08 | Expirar jornada por inatividade | Verificação reativa em todo acesso a uma jornada aberta (`IJourneyExpirationService`) |
 | UC09 | Consultar histórico de jornada (painel) | `GET /context/customer/{id}` + `GET /context/{id}/transitions`, com polling |
-| UC10 | Contestar cobrança indevida (ETAPA 2/FASE 3, Passo C) | `GET /invoices/customer/{id}` + `GET /invoices/{id}` + fluxo dedicado nos 3 canais, `intent: dispute_charge` |
+| UC10 | Contestar cobrança indevida | `GET /invoices/customer/{id}` + `GET /invoices/{id}` + fluxo dedicado nos 3 canais, `intent: dispute_charge` |
 | RNF003 | Operação em modo degradado quando o CFE está indisponível | Timeout + retry + banner de indisponibilidade nos 3 canais |
-| — | Jornadas ativas em tempo real (painel, FASE 3.2) | `GET /journeys/active` |
-| — | Métricas operacionais (painel, FASE 3.2) | `GET /metrics/summary` (TMA mediano, jornadas hoje, taxa de conclusão, canal mais usado) |
+| N/A | Jornadas ativas em tempo real (painel) | `GET /journeys/active` |
+| N/A | Métricas operacionais (painel) | `GET /metrics/summary` (TMA mediano, jornadas hoje, taxa de conclusão, canal mais usado) |
 
 ---
 
@@ -277,7 +277,7 @@ A spec funcional deste projeto organiza os requisitos como casos de uso (UC01–
 - O login do App é mock: aceita qualquer credencial que atenda a um formato mínimo, sem verificação contra base real.
 - Não há cobertura de testes automatizados; a validação é manual e estruturada, uma fase por vez.
 - A regra de expiração de jornada é reativa (verificada no momento do acesso), não um job agendado em background.
-- Campos do painel do atendente como "segmento" e "vencimento" são colunas reais no banco, mas preenchidas com dado mockado via seed — não refletem um sistema de billing real.
+- Campos do painel do atendente como "segmento" e "vencimento" são colunas reais no banco, mas preenchidas com dado mockado via seed, sem refletir um sistema de billing real.
 - A tela "Configurações" do painel é mockada (campos desabilitados): não há sistema de usuários/autenticação de atendente no CFE ainda.
 - Os três canais simulados não têm build step nem framework de frontend: HTML/CSS/JS puro, sem testes de UI automatizados.
 
@@ -285,7 +285,7 @@ A spec funcional deste projeto organiza os requisitos como casos de uso (UC01–
 
 ## Roadmap de evolução
 
-O protótipo evoluiu em ondas sucessivas a partir do MVP inicial: ETAPA 2 (interatividade do bot, painel enriquecido, contestação de cobrança), FASE 3 (fluxo de contestação ponta a ponta nos 3 canais), FASE 3.1 (polimento do painel) e FASE 3.2 (menu lateral do painel com dados reais em vez de mock). Todas concluídas — o [histórico de commits e PRs](https://github.com/givasques/Challenge.ClaroFlowEngineCFE/pulls?q=is%3Apr) documenta o detalhe de cada etapa.
+O protótipo evoluiu bastante além do MVP inicial. Já foram entregues: interatividade do bot (botões e listas no chat), fluxo completo de contestação de cobrança indevida nos 3 canais, enriquecimento do painel do atendente (dados agregados do cliente, timeline de eventos contextualizada, resumo de interações), conexão do menu lateral do painel a dados reais do banco (jornadas ativas e métricas operacionais, antes mockados) e integração com o VLibras do Governo Federal junto de melhorias básicas de acessibilidade HTML, em resposta a feedback recebido sobre atendimento a clientes com necessidades especiais. O [histórico de commits e PRs](https://github.com/givasques/Challenge.ClaroFlowEngineCFE/pulls?q=is%3Apr) documenta o detalhe de cada entrega.
 
 ### Próximo passo em avaliação
 
@@ -298,7 +298,7 @@ Sem compromisso de prazo; dependem de uma eventual evolução do protótipo para
 - Autenticação real entre canais e API (JWT/OAuth2), substituindo o header mockado.
 - Expansão para outros canais (Alexa, RCS, SMS, USSD, totem) e outras intenções além de troca de plano e contestação de cobrança.
 - Notificação automática ao time técnico em caso de indisponibilidade prolongada.
-- Acessibilidade (WCAG 2.1 AA, integração com VLibras).
+- Cobertura completa de WCAG 2.1 AA (hoje o projeto tem VLibras e melhorias básicas de acessibilidade HTML, não o padrão completo).
 - Extração dos módulos internos para microsserviços independentes, se a escala justificar.
 - Sistema de usuários/autenticação para atendentes, habilitando a tela de Configurações do painel a deixar de ser mockada.
 - Reescrita dos canais simulados em stack moderna (React/Vue).
