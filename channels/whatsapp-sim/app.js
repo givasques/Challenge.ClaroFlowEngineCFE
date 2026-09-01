@@ -6,6 +6,7 @@
 const SESSION_KEY = 'cfe_whatsapp_session';
 
 const BOT_STATES = {
+  NOT_STARTED: 'not_started',
   AWAITING_INTENT: 'awaiting_intent',
   AWAITING_CPF: 'awaiting_cpf',
   AWAITING_NAME: 'awaiting_name',
@@ -126,7 +127,7 @@ function onCallSucceeded() {
 
 function createFreshSession() {
   return {
-    state: BOT_STATES.AWAITING_INTENT,
+    state: BOT_STATES.NOT_STARTED,
     messages: [],
     cpf: null,
     customerId: null,
@@ -154,14 +155,10 @@ async function loadOrInitSession() {
     session.messages.forEach((m, i) => renderMessage(m, session.messages[i - 1]));
     showDegradedBanner(!!session.degraded);
   } else {
+    // Igual numa conversa real: o chat abre vazio, sem mensagem automática do bot.
+    // A saudação com os botões só aparece como resposta à primeira mensagem do usuário
+    // (ver handleFirstMessage) — não é o assistente que puxa assunto sozinho.
     session = createFreshSession();
-    await botSay('Olá! 👋 Sou o assistente virtual da Claro. Como posso te ajudar hoje?', {
-      type: 'buttons',
-      options: [
-        { id: INTENTS.CHANGE_PLAN, label: 'Trocar de plano' },
-        { id: INTENTS.DISPUTE_CHARGE, label: 'Contestar cobrança' },
-      ],
-    });
   }
   persistSession();
   scrollToBottom();
@@ -261,6 +258,9 @@ async function handleUserMessage(text) {
   setInputEnabled(false);
   try {
     switch (session.state) {
+      case BOT_STATES.NOT_STARTED:
+        await handleFirstMessage();
+        break;
       case BOT_STATES.AWAITING_INTENT:
         await handleAwaitingIntent(text);
         break;
@@ -317,6 +317,23 @@ async function withProcessing(text, fn) {
   } finally {
     showProcessing(false);
   }
+}
+
+/**
+ * Primeira mensagem do usuário na conversa (estado NOT_STARTED). Igual a um atendimento real:
+ * o conteúdo em si não é interpretado aqui (isso já acontece em handleAwaitingIntent a partir da
+ * próxima mensagem) — a primeira mensagem só "abre" a conversa e recebe a saudação padrão com os
+ * botões de intenção, que antes era enviada sozinha assim que a página carregava.
+ */
+async function handleFirstMessage() {
+  await botSay('Olá! 👋 Sou o assistente virtual da Claro. Como posso te ajudar hoje?', {
+    type: 'buttons',
+    options: [
+      { id: INTENTS.CHANGE_PLAN, label: 'Trocar de plano' },
+      { id: INTENTS.DISPUTE_CHARGE, label: 'Contestar cobrança' },
+    ],
+  });
+  session.state = BOT_STATES.AWAITING_INTENT;
 }
 
 async function handleAwaitingIntent(text) {
