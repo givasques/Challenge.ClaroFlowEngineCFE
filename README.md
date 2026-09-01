@@ -306,11 +306,6 @@ O [histórico de commits e PRs](https://github.com/givasques/Challenge.ClaroFlow
 - **Autenticação real (RNF004)**: fora do escopo. Em produção seria provida pelos canais Claro existentes (login do App Minha Claro, WhatsApp Business). O `X-Channel-Token` é identificação simplificada entre serviços do protótipo.
 - **Stack do painel**: HTML/CSS/JS puro em vez de React (previsto no Sprint 1), o que simplificou o deployment e reduziu o tempo de MVP. Reescrita em framework moderno pode ser priorizada se o volume de funcionalidades justificar.
 
-### Próximos passos
-
-- **Direito ao Esquecimento (Art. 18 LGPD)**: endpoint de anonimização de dados pessoais, executável pelo cliente no App. Em desenvolvimento, é a próxima entrega.
-- **Modo Explicação**: painel de orquestração que pausa a execução do CFE em pontos-chave e exibe, em tempo real, qual componente está processando o quê. Pensado para tornar a demonstração didática, já que o protótipo em operação normal executa em menos de um segundo por requisição. Em avaliação, ainda não implementado.
-
 ### Evoluções futuras possíveis
 
 Sem compromisso de prazo; dependem de uma eventual evolução do protótipo para produto:
