@@ -285,24 +285,40 @@ A spec funcional deste projeto organiza os requisitos como casos de uso (UC01–
 
 ## Roadmap de evolução
 
-O protótipo evoluiu bastante além do MVP inicial. Já foram entregues: interatividade do bot (botões e listas no chat), fluxo completo de contestação de cobrança indevida nos 3 canais, enriquecimento do painel do atendente (dados agregados do cliente, timeline de eventos contextualizada, resumo de interações), conexão do menu lateral do painel a dados reais do banco (jornadas ativas e métricas operacionais, antes mockados) e integração com o VLibras do Governo Federal junto de melhorias básicas de acessibilidade HTML, em resposta a feedback recebido sobre atendimento a clientes com necessidades especiais. O [histórico de commits e PRs](https://github.com/givasques/Challenge.ClaroFlowEngineCFE/pulls?q=is%3Apr) documenta o detalhe de cada entrega.
+O protótipo evoluiu além do MVP inicial. Já foram entregues:
 
-### Próximo passo em avaliação
+- Interatividade do bot (botões e listas no chat WhatsApp).
+- Fluxo completo de contestação de cobrança nos 3 canais.
+- Enriquecimento do painel do atendente com dados agregados, timeline contextualizada e histórico de jornadas anteriores.
+- Menu lateral do painel conectado a dados reais (jornadas ativas e métricas operacionais).
+- Integração com VLibras do Governo Federal e melhorias básicas de acessibilidade HTML.
 
-**Modo Explicação**: um painel de orquestração que pausa a execução do CFE em pontos-chave e exibe, em tempo real, qual componente está processando o quê. Pensado para tornar a demonstração didática, já que o protótipo em operação normal executa em menos de um segundo por requisição. Ainda não implementado.
+O [histórico de commits e PRs](https://github.com/givasques/Challenge.ClaroFlowEngineCFE/pulls?q=is%3Apr) documenta cada entrega.
+
+### Atendimento aos RNFs do Sprint 1
+
+- **RNF003 (disponibilidade e notificação técnica)**: Serilog e Health Checks implementados; base pronta para integração com ferramentas de monitoring (Sentry, Datadog) em produção.
+- **RNF005 (LGPD)**: auditabilidade completa e TTL em tokens e jornadas implementados. Direito ao Esquecimento (Art. 18 LGPD) em desenvolvimento (próxima entrega); ampliação prevista para anonimização automática de dados antigos e outros direitos do titular.
+- **Acessibilidade**: VLibras e ajustes básicos de HTML semântico entregues. Cobertura completa de WCAG 2.1 AA prevista para iteração futura.
+
+### Decisões de escopo do MVP
+
+- **Autenticação real (RNF004)**: fora do escopo. Em produção seria provida pelos canais Claro existentes (login do App Minha Claro, WhatsApp Business). O `X-Channel-Token` é identificação simplificada entre serviços do protótipo.
+- **Stack do painel**: HTML/CSS/JS puro em vez de React (previsto no Sprint 1), o que simplificou o deployment e reduziu o tempo de MVP. Reescrita em framework moderno pode ser priorizada se o volume de funcionalidades justificar.
+
+### Próximos passos
+
+- **Direito ao Esquecimento (Art. 18 LGPD)**: endpoint de anonimização de dados pessoais, executável pelo cliente no App. Em desenvolvimento, é a próxima entrega.
+- **Modo Explicação**: painel de orquestração que pausa a execução do CFE em pontos-chave e exibe, em tempo real, qual componente está processando o quê. Pensado para tornar a demonstração didática, já que o protótipo em operação normal executa em menos de um segundo por requisição. Em avaliação, ainda não implementado.
 
 ### Evoluções futuras possíveis
 
 Sem compromisso de prazo; dependem de uma eventual evolução do protótipo para produto:
 
-- Autenticação real entre canais e API (JWT/OAuth2), substituindo o header mockado.
-- Expansão para outros canais (Alexa, RCS, SMS, USSD, totem) e outras intenções além de troca de plano e contestação de cobrança.
-- Notificação automática ao time técnico em caso de indisponibilidade prolongada.
-- Cobertura completa de WCAG 2.1 AA (hoje o projeto tem VLibras e melhorias básicas de acessibilidade HTML, não o padrão completo).
+- Novos canais (Alexa, RCS, SMS, USSD, totem).
+- Novas intenções (2ª via, portabilidade, cancelamento, agendamento técnico).
 - Extração dos módulos internos para microsserviços independentes, se a escala justificar.
 - Sistema de usuários/autenticação para atendentes, habilitando a tela de Configurações do painel a deixar de ser mockada.
-- Reescrita dos canais simulados em stack moderna (React/Vue).
-- Cobertura ampliada de LGPD (exercício de direitos do titular, anonimização automática).
 - Integração real com WhatsApp Business API.
 
 ---
