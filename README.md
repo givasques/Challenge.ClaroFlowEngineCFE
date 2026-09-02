@@ -255,6 +255,7 @@ A spec funcional deste projeto organiza os requisitos como casos de uso (UC01–
 | RNF003 | Operação em modo degradado quando o CFE está indisponível | Timeout + retry + banner de indisponibilidade nos 3 canais |
 | N/A | Jornadas ativas em tempo real (painel) | `GET /journeys/active` |
 | N/A | Métricas operacionais (painel) | `GET /metrics/summary` (TMA mediano, jornadas hoje, taxa de conclusão, canal mais usado) |
+| RNF005 | Direito ao esquecimento (Art. 18 LGPD) | `POST /customers/{cpf}/right-to-be-forgotten` + tela "Meus dados" no App |
 
 ---
 
@@ -292,13 +293,14 @@ O protótipo evoluiu além do MVP inicial. Já foram entregues:
 - Enriquecimento do painel do atendente com dados agregados, timeline contextualizada e histórico de jornadas anteriores.
 - Menu lateral do painel conectado a dados reais (jornadas ativas e métricas operacionais).
 - Integração com VLibras do Governo Federal e melhorias básicas de acessibilidade HTML.
+- Direito ao esquecimento (Art. 18 LGPD), exercível pelo cliente na área "Meus dados" do App ou pelo atendente no painel.
 
 O [histórico de commits e PRs](https://github.com/givasques/Challenge.ClaroFlowEngineCFE/pulls?q=is%3Apr) documenta cada entrega.
 
 ### Atendimento aos RNFs do Sprint 1
 
 - **RNF003 (disponibilidade e notificação técnica)**: Serilog e Health Checks implementados; base pronta para integração com ferramentas de monitoring (Sentry, Datadog) em produção.
-- **RNF005 (LGPD)**: auditabilidade completa e TTL em tokens e jornadas implementados. Direito ao Esquecimento (Art. 18 LGPD) em desenvolvimento (próxima entrega); ampliação prevista para anonimização automática de dados antigos e outros direitos do titular.
+- **RNF005 (LGPD)**: auditabilidade completa (toda transição de jornada registrada com origem, canal e timestamp), TTL em tokens de handoff e jornadas inativas, e logs estruturados via Serilog. Direito ao esquecimento (Art. 18 LGPD) implementado: `POST /customers/{cpf}/right-to-be-forgotten` anonimiza nome, CPF e identificadores de canal mantendo o histórico operacional (jornadas, transições) íntegro para auditoria, executável pelo cliente na área "Meus dados" do App ou pelo atendente no painel. Ampliação prevista: rotina automática de anonimização por política de retenção, e outros direitos do titular (portabilidade, correção, revogação de consentimento).
 - **Acessibilidade**: VLibras e ajustes básicos de HTML semântico entregues. Cobertura completa de WCAG 2.1 AA prevista para iteração futura.
 
 ### Decisões de escopo do MVP
