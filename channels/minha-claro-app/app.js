@@ -7,6 +7,8 @@ const state = {
   journeyId: null,
   intent: null,
   lastFailedAction: null,
+  currentScreen: null,
+  screenBeforeMyData: null,
 };
 
 // ---------- Cliente HTTP com timeout, retry (só GET) e detecção de indisponibilidade (RNF003 / spec-funcional §8.4) ----------
@@ -77,6 +79,7 @@ async function apiCall(path, { method = 'GET', body } = {}) {
 function showScreen(name) {
   document.querySelectorAll('.screen').forEach(el => el.classList.add('hidden'));
   document.getElementById(`screen-${name}`).classList.remove('hidden');
+  state.currentScreen = name;
 }
 
 // ---------- Formatação ----------
@@ -92,6 +95,13 @@ function formatCpf(cpf) {
 function formatDateShort(isoDate) {
   const [y, m, d] = isoDate.split('-');
   return `${d}/${m}/${y}`;
+}
+
+/** "02/09/2026 15:32" — usado na tela de sucesso do direito ao esquecimento (FASE 3.4). */
+function formatDateTimeShort(isoString) {
+  const date = new Date(isoString);
+  const pad = n => String(n).padStart(2, '0');
+  return `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
 function escapeHtml(text) {
@@ -353,9 +363,109 @@ async function closeJourney(outcome) {
   }
 }
 
+// ---------- Meus dados — direito ao esquecimento, Art. 18 LGPD (FASE 3.4) ----------
+// Independente do fluxo de handoff/token acima: o cliente pode abrir esta tela a partir do rodapé
+// em qualquer momento, mesmo sem um deep link válido (ex: a partir da tela "Link inválido").
+
+function openMyDataScreen() {
+  state.screenBeforeMyData = state.currentScreen;
+  document.getElementById('my-data-cpf-input').value = '';
+  document.getElementById('my-data-submit-button').disabled = true;
+  showScreen('my-data');
+}
+
+function closeMyDataScreen() {
+  showScreen(state.screenBeforeMyData || 'no-token');
+}
+
+/** Aplica a máscara 000.000.000-00 progressivamente enquanto o usuário digita. */
+function maskCpfInput(digits) {
+  const parts = [digits.slice(0, 3), digits.slice(3, 6), digits.slice(6, 9), digits.slice(9, 11)];
+  let out = parts[0];
+  if (parts[1]) out += `.${parts[1]}`;
+  if (parts[2]) out += `.${parts[2]}`;
+  if (parts[3]) out += `-${parts[3]}`;
+  return out;
+}
+
+function handleMyDataCpfInput(event) {
+  const digits = event.target.value.replace(/\D/g, '').slice(0, 11);
+  event.target.value = maskCpfInput(digits);
+  document.getElementById('my-data-submit-button').disabled = digits.length !== 11;
+}
+
+function openConfirmModal() {
+  document.getElementById('my-data-confirm-modal').classList.remove('hidden');
+}
+
+function closeConfirmModal() {
+  document.getElementById('my-data-confirm-modal').classList.add('hidden');
+}
+
+function openMockFeatureModal() {
+  document.getElementById('mock-feature-modal').classList.remove('hidden');
+}
+
+function closeMockFeatureModal() {
+  document.getElementById('mock-feature-modal').classList.add('hidden');
+}
+
+const MY_DATA_ERROR_MESSAGES = {
+  customer_not_found: 'Não encontramos um cadastro com este CPF em nossa base.',
+  already_anonymized: 'Seus dados já foram anonimizados anteriormente.',
+};
+const MY_DATA_GENERIC_ERROR = 'Não foi possível processar sua solicitação. Tente novamente em alguns instantes.';
+
+async function exerciseRightToBeForgotten() {
+  const digits = document.getElementById('my-data-cpf-input').value.replace(/\D/g, '');
+  closeConfirmModal();
+  showScreen('closing');
+
+  try {
+    const data = await apiCall(`/customers/${digits}/right-to-be-forgotten`, { method: 'POST' });
+    document.getElementById('my-data-success-timestamp').textContent = formatDateTimeShort(data.anonymized_at);
+    showScreen('my-data-success');
+  } catch (err) {
+    const message = err instanceof CfeUnavailableError
+      ? MY_DATA_GENERIC_ERROR
+      : (MY_DATA_ERROR_MESSAGES[err.errorCode] || MY_DATA_GENERIC_ERROR);
+    document.getElementById('my-data-error-message').textContent = message;
+    showScreen('my-data-error');
+  }
+}
+
 // ---------- Bootstrap ----------
 
 document.addEventListener('DOMContentLoaded', () => {
+  // Rodapé e "Meus dados" (FASE 3.4) — precisam funcionar em qualquer tela, inclusive sem token
+  // válido na URL, então são registrados antes do "return" precoce do fluxo de handoff abaixo.
+  document.getElementById('footer-link-my-data').addEventListener('click', event => {
+    event.preventDefault();
+    openMyDataScreen();
+  });
+  document.getElementById('footer-link-terms').addEventListener('click', event => {
+    event.preventDefault();
+    openMockFeatureModal();
+  });
+  document.getElementById('footer-link-privacy').addEventListener('click', event => {
+    event.preventDefault();
+    openMockFeatureModal();
+  });
+  document.getElementById('footer-link-help').addEventListener('click', event => {
+    event.preventDefault();
+    openMockFeatureModal();
+  });
+  document.getElementById('mock-feature-modal-close').addEventListener('click', closeMockFeatureModal);
+  document.getElementById('my-data-back-button').addEventListener('click', closeMyDataScreen);
+  document.getElementById('my-data-error-back-button').addEventListener('click', () => showScreen('my-data'));
+  document.getElementById('my-data-cpf-input').addEventListener('input', handleMyDataCpfInput);
+  document.getElementById('my-data-form').addEventListener('submit', event => {
+    event.preventDefault();
+    openConfirmModal();
+  });
+  document.getElementById('my-data-cancel-modal-button').addEventListener('click', closeConfirmModal);
+  document.getElementById('my-data-confirm-button').addEventListener('click', exerciseRightToBeForgotten);
+
   const params = new URLSearchParams(window.location.search);
   state.token = params.get('token');
 

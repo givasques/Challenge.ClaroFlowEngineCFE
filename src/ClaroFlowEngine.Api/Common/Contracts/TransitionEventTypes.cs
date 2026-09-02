@@ -13,4 +13,7 @@ public static class TransitionEventTypes
     public const string JourneyClosed = "journey_closed";
     public const string JourneyExpired = "journey_expired";
     public const string PanelAccessed = "panel_accessed";
+
+    /// <summary>Direito ao esquecimento exercido (Art. 18 LGPD, FASE 3.4) — transição órfã, sem journey_context_id.</summary>
+    public const string DataAnonymizationRequested = "data_anonymization_requested";
 }

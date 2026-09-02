@@ -44,12 +44,12 @@ public class PanelService : IPanelService
         // dataset pequeno no protótipo, resolvido em memória em vez de uma subquery correlacionada por jornada.
         var latestChannelByJourney = await _db.JourneyTransitions
             .AsNoTracking()
-            .Where(t => journeyIds.Contains(t.JourneyContextId))
+            .Where(t => t.JourneyContextId != null && journeyIds.Contains(t.JourneyContextId.Value))
             .Select(t => new { t.JourneyContextId, t.Channel, t.OccurredAt })
             .ToListAsync(cancellationToken);
 
         var currentChannelById = latestChannelByJourney
-            .GroupBy(t => t.JourneyContextId)
+            .GroupBy(t => t.JourneyContextId!.Value)
             .ToDictionary(g => g.Key, g => g.OrderByDescending(t => t.OccurredAt).First().Channel);
 
         var journeys = openJourneys.Select(j =>

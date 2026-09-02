@@ -208,7 +208,9 @@ body {
 .screen#screen-completed,
 .screen#screen-cancelled,
 .screen#screen-session-expired,
-.screen#screen-unavailable {
+.screen#screen-unavailable,
+.screen#screen-my-data-success,
+.screen#screen-my-data-error {
   align-items: center;
   text-align: center;
   justify-content: center;
@@ -477,6 +479,146 @@ body {
   text-align: right;
 }
 
+/* ---------- Meus dados — direito ao esquecimento (FASE 3.4, item B.2) ---------- */
+
+.back-button {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  align-self: flex-start;
+  background: none;
+  border: none;
+  padding: 4px 0;
+  margin-bottom: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.back-button:hover {
+  color: var(--claro-red);
+}
+
+.my-data-icon {
+  align-self: center;
+}
+
+.my-data-title {
+  text-align: center;
+}
+
+.section-divider {
+  border: none;
+  border-top: 1px solid var(--border-subtle);
+  margin: 16px 0;
+}
+
+.my-data-subtitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 8px;
+}
+
+.my-data-checklist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.my-data-checklist li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.my-data-checklist-icon {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.my-data-checklist-icon--ok { color: var(--success); }
+.my-data-checklist-icon--warning { color: var(--warning); }
+
+/* ---------- Modais (confirmação de eliminação, links institucionais mockados) ---------- */
+
+.modal-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(17, 24, 39, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 20;
+}
+
+.modal-box {
+  background: var(--app-bg);
+  border-radius: var(--radius-md);
+  padding: 24px 20px;
+  width: 100%;
+  max-width: 300px;
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+  animation: fade-in 0.2s ease-out;
+}
+
+.modal-title {
+  text-align: center;
+  font-size: 17px;
+  margin: 0 0 10px;
+  color: var(--text-primary);
+}
+
+.modal-text {
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin: 0 0 6px;
+}
+
+/* ---------- Rodapé com links institucionais (FASE 3.4, item B.1) ---------- */
+
+.app-footer-links {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  padding: 10px 8px 4px;
+}
+
+.footer-link {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-decoration: none;
+}
+
+.footer-link:hover {
+  text-decoration: underline;
+}
+
+.footer-link--highlight {
+  color: var(--claro-red);
+  font-weight: 700;
+}
+
+.app-footer-disclaimer {
+  text-align: center;
+  font-size: 10px;
+  color: var(--text-muted);
+  padding: 2px 8px 8px;
+}
+
 .plan-change {
   display: flex;
   align-items: center;
@@ -624,12 +766,8 @@ body {
 
 .app-footer {
   flex-shrink: 0;
-  text-align: center;
-  font-size: 11px;
-  color: var(--text-muted);
   background: var(--surface-muted);
   border-top: 1px solid var(--border-subtle);
-  padding: 8px;
 }
 
 /* ---------- Responsivo ---------- */

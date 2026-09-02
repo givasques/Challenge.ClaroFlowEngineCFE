@@ -16,6 +16,12 @@ public class Customer
     /// <summary>Segmento comercial do cliente (ex: "Pessoa Física", "Premium"). Placeholder mockado (FASE 3, item C.3).</summary>
     public string? Segment { get; set; }
 
+    /// <summary>Data/hora em que o cliente exerceu o direito ao esquecimento (Art. 18 LGPD, FASE 3.4). Null = nunca anonimizado.</summary>
+    public DateTime? AnonymizedAt { get; set; }
+
+    /// <summary>Canal que originou a anonimização: "app" (o próprio cliente) ou "panel" (atendente em nome do cliente).</summary>
+    public string? AnonymizationSource { get; set; }
+
     public ICollection<IdentityLink> IdentityLinks { get; set; } = new List<IdentityLink>();
     public ICollection<CustomerPlan> CustomerPlans { get; set; } = new List<CustomerPlan>();
     public ICollection<JourneyContext> JourneyContexts { get; set; } = new List<JourneyContext>();

@@ -32,6 +32,7 @@ public class JourneyTransitionConfiguration : IEntityTypeConfiguration<JourneyTr
         builder.HasOne(t => t.JourneyContext)
             .WithMany(j => j.Transitions)
             .HasForeignKey(t => t.JourneyContextId)
+            .IsRequired(false)
             .OnDelete(DeleteBehavior.Cascade);
     }
 }

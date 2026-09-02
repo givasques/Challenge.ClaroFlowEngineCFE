@@ -28,6 +28,7 @@ public class ExceptionHandlingMiddleware
             var status = ex switch
             {
                 NotFoundException => StatusCodes.Status404NotFound,
+                ForbiddenException => StatusCodes.Status403Forbidden,
                 ConflictException => StatusCodes.Status409Conflict,
                 GoneException => StatusCodes.Status410Gone,
                 ValidationException => StatusCodes.Status400BadRequest,

@@ -325,9 +325,148 @@
         <button id="retry-button" class="primary-button">Tentar novamente</button>
       </section>
 
+      <!-- Meus dados — Direito ao esquecimento, Art. 18 LGPD (FASE 3.4, item B.2) -->
+      <section id="screen-my-data" class="screen hidden">
+        <button type="button" class="back-button" id="my-data-back-button">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="16" height="16" aria-hidden="true">
+            <path d="M15 5l-7 7 7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          Voltar
+        </button>
+
+        <div class="state-icon state-icon-neutral my-data-icon">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="30" height="30">
+            <path d="M9 4h6a1 1 0 011 1v1H8V5a1 1 0 011-1z" stroke="white" stroke-width="1.8" stroke-linejoin="round"/>
+            <rect x="5" y="5" width="14" height="16" rx="2" stroke="white" stroke-width="1.8"/>
+            <line x1="8.5" y1="11" x2="15.5" y2="11" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+            <line x1="8.5" y1="14.5" x2="15.5" y2="14.5" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+            <line x1="8.5" y1="18" x2="12.5" y2="18" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <h1 class="my-data-title">Meus dados</h1>
+
+        <hr class="section-divider" />
+
+        <h2 class="my-data-subtitle">Direitos garantidos pela LGPD</h2>
+        <p>
+          A Lei Geral de Proteção de Dados garante a você o direito de solicitar a eliminação dos
+          seus dados pessoais dos nossos sistemas a qualquer momento.
+        </p>
+
+        <hr class="section-divider" />
+
+        <h2 class="my-data-subtitle">O que acontece quando você solicita:</h2>
+        <ul class="my-data-checklist">
+          <li>
+            <svg class="my-data-checklist-icon my-data-checklist-icon--ok" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="16" height="16" aria-hidden="true">
+              <polyline points="4 12 9.5 17.5 20 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span>Seu nome, CPF e telefone são anonimizados imediatamente</span>
+          </li>
+          <li>
+            <svg class="my-data-checklist-icon my-data-checklist-icon--ok" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="16" height="16" aria-hidden="true">
+              <polyline points="4 12 9.5 17.5 20 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span>O histórico de jornadas é preservado apenas para fins de auditoria, sem identificação</span>
+          </li>
+          <li>
+            <svg class="my-data-checklist-icon my-data-checklist-icon--ok" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="16" height="16" aria-hidden="true">
+              <polyline points="4 12 9.5 17.5 20 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span>Tokens de acesso ativos são revogados</span>
+          </li>
+          <li>
+            <svg class="my-data-checklist-icon my-data-checklist-icon--warning" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="16" height="16" aria-hidden="true">
+              <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <line x1="12" y1="9" x2="12" y2="13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              <circle cx="12" cy="17" r="1" fill="currentColor"/>
+            </svg>
+            <span><strong>Esta ação é irreversível</strong></span>
+          </li>
+        </ul>
+
+        <hr class="section-divider" />
+
+        <form id="my-data-form" class="form">
+          <label for="my-data-cpf-input">Digite seu CPF para confirmar</label>
+          <div class="input-wrapper">
+            <span class="input-icon">
+              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="16" height="16">
+                <circle cx="12" cy="8" r="3.5" stroke="currentColor" stroke-width="1.8"/>
+                <path d="M4.5 20c1.6-3.6 4.6-5.5 7.5-5.5s5.9 1.9 7.5 5.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+              </svg>
+            </span>
+            <input id="my-data-cpf-input" type="text" inputmode="numeric" autocomplete="off" placeholder="000.000.000-00" maxlength="14" />
+          </div>
+
+          <button type="submit" class="primary-button" id="my-data-submit-button" disabled>Solicitar eliminação dos meus dados</button>
+        </form>
+      </section>
+
+      <!-- Sucesso — direito ao esquecimento exercido (FASE 3.4, item B.4) -->
+      <section id="screen-my-data-success" class="screen hidden">
+        <div class="state-icon state-icon-success">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="36" height="36">
+            <polyline points="5 13 10 18 19 7" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <h1>Dados eliminados com sucesso</h1>
+        <p>Seus dados pessoais foram anonimizados em nossos sistemas.</p>
+        <p class="muted">Operação realizada em: <span id="my-data-success-timestamp"></span></p>
+        <p>Você pode fechar este aplicativo.</p>
+      </section>
+
+      <!-- Erro — direito ao esquecimento (FASE 3.4, item B.5) -->
+      <section id="screen-my-data-error" class="screen hidden">
+        <div class="state-icon state-icon-error">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="32" height="32">
+            <line x1="7" y1="7" x2="17" y2="17" stroke="white" stroke-width="2.2" stroke-linecap="round"/>
+            <line x1="17" y1="7" x2="7" y2="17" stroke="white" stroke-width="2.2" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <h1>Não foi possível concluir</h1>
+        <p id="my-data-error-message"></p>
+        <button type="button" class="secondary-button" id="my-data-error-back-button">Voltar</button>
+      </section>
+
     </main>
 
-    <footer class="app-footer">Ambiente simulado — dados fictícios</footer>
+    <!-- Modal de confirmação da eliminação (FASE 3.4, item B.3) -->
+    <div id="my-data-confirm-modal" class="modal-overlay hidden">
+      <div class="modal-box">
+        <div class="state-icon state-icon-warning" style="margin: 0 auto 14px;">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="28" height="28">
+            <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <line x1="12" y1="9" x2="12" y2="13" stroke="white" stroke-width="2" stroke-linecap="round"/>
+            <circle cx="12" cy="17" r="1" fill="white"/>
+          </svg>
+        </div>
+        <h2 class="modal-title">Confirmar eliminação</h2>
+        <p class="modal-text">Você está prestes a eliminar todos os seus dados pessoais do CFE.</p>
+        <p class="modal-text"><strong>Esta ação NÃO pode ser desfeita.</strong></p>
+        <p class="modal-text">Tem certeza que deseja continuar?</p>
+        <button type="button" class="primary-button" id="my-data-confirm-button">Sim, eliminar</button>
+        <button type="button" class="secondary-button" id="my-data-cancel-modal-button">Cancelar</button>
+      </div>
+    </div>
+
+    <!-- Modal genérico para links mockados do rodapé (Termos, Privacidade, Ajuda) -->
+    <div id="mock-feature-modal" class="modal-overlay hidden">
+      <div class="modal-box">
+        <p class="modal-text">Página em desenvolvimento — versão de demonstração.</p>
+        <button type="button" class="primary-button" id="mock-feature-modal-close">Fechar</button>
+      </div>
+    </div>
+
+    <footer class="app-footer">
+      <nav class="app-footer-links" aria-label="Links institucionais">
+        <a href="#" class="footer-link" id="footer-link-terms">Termos de uso</a>
+        <a href="#" class="footer-link" id="footer-link-privacy">Política de privacidade</a>
+        <a href="#" class="footer-link footer-link--highlight" id="footer-link-my-data">Meus dados</a>
+        <a href="#" class="footer-link" id="footer-link-help">Ajuda</a>
+      </nav>
+      <div class="app-footer-disclaimer">Ambiente simulado — dados fictícios</div>
+    </footer>
   </div>
 
   <script src="config.js"></script>

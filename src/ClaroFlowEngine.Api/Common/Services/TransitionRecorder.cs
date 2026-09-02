@@ -10,7 +10,7 @@ public class TransitionRecorder : ITransitionRecorder
 
     public TransitionRecorder(CfeDbContext db) => _db = db;
 
-    public void Record(Guid journeyContextId, string channel, string eventType, string? description = null, object? metadata = null)
+    public void Record(Guid? journeyContextId, string channel, string eventType, string? description = null, object? metadata = null)
     {
         _db.JourneyTransitions.Add(new JourneyTransition
         {
