@@ -7,12 +7,18 @@ namespace ClaroFlowEngine.Api.Data.Entities;
 public class JourneyTransition
 {
     public Guid Id { get; set; }
-    public Guid JourneyContextId { get; set; }
+
+    /// <summary>
+    /// Null para transições de auditoria que não pertencem a uma jornada específica
+    /// (ex: direito ao esquecimento, FASE 3.4).
+    /// </summary>
+    public Guid? JourneyContextId { get; set; }
+
     public string Channel { get; set; } = string.Empty;
     public string EventType { get; set; } = string.Empty;
     public string? Description { get; set; }
     public Dictionary<string, object> Metadata { get; set; } = new();
     public DateTime OccurredAt { get; set; }
 
-    public JourneyContext JourneyContext { get; set; } = null!;
+    public JourneyContext? JourneyContext { get; set; }
 }
