@@ -38,6 +38,9 @@
   --status-expired-bg: #f1f5f9;
   --status-expired-text: #64748b;
   --status-expired-dot: #94a3b8;
+  --status-escalated-bg: #ffedd5;
+  --status-escalated-text: #9a3412;
+  --status-escalated-dot: #f97316;
 
   --event-start: #6366f1;
   --event-identity: #8b5cf6;
@@ -48,6 +51,8 @@
   --event-expired: #94a3b8;
   --event-abandoned: #ef4444;
   --event-panel: #6b7280;
+  --event-concluded-agent: #16a34a;
+  --event-escalated: #f97316;
 
   --shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.04);
   --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.08), 0 1px 2px rgba(15, 23, 42, 0.04);
@@ -1086,6 +1091,280 @@ body {
 
 .status-expired::before { background: var(--status-expired-dot); }
 
+.status-escalated {
+  background: var(--status-escalated-bg);
+  color: var(--status-escalated-text);
+}
+
+.status-escalated::before { background: var(--status-escalated-dot); }
+
+/* ---------- Ações de concluir/escalar jornada (FASE 3.5) ---------- */
+
+.journey-actions-row {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.journey-action-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 16px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.journey-action-button:hover {
+  transform: translateY(-1px);
+}
+
+.journey-action-button--conclude {
+  background: var(--status-open-bg);
+  color: var(--status-open-text);
+}
+
+.journey-action-button--conclude:hover {
+  background: #bbf7d0;
+}
+
+.journey-action-button--escalate {
+  background: var(--surface-muted);
+  color: var(--text-secondary);
+  border-color: var(--border-medium);
+}
+
+.journey-action-button--escalate:hover {
+  background: var(--border-subtle);
+}
+
+.journey-escalated-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+  padding: 10px 14px;
+  background: var(--status-escalated-bg);
+  color: var(--status-escalated-text);
+  border-radius: var(--radius-md);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.journey-resolution-box {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  border-left: 4px solid var(--status-open-dot);
+  background: var(--status-open-bg);
+}
+
+.journey-resolution-box--escalated {
+  border-left-color: var(--status-escalated-dot);
+  background: var(--status-escalated-bg);
+}
+
+.journey-resolution-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.journey-resolution-description {
+  margin: 6px 0 0;
+  font-size: 12.5px;
+  font-style: italic;
+  color: var(--text-secondary);
+}
+
+/* ---------- Modais de ação do painel (FASE 3.5, itens B.2/B.3) ---------- */
+
+.panel-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 50;
+}
+
+.panel-modal-box {
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  width: 100%;
+  max-width: 420px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: var(--shadow-lg);
+  animation: fade-in 0.2s ease-out;
+}
+
+.panel-modal-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+  padding-bottom: 14px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.panel-modal-question {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 10px;
+}
+
+.panel-modal-options {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 16px;
+}
+
+.panel-modal-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.panel-modal-option:hover {
+  background: var(--surface-muted);
+}
+
+.panel-modal-option input[type="radio"] {
+  margin-top: 2px;
+  accent-color: var(--claro-red);
+  flex-shrink: 0;
+}
+
+.panel-modal-textarea-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.panel-modal-textarea {
+  width: 100%;
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  font-size: 13px;
+  font-family: inherit;
+  resize: vertical;
+}
+
+.panel-modal-textarea:focus {
+  outline: none;
+  border-color: var(--claro-red);
+  box-shadow: 0 0 0 3px var(--claro-red-subtle);
+}
+
+.panel-modal-char-count {
+  text-align: right;
+  font-size: 11px;
+  color: var(--text-subtle);
+  margin-top: 4px;
+}
+
+.panel-modal-info-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 8px 10px;
+  background: var(--surface-muted);
+  border-radius: var(--radius-sm);
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
+.panel-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.panel-modal-actions .primary-button,
+.panel-modal-actions .secondary-button {
+  padding: 9px 18px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.panel-modal-actions .primary-button {
+  background: var(--claro-red);
+  color: white;
+  border: none;
+}
+
+.panel-modal-actions .primary-button:hover {
+  background: var(--claro-red-hover);
+}
+
+.panel-modal-actions .primary-button:disabled {
+  background: var(--border-medium);
+  cursor: not-allowed;
+}
+
+.panel-modal-actions .secondary-button {
+  background: transparent;
+  border: 1px solid var(--border-medium);
+  color: var(--text-secondary);
+}
+
+.panel-modal-actions .secondary-button:hover {
+  background: var(--surface-muted);
+}
+
+/* ---------- Toasts de feedback (FASE 3.5, item B.4) ---------- */
+
+.toast-container {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 60;
+}
+
+.toast {
+  background: var(--text-primary);
+  color: white;
+  padding: 12px 16px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: var(--shadow-lg);
+  animation: fade-in 0.2s ease-out;
+  max-width: 320px;
+}
+
+.toast--error {
+  background: var(--claro-red-dark);
+}
+
 .channel-flow {
   display: flex;
   align-items: center;
@@ -1178,6 +1457,16 @@ body {
 .history-icon--event-expired { background: rgba(148, 163, 184, 0.1); color: var(--event-expired); }
 .history-icon--event-abandoned { background: rgba(239, 68, 68, 0.1); color: var(--event-abandoned); }
 .history-icon--event-panel { background: rgba(107, 114, 128, 0.1); color: var(--event-panel); }
+.history-icon--event-concluded-agent { background: rgba(22, 163, 74, 0.1); color: var(--event-concluded-agent); }
+.history-icon--event-escalated { background: rgba(249, 115, 22, 0.1); color: var(--event-escalated); }
+
+.history-secondary-note {
+  font-size: 12px;
+  font-style: italic;
+  color: var(--text-subtle);
+  line-height: 1.5;
+  margin-top: 2px;
+}
 
 .history-body {
   flex: 1;

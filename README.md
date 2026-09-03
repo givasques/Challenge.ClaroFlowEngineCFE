@@ -248,7 +248,7 @@ A spec funcional deste projeto organiza os requisitos como casos de uso (UC01–
 | UC04 | Atualizar contexto de jornada | `PATCH /context/{id}` |
 | UC05 | Gerar deep link para handoff | `POST /handoff/generate` |
 | UC06 | Retomar jornada em outro canal | `GET /context/resolve?token=` |
-| UC07 | Encerrar jornada | `POST /context/{id}/close` |
+| UC07 | Encerrar jornada | `POST /context/{id}/close`; painel também pode concluir com categoria padronizada (`POST /journeys/{id}/conclude`) ou escalar para outra área sem fechar (`POST /journeys/{id}/escalate`, status `escalated`) |
 | UC08 | Expirar jornada por inatividade | Verificação reativa em todo acesso a uma jornada aberta (`IJourneyExpirationService`) |
 | UC09 | Consultar histórico de jornada (painel) | `GET /context/customer/{id}` + `GET /context/{id}/transitions`, com polling |
 | UC10 | Contestar cobrança indevida | `GET /invoices/customer/{id}` + `GET /invoices/{id}` + fluxo dedicado nos 3 canais, `intent: dispute_charge` |
@@ -294,6 +294,7 @@ O protótipo evoluiu além do MVP inicial. Já foram entregues:
 - Menu lateral do painel conectado a dados reais (jornadas ativas e métricas operacionais).
 - Integração com VLibras do Governo Federal e melhorias básicas de acessibilidade HTML.
 - Direito ao esquecimento (Art. 18 LGPD), exercível pelo cliente na área "Meus dados" do App ou pelo atendente no painel.
+- Fechamento categorizado e escalação de jornadas pelo painel, com novo status `escalated` para casos transferidos a outras áreas (Financeiro, Retenção, Suporte técnico, Vendas, Ouvidoria) sem expirar automaticamente.
 
 O [histórico de commits e PRs](https://github.com/givasques/Challenge.ClaroFlowEngineCFE/pulls?q=is%3Apr) documenta cada entrega.
 

@@ -14,7 +14,9 @@ public record ActiveJourneyDto(
     string CurrentChannelLabel,
     DateTime CreatedAt,
     DateTime UpdatedAt,
-    int MinutesSinceStart);
+    int MinutesSinceStart,
+    // Sempre 'open' hoje; só varia quando ?include_escalated=true é usado (FASE 3.5, item A.8).
+    string Status);
 
 public record ActiveJourneyCustomerDto(Guid Id, string FullName, string Cpf);
 
@@ -29,3 +31,17 @@ public record MetricsSummaryResponse(
     MetricsPeriodDto Period);
 
 public record MetricsPeriodDto(DateTime From, DateTime To, int WindowDays);
+
+/// <summary>Requisição de POST /journeys/{id}/conclude (FASE 3.5).</summary>
+public record ConcludeJourneyRequest(string ResolutionCategory, string? Description);
+
+/// <summary>Resposta de POST /journeys/{id}/conclude.</summary>
+public record ConcludeJourneyResponse(
+    Guid JourneyId, string Status, DateTime ClosedAt, string ResolutionCategory, string ResolutionCategoryLabel);
+
+/// <summary>Requisição de POST /journeys/{id}/escalate (FASE 3.5).</summary>
+public record EscalateJourneyRequest(string EscalationArea, string? Description);
+
+/// <summary>Resposta de POST /journeys/{id}/escalate.</summary>
+public record EscalateJourneyResponse(
+    Guid JourneyId, string Status, DateTime EscalatedAt, string EscalationArea, string EscalationAreaLabel);

@@ -17,6 +17,9 @@ public class JourneyContext
     public DateTime UpdatedAt { get; set; }
     public DateTime? ClosedAt { get; set; }
 
+    /// <summary>Data/hora em que a jornada foi escalada para outra área via painel (FASE 3.5). Null se nunca escalada.</summary>
+    public DateTime? EscalatedAt { get; set; }
+
     public Customer Customer { get; set; } = null!;
     public ICollection<JourneyTransition> Transitions { get; set; } = new List<JourneyTransition>();
     public ICollection<HandoffToken> HandoffTokens { get; set; } = new List<HandoffToken>();
