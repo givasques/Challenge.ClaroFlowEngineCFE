@@ -107,13 +107,18 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-async function rawFetch(path, timeoutMs) {
+async function rawFetch(path, method, body, timeoutMs) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     const res = await fetch(`${CFE_CONFIG.apiBaseUrl}${path}`, {
-      headers: { 'X-Channel-Token': CFE_CONFIG.channelToken },
+      method,
+      headers: {
+        'X-Channel-Token': CFE_CONFIG.channelToken,
+        ...(body ? { 'Content-Type': 'application/json' } : {}),
+      },
+      body: body ? JSON.stringify(body) : undefined,
       signal: controller.signal,
     });
 
@@ -138,16 +143,19 @@ async function rawFetch(path, timeoutMs) {
   }
 }
 
-// Todo endpoint do painel é GET — retenta uma vez após 2s antes de considerar indisponível.
-async function apiCall(path) {
+// GET retenta uma vez após 2s antes de considerar indisponível — POST nunca retenta automaticamente
+// (evita disparar a mesma ação de mutação duas vezes; painel passou a ter mutações a partir da FASE 3.5).
+async function apiCall(path, { method = 'GET', body } = {}) {
+  const allowRetry = method === 'GET';
   try {
-    const result = await rawFetch(path, 10000);
+    const result = await rawFetch(path, method, body, 10000);
     clearDegraded();
     return result;
   } catch (err) {
     if (err.isApiError) throw err;
+    if (!allowRetry) throw err;
     await sleep(2000);
-    const result = await rawFetch(path, 10000); // se falhar de novo, propaga
+    const result = await rawFetch(path, method, body, 10000); // se falhar de novo, propaga
     clearDegraded();
     return result;
   }
@@ -766,6 +774,7 @@ const VIEW_HEADERS = {
   consulta: ['Consulta de Jornada', 'Consulte o contexto completo de qualquer cliente em atendimento'],
   'jornadas-ativas': ['Jornadas Ativas', 'Jornadas em andamento no momento, em todos os canais'],
   metricas: ['Métricas', 'Indicadores operacionais do atendimento'],
+  oportunidades: ['Oportunidades', 'Leads comerciais detectados a partir de dados de jornadas'],
   configuracoes: ['Configurações', 'Preferências do atendente'],
 };
 
@@ -801,6 +810,11 @@ function switchView(view) {
     state.metricsPollHandle = setInterval(fetchMetricsSummary, 60000);
   } else if (previousView === 'metricas') {
     stopMetricsPolling();
+  }
+
+  // Oportunidades (FASE 3.6) — sem polling automático; o atendente atualiza via botão "Detectar".
+  if (view === 'oportunidades') {
+    fetchOpportunities();
   }
 }
 
@@ -944,6 +958,264 @@ function updateHeaderClock() {
   document.getElementById('header-clock').textContent = `${time} · ${date}`;
 }
 
+// ---------- Oportunidades — dados reais via GET /opportunities (FASE 3.6) ----------
+
+const OPP_CHECK_ICON = '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="13" height="13"><polyline points="4 12 9.5 17.5 20 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const OPP_X_ICON = '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="13" height="13"><line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>';
+
+// Contexto da ação em andamento no modal genérico (marcar como abordada/convertida/não relevante).
+let opportunityActionContext = null;
+
+function showToast(message, isError = false) {
+  const container = document.getElementById('toast-container');
+  const toast = document.createElement('div');
+  toast.className = `toast${isError ? ' toast--error' : ''}`;
+  toast.textContent = message;
+  container.appendChild(toast);
+  setTimeout(() => toast.remove(), 4000);
+}
+
+function formatDateTime(isoString) {
+  return `${formatDateShort(isoString)} ${formatMessageTime(isoString)}`;
+}
+
+/** Filtro de status exato tem prioridade sobre o agrupamento Todas/Ativas/Histórico (FASE 3.6, item B.6). */
+function buildOpportunitiesQuery() {
+  const group = document.getElementById('opp-filter-group').value;
+  const urgency = document.getElementById('opp-filter-urgency').value;
+  const category = document.getElementById('opp-filter-category').value;
+  const exactStatus = document.getElementById('opp-filter-status').value;
+
+  const params = new URLSearchParams();
+
+  if (exactStatus) {
+    params.set('status', exactStatus);
+  } else if (group === 'history') {
+    params.set('status', 'converted,not_relevant');
+  } else if (group === 'all') {
+    params.set('status', 'new,contacted,converted,not_relevant');
+  } else {
+    params.set('status', 'new,contacted');
+  }
+
+  if (urgency) params.set('urgency', urgency);
+  if (category) params.set('category', category);
+
+  return params.toString();
+}
+
+async function fetchOpportunities() {
+  const container = document.getElementById('opp-cards-container');
+  const emptyMessage = document.getElementById('opp-empty-message');
+
+  try {
+    const query = buildOpportunitiesQuery();
+    const data = await apiCall(`/opportunities?${query}`);
+    await renderOpportunityCards(data.opportunities);
+  } catch (err) {
+    container.innerHTML = '';
+    emptyMessage.textContent = err instanceof CfeUnavailableError
+      ? 'Sistema de contexto indisponível — tente novamente em instantes.'
+      : `Não foi possível carregar oportunidades: ${err.message}`;
+    emptyMessage.classList.remove('hidden');
+  }
+
+  await fetchOpportunitiesBadge();
+}
+
+/** Contador do menu lateral (FASE 3.6, item B.1) — sempre new+contacted, independente dos filtros da tela. */
+async function fetchOpportunitiesBadge() {
+  try {
+    const data = await apiCall('/opportunities?status=new,contacted&limit=1');
+    const badge = document.getElementById('opportunities-badge');
+    badge.textContent = data.total;
+    badge.classList.toggle('hidden', data.total === 0);
+  } catch (err) {
+    // Falha silenciosa — mesmo padrão do contador de Jornadas Ativas.
+  }
+}
+
+async function renderOpportunityCards(opportunities) {
+  const container = document.getElementById('opp-cards-container');
+  const emptyMessage = document.getElementById('opp-empty-message');
+  container.innerHTML = '';
+
+  if (opportunities.length === 0) {
+    emptyMessage.textContent = 'Nenhuma oportunidade encontrada com os filtros atuais.';
+    emptyMessage.classList.remove('hidden');
+    return;
+  }
+  emptyMessage.classList.add('hidden');
+
+  const plansCatalog = await loadPlansCatalog();
+  opportunities.forEach(opp => container.appendChild(buildOpportunityCard(opp, plansCatalog)));
+}
+
+function buildOpportunityContextLine(opp, plansCatalog) {
+  const m = opp.metadata || {};
+  switch (opp.category) {
+    case 'abandoned_plan_change': {
+      const interest = plansCatalog[m.plan_of_interest];
+      const original = plansCatalog[m.original_plan];
+      const interestLabel = interest ? interest.name : (m.plan_of_interest || 'não informado');
+      const originalLabel = original ? original.name : (m.original_plan || 'não informado');
+      return `Plano de interesse: <strong>${escapeHtml(interestLabel)}</strong> (atual: ${escapeHtml(originalLabel)})`;
+    }
+    case 'abandoned_dispute':
+      return `Motivo: <strong>${escapeHtml(DISPUTE_REASON_LABELS[m.dispute_reason] || m.dispute_reason || 'não informado')}</strong>`;
+    case 'active_engaged_customer': {
+      const intents = (m.intents_used || []).map(i => INTENT_LABELS[i] || i).join(', ');
+      return `${m.recent_journey_count || 0} jornadas concluídas recentemente (${escapeHtml(intents)})`;
+    }
+    case 'inactive_customer':
+      return `Sem interação há <strong>${m.days_since_activity ?? '?'} dias</strong> (${m.total_journeys_last_180d || 0} jornadas nos últimos 180 dias)`;
+    default:
+      return '';
+  }
+}
+
+function buildOpportunityStatusInfo(opp) {
+  if (opp.status === 'contacted') {
+    let html = `<div class="opp-status-info opp-status-info--contacted">${OPP_CHECK_ICON} Abordada em ${formatDateTime(opp.contacted_at)}</div>`;
+    if (opp.resolution_notes) html += `<div class="opp-status-note">"${escapeHtml(opp.resolution_notes)}"</div>`;
+    return html;
+  }
+  if (opp.status === 'converted') {
+    let html = `<div class="opp-status-info opp-status-info--converted">${OPP_CHECK_ICON} Convertida em ${formatDateTime(opp.resolved_at)}</div>`;
+    if (opp.resolution_notes) html += `<div class="opp-status-note">"${escapeHtml(opp.resolution_notes)}"</div>`;
+    return html;
+  }
+  if (opp.status === 'not_relevant') {
+    let html = `<div class="opp-status-info opp-status-info--not-relevant">${OPP_X_ICON} Não relevante em ${formatDateTime(opp.resolved_at)}</div>`;
+    if (opp.resolution_notes) html += `<div class="opp-status-note">"${escapeHtml(opp.resolution_notes)}"</div>`;
+    return html;
+  }
+  return '';
+}
+
+function buildOpportunityCard(opp, plansCatalog) {
+  const card = document.createElement('div');
+  card.className = 'opp-card';
+
+  const validityText = opp.days_remaining > 0
+    ? `Válida por mais ${opp.days_remaining} dia${opp.days_remaining === 1 ? '' : 's'}`
+    : 'Expira hoje';
+
+  card.innerHTML = `
+    <div class="opp-card-header">
+      <span class="opp-urgency-badge opp-urgency--${opp.urgency}">
+        <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10"/></svg>
+        ${escapeHtml(opp.urgency_label)}
+      </span>
+      <span class="opp-category">${escapeHtml(opp.category_label)}</span>
+    </div>
+    <div class="opp-customer">${escapeHtml(opp.customer.full_name)} · CPF ${formatCpf(opp.customer.cpf)}</div>
+    <div class="opp-meta">Detectada ${relativeTime(opp.detected_at)} · ${validityText}</div>
+    <div class="opp-context-line">${buildOpportunityContextLine(opp, plansCatalog)}</div>
+    <div class="opp-suggested-action">Ação sugerida: ${escapeHtml(opp.suggested_action)}</div>
+    ${buildOpportunityStatusInfo(opp)}
+    <div class="opp-card-actions"></div>
+  `;
+
+  const actionsEl = card.querySelector('.opp-card-actions');
+  if (opp.status === 'new') {
+    actionsEl.appendChild(buildOppActionButton('primary', 'Marcar como abordado', () =>
+      openOpportunityActionModal(opp, 'contacted')));
+  } else if (opp.status === 'contacted') {
+    actionsEl.appendChild(buildOppActionButton('primary', 'Marcar como convertida', () =>
+      openOpportunityActionModal(opp, 'converted')));
+    actionsEl.appendChild(buildOppActionButton('secondary', 'Não relevante', () =>
+      openOpportunityActionModal(opp, 'not_relevant')));
+  }
+
+  return card;
+}
+
+function buildOppActionButton(variant, label, onClick) {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = `opp-action-button opp-action-button--${variant}`;
+  button.textContent = label;
+  button.addEventListener('click', onClick);
+  return button;
+}
+
+const OPP_ACTION_CONFIG = {
+  contacted: { endpoint: 'mark-as-contacted', title: 'Marcar oportunidade como abordada', confirmLabel: 'Confirmar', successMessage: 'Oportunidade marcada como abordada' },
+  converted: { endpoint: 'mark-as-converted', title: 'Registrar conversão desta oportunidade em negócio', confirmLabel: 'Confirmar', successMessage: 'Oportunidade marcada como convertida' },
+  not_relevant: { endpoint: 'mark-as-not-relevant', title: 'Marcar que esta oportunidade não se aplica (cliente já resolveu por outro canal, dados desatualizados, etc.)', confirmLabel: 'Confirmar', successMessage: 'Oportunidade marcada como não relevante' },
+};
+
+function openOpportunityActionModal(opp, action) {
+  opportunityActionContext = { id: opp.id, action };
+  const config = OPP_ACTION_CONFIG[action];
+
+  document.getElementById('opp-action-modal-title').textContent = config.title;
+  document.getElementById('opp-action-modal-subtitle').textContent =
+    `${opp.customer.full_name} · ${opp.category_label}`;
+  document.getElementById('opp-action-notes').value = '';
+  document.getElementById('opp-action-notes-count').textContent = '0';
+  document.getElementById('opp-action-confirm-button').textContent = config.confirmLabel;
+  document.getElementById('opp-action-modal').classList.remove('hidden');
+}
+
+function closeOpportunityActionModal() {
+  opportunityActionContext = null;
+  document.getElementById('opp-action-modal').classList.add('hidden');
+}
+
+async function handleOpportunityActionConfirm() {
+  if (!opportunityActionContext) return;
+  const { id, action } = opportunityActionContext;
+  const config = OPP_ACTION_CONFIG[action];
+  const notes = document.getElementById('opp-action-notes').value.trim();
+  const button = document.getElementById('opp-action-confirm-button');
+  button.disabled = true;
+
+  try {
+    await apiCall(`/opportunities/${id}/${config.endpoint}`, { method: 'POST', body: { notes: notes || null } });
+    closeOpportunityActionModal();
+    showToast(config.successMessage);
+    await fetchOpportunities();
+  } catch (err) {
+    showToast(err instanceof CfeUnavailableError
+      ? 'Sistema de contexto indisponível — tente novamente em instantes.'
+      : `Não foi possível concluir: ${err.message}`, true);
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function handleDetectOpportunities() {
+  const button = document.getElementById('opp-detect-button');
+  button.disabled = true;
+
+  try {
+    const result = await apiCall('/opportunities/detect', { method: 'POST' });
+    const breakdown = Object.entries(result.opportunities_created)
+      .filter(([, count]) => count > 0)
+      .map(([category, count]) => `${count} ${OPPORTUNITY_CATEGORY_SHORT_LABELS[category] || category}`)
+      .join(' · ');
+    showToast(result.total > 0
+      ? `${result.total} oportunidade${result.total === 1 ? '' : 's'} nova${result.total === 1 ? '' : 's'} detectada${result.total === 1 ? '' : 's'}${breakdown ? ' · ' + breakdown : ''}`
+      : 'Nenhuma oportunidade nova detectada');
+    await fetchOpportunities();
+  } catch (err) {
+    showToast(err instanceof CfeUnavailableError
+      ? 'Sistema de contexto indisponível — tente novamente em instantes.'
+      : `Não foi possível detectar oportunidades: ${err.message}`, true);
+  } finally {
+    button.disabled = false;
+  }
+}
+
+const OPPORTUNITY_CATEGORY_SHORT_LABELS = {
+  abandoned_plan_change: 'abandonaram troca de plano',
+  abandoned_dispute: 'abandonaram contestação',
+  active_engaged_customer: 'cliente engajado',
+  inactive_customer: 'cliente inativo',
+};
+
 // ---------- Bootstrap ----------
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -956,6 +1228,18 @@ document.addEventListener('DOMContentLoaded', () => {
   // Busca uma vez no carregamento pra popular o badge do menu lateral mesmo antes do atendente
   // entrar na tela Jornadas Ativas (ela só reflete um valor real a partir do primeiro fetch).
   fetchActiveJourneys();
+
+  // Oportunidades (FASE 3.6): badge no carregamento + filtros + modal de ação.
+  fetchOpportunitiesBadge();
+  document.getElementById('opp-detect-button').addEventListener('click', handleDetectOpportunities);
+  ['opp-filter-group', 'opp-filter-urgency', 'opp-filter-category', 'opp-filter-status'].forEach(id => {
+    document.getElementById(id).addEventListener('change', fetchOpportunities);
+  });
+  document.getElementById('opp-action-cancel-button').addEventListener('click', closeOpportunityActionModal);
+  document.getElementById('opp-action-confirm-button').addEventListener('click', handleOpportunityActionConfirm);
+  document.getElementById('opp-action-notes').addEventListener('input', event => {
+    document.getElementById('opp-action-notes-count').textContent = event.target.value.length;
+  });
 
   updateHeaderClock();
   setInterval(updateHeaderClock, 60000);

@@ -1234,6 +1234,338 @@ body {
   background: var(--status-abandoned-dot);
 }
 
+/* ---------- Oportunidades (FASE 3.6) ---------- */
+
+.opp-intro {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 0 0 16px;
+}
+
+.opp-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.opp-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.opp-filter-select {
+  padding: 7px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-medium);
+  background: var(--surface);
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+
+.opp-detect-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-medium);
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.opp-detect-button:hover {
+  background: var(--surface-muted);
+}
+
+.opp-detect-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.opp-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.opp-card {
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 16px 18px;
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow 0.15s ease;
+}
+
+.opp-card:hover {
+  box-shadow: var(--shadow-md);
+}
+
+.opp-card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.opp-urgency-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.opp-urgency-badge svg {
+  width: 8px;
+  height: 8px;
+}
+
+.opp-urgency--critical { background: #fef2f2; color: #b91c1c; }
+.opp-urgency--high { background: #fff7ed; color: #c2410c; }
+.opp-urgency--medium { background: #fefce8; color: #a16207; }
+.opp-urgency--low { background: #f1f5f9; color: #64748b; }
+
+.opp-category {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.opp-customer {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 2px;
+}
+
+.opp-meta {
+  font-size: 11.5px;
+  color: var(--text-subtle);
+  margin-bottom: 10px;
+}
+
+.opp-context-line,
+.opp-suggested-action {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+.opp-suggested-action strong,
+.opp-context-line strong {
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.opp-status-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.opp-status-info--contacted { color: var(--status-open-text); }
+.opp-status-info--converted { color: #15803d; }
+.opp-status-info--not-relevant { color: var(--text-muted); }
+
+.opp-status-note {
+  font-size: 12px;
+  font-style: italic;
+  color: var(--text-subtle);
+  margin-top: 4px;
+}
+
+.opp-card-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.opp-action-button {
+  padding: 7px 14px;
+  border-radius: var(--radius-md);
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.opp-action-button--primary {
+  background: var(--claro-red);
+  color: white;
+}
+
+.opp-action-button--primary:hover {
+  background: var(--claro-red-hover);
+}
+
+.opp-action-button--secondary {
+  background: var(--surface-muted);
+  color: var(--text-secondary);
+  border-color: var(--border-medium);
+}
+
+.opp-action-button--secondary:hover {
+  background: var(--border-subtle);
+}
+
+.opp-empty-message {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-style: italic;
+  padding: 40px 0;
+}
+
+/* ---------- Modais genéricos do painel (FASE 3.6, item B.4) ---------- */
+
+.panel-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 50;
+}
+
+.panel-modal-box {
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  width: 100%;
+  max-width: 420px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: var(--shadow-lg);
+  animation: fade-in 0.2s ease-out;
+}
+
+.panel-modal-header {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+  padding-bottom: 14px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.panel-modal-question {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 14px;
+}
+
+.panel-modal-textarea-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.panel-modal-textarea {
+  width: 100%;
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  font-size: 13px;
+  font-family: inherit;
+  resize: vertical;
+}
+
+.panel-modal-textarea:focus {
+  outline: none;
+  border-color: var(--claro-red);
+  box-shadow: 0 0 0 3px var(--claro-red-subtle);
+}
+
+.panel-modal-char-count {
+  text-align: right;
+  font-size: 11px;
+  color: var(--text-subtle);
+  margin-top: 4px;
+}
+
+.panel-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.panel-modal-actions .primary-button,
+.panel-modal-actions .secondary-button {
+  padding: 9px 18px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.panel-modal-actions .primary-button {
+  background: var(--claro-red);
+  color: white;
+  border: none;
+}
+
+.panel-modal-actions .primary-button:hover {
+  background: var(--claro-red-hover);
+}
+
+.panel-modal-actions .secondary-button {
+  background: transparent;
+  border: 1px solid var(--border-medium);
+  color: var(--text-secondary);
+}
+
+.panel-modal-actions .secondary-button:hover {
+  background: var(--surface-muted);
+}
+
+/* ---------- Toasts de feedback (FASE 3.6, item B.7) ---------- */
+
+.toast-container {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 60;
+}
+
+.toast {
+  background: var(--text-primary);
+  color: white;
+  padding: 12px 16px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: var(--shadow-lg);
+  animation: fade-in 0.2s ease-out;
+  max-width: 320px;
+}
+
+.toast--error {
+  background: var(--claro-red-dark);
+}
+
 .hidden {
   display: none !important;
 }
