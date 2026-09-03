@@ -8,6 +8,7 @@ using ClaroFlowEngine.Api.Modules.Handoff;
 using ClaroFlowEngine.Api.Modules.Identity;
 using ClaroFlowEngine.Api.Modules.Invoices;
 using ClaroFlowEngine.Api.Modules.Lgpd;
+using ClaroFlowEngine.Api.Modules.Opportunities;
 using ClaroFlowEngine.Api.Modules.Panel;
 using HealthChecks.NpgSql;
 using Microsoft.EntityFrameworkCore;
@@ -67,6 +68,7 @@ builder.Services.AddHandoffModule();
 builder.Services.AddInvoicesModule();
 builder.Services.AddPanelModule();
 builder.Services.AddLgpdModule();
+builder.Services.AddOpportunitiesModule();
 
 builder.Services.AddHealthChecks()
     .AddNpgSql(builder.Configuration.GetConnectionString("Postgres")!, name: "db");

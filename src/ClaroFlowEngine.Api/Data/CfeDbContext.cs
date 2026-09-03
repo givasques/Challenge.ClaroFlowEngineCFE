@@ -16,6 +16,7 @@ public class CfeDbContext : DbContext
     public DbSet<HandoffToken> HandoffTokens => Set<HandoffToken>();
     public DbSet<Invoice> Invoices => Set<Invoice>();
     public DbSet<InvoiceItem> InvoiceItems => Set<InvoiceItem>();
+    public DbSet<Opportunity> Opportunities => Set<Opportunity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
