@@ -51,6 +51,8 @@
   --event-expired: #94a3b8;
   --event-abandoned: #ef4444;
   --event-panel: #6b7280;
+  --event-concluded-agent: #16a34a;
+  --event-escalated: #f97316;
 
   --shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.04);
   --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.08), 0 1px 2px rgba(15, 23, 42, 0.04);
@@ -1455,6 +1457,16 @@ body {
 .history-icon--event-expired { background: rgba(148, 163, 184, 0.1); color: var(--event-expired); }
 .history-icon--event-abandoned { background: rgba(239, 68, 68, 0.1); color: var(--event-abandoned); }
 .history-icon--event-panel { background: rgba(107, 114, 128, 0.1); color: var(--event-panel); }
+.history-icon--event-concluded-agent { background: rgba(22, 163, 74, 0.1); color: var(--event-concluded-agent); }
+.history-icon--event-escalated { background: rgba(249, 115, 22, 0.1); color: var(--event-escalated); }
+
+.history-secondary-note {
+  font-size: 12px;
+  font-style: italic;
+  color: var(--text-subtle);
+  line-height: 1.5;
+  margin-top: 2px;
+}
 
 .history-body {
   flex: 1;

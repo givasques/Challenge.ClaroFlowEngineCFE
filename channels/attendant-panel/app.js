@@ -12,6 +12,9 @@ const EVENT_ICONS = {
   journey_expired: '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="15" height="15"><circle cx="12" cy="12" r="9.5" stroke="currentColor" stroke-width="1.8"/><path d="M12 7v5l3.5 2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   journey_abandoned: '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="15" height="15"><line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
   panel_accessed: '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="15" height="15"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.8"/></svg>',
+  // FASE 3.5, item C.2 — ícones distintos pra conclusão manual (mão + check) e escalação (seta ↗).
+  journey_concluded_by_agent: '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="15" height="15"><path d="M2 13l4 4a2 2 0 002 1h8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 18h5a2 2 0 002-2v-1a2 2 0 00-2-2h-4l-3-2H6a2 2 0 00-2 2v3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M17 6.5l1.5 1.5L22 4.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  journey_escalated: '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="15" height="15"><line x1="7" y1="17" x2="17" y2="7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><polyline points="8 7 17 7 17 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
 };
 
 // Classe de cor por tipo de evento — ver variáveis --event-* em styles.css.
@@ -26,6 +29,8 @@ const EVENT_COLOR_CLASS = {
   journey_expired: 'event-expired',
   journey_abandoned: 'event-abandoned',
   panel_accessed: 'event-panel',
+  journey_concluded_by_agent: 'event-concluded-agent',
+  journey_escalated: 'event-escalated',
 };
 
 const EVENT_LABELS = {
@@ -39,6 +44,8 @@ const EVENT_LABELS = {
   journey_expired: 'Jornada expirada por inatividade',
   journey_abandoned: 'Jornada abandonada',
   panel_accessed: 'Painel consultou esta jornada',
+  journey_concluded_by_agent: 'Concluída pelo atendente',
+  journey_escalated: 'Escalada para outra área',
 };
 
 const STATUS_LABELS = {
@@ -708,9 +715,23 @@ function buildTransitionDescription(transition, journeyPayload, context) {
     case 'panel_accessed':
       return 'Painel consultado por atendente';
 
+    // FASE 3.5, item C.1 — a observação do atendente (metadata.description) vai numa segunda linha,
+    // renderizada por buildTransitionSecondaryNote, não aqui.
+    case 'journey_concluded_by_agent':
+      return `Jornada concluída pelo atendente — ${resolutionCategoryLabel(metadata.resolution_category)}`;
+
+    case 'journey_escalated':
+      return `Jornada escalada para ${escalationAreaLabel(metadata.escalation_area)}`;
+
     default:
       return transition.description || EVENT_LABELS[transition.event_type] || transition.event_type;
   }
+}
+
+/** Observação livre do atendente (concluir/escalar, FASE 3.5, item C.1) — segunda linha em itálico entre aspas. */
+function buildTransitionSecondaryNote(transition) {
+  const metadata = transition.metadata || {};
+  return metadata.description || null;
 }
 
 function formatMessageTime(isoString) {
@@ -734,7 +755,8 @@ async function appendTimelineItems(list, transitions, journeyPayload) {
       <div class="history-icon history-icon--${colorClass}">${EVENT_ICONS[t.event_type] || '•'}</div>
       <div class="history-body">
         <div class="history-title">${EVENT_LABELS[t.event_type] || t.event_type}</div>
-        <div class="history-description">${escapeHtml(buildTransitionDescription(t, journeyPayload))}</div>
+        <div class="history-description">${escapeHtml(buildTransitionDescription(t, journeyPayload, context))}</div>
+        ${buildTransitionSecondaryNote(t) ? `<div class="history-secondary-note">"${escapeHtml(buildTransitionSecondaryNote(t))}"</div>` : ''}
         <div class="history-meta">${CHANNEL_ICONS[t.channel] || CHANNEL_ICON_DEFAULT} ${t.channel} · ${relativeTime(t.occurred_at)}</div>
       </div>
     `;
