@@ -12,6 +12,9 @@ const EVENT_ICONS = {
   journey_expired: '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="15" height="15"><circle cx="12" cy="12" r="9.5" stroke="currentColor" stroke-width="1.8"/><path d="M12 7v5l3.5 2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   journey_abandoned: '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="15" height="15"><line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
   panel_accessed: '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="15" height="15"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.8"/></svg>',
+  // FASE 3.5, item C.2 — ícones distintos pra conclusão manual (mão + check) e escalação (seta ↗).
+  journey_concluded_by_agent: '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="15" height="15"><path d="M2 13l4 4a2 2 0 002 1h8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 18h5a2 2 0 002-2v-1a2 2 0 00-2-2h-4l-3-2H6a2 2 0 00-2 2v3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M17 6.5l1.5 1.5L22 4.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  journey_escalated: '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="15" height="15"><line x1="7" y1="17" x2="17" y2="7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><polyline points="8 7 17 7 17 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
 };
 
 // Classe de cor por tipo de evento — ver variáveis --event-* em styles.css.
@@ -26,6 +29,8 @@ const EVENT_COLOR_CLASS = {
   journey_expired: 'event-expired',
   journey_abandoned: 'event-abandoned',
   panel_accessed: 'event-panel',
+  journey_concluded_by_agent: 'event-concluded-agent',
+  journey_escalated: 'event-escalated',
 };
 
 const EVENT_LABELS = {
@@ -39,6 +44,8 @@ const EVENT_LABELS = {
   journey_expired: 'Jornada expirada por inatividade',
   journey_abandoned: 'Jornada abandonada',
   panel_accessed: 'Painel consultou esta jornada',
+  journey_concluded_by_agent: 'Concluída pelo atendente',
+  journey_escalated: 'Escalada para outra área',
 };
 
 const STATUS_LABELS = {
@@ -46,6 +53,7 @@ const STATUS_LABELS = {
   concluded: 'Concluída',
   abandoned: 'Abandonada',
   expired: 'Expirada',
+  escalated: 'Escalada',
 };
 
 // Ícones pequenos por canal, usados na timeline e no bloco de status.
@@ -85,6 +93,32 @@ const DISPUTE_REASON_LABELS = {
   after_portability: 'Cobrança após portabilidade',
   other: 'Outro motivo',
 };
+
+// Categorias de conclusão e áreas de escalação (FASE 3.5) — ids espelham
+// Common/Contracts/ResolutionCategory.cs e EscalationArea.cs.
+const RESOLUTION_CATEGORIES = [
+  { id: 'resolved_answered', label: 'Resolvido — dúvida esclarecida' },
+  { id: 'resolved_action_taken', label: 'Resolvido — ação executada em outro sistema' },
+  { id: 'resolved_guidance_given', label: 'Resolvido — orientação dada, cliente executará depois' },
+  { id: 'customer_gave_up', label: 'Cliente desistiu' },
+  { id: 'unable_to_resolve', label: 'Não foi possível resolver — requer follow-up' },
+];
+
+const ESCALATION_AREAS = [
+  { id: 'technical_support', label: 'Suporte técnico' },
+  { id: 'financial', label: 'Financeiro / Cobrança' },
+  { id: 'retention', label: 'Retenção / Fidelização' },
+  { id: 'sales', label: 'Vendas / Comercial' },
+  { id: 'ombudsman', label: 'Ouvidoria' },
+];
+
+function resolutionCategoryLabel(id) {
+  return RESOLUTION_CATEGORIES.find(c => c.id === id)?.label || id;
+}
+
+function escalationAreaLabel(id) {
+  return ESCALATION_AREAS.find(a => a.id === id)?.label || id;
+}
 
 const state = {
   customerId: null,
@@ -143,8 +177,9 @@ async function rawFetch(path, method, body, timeoutMs) {
   }
 }
 
-// GET retenta uma vez após 2s antes de considerar indisponível — POST nunca retenta automaticamente
-// (evita disparar a mesma ação de mutação duas vezes; painel passou a ter mutações a partir da FASE 3.5).
+// GET retenta uma vez após 2s antes de considerar indisponível — POST/PATCH nunca retentam
+// automaticamente (evita disparar a mesma ação de mutação duas vezes), mesmo padrão já usado
+// em whatsapp-sim/minha-claro-app (FASE 3.5, item B.2/B.3: botões de concluir/escalar são POST).
 async function apiCall(path, { method = 'GET', body } = {}) {
   const allowRetry = method === 'GET';
   try {
@@ -515,7 +550,52 @@ function renderJourneyStatus(journey) {
 
   descriptionBlock.classList.toggle('hidden', !reason && !description);
 
+  renderJourneyActionsAndResolution(journey.status, payload);
+
   block.classList.remove('hidden');
+}
+
+/**
+ * Botões "Concluir jornada"/"Escalar" (só quando 'open'), badge de escalação, e caixa de desfecho
+ * com a categoria/área escolhida pelo atendente (FASE 3.5, itens B.1 e B.4).
+ */
+function renderJourneyActionsAndResolution(status, payload) {
+  const actionsRow = document.getElementById('journey-actions-row');
+  const escalatedInfo = document.getElementById('journey-escalated-info');
+  const resolutionBox = document.getElementById('journey-resolution-box');
+  const resolutionTitle = document.getElementById('journey-resolution-title');
+  const resolutionDescription = document.getElementById('journey-resolution-description');
+
+  actionsRow.classList.toggle('hidden', status !== 'open');
+  escalatedInfo.classList.add('hidden');
+  resolutionBox.classList.add('hidden');
+  resolutionBox.classList.remove('journey-resolution-box--escalated');
+
+  if (status === 'escalated') {
+    const areaLabel = escalationAreaLabel(payload.escalation_area);
+    document.getElementById('journey-escalated-area').textContent = areaLabel;
+    escalatedInfo.classList.remove('hidden');
+
+    resolutionBox.classList.remove('hidden');
+    resolutionBox.classList.add('journey-resolution-box--escalated');
+    resolutionTitle.textContent = `Escalada para ${areaLabel}`;
+    setResolutionDescription(resolutionDescription, payload.escalation_description);
+  } else if (status === 'concluded' && payload.resolution_category) {
+    // Só mostra a caixa quando a conclusão veio do painel (FASE 3.5) — jornadas concluídas pelo
+    // fluxo antigo (cliente confirmando no App) não têm resolution_category no payload.
+    resolutionBox.classList.remove('hidden');
+    resolutionTitle.textContent = resolutionCategoryLabel(payload.resolution_category);
+    setResolutionDescription(resolutionDescription, payload.resolution_description);
+  }
+}
+
+function setResolutionDescription(el, text) {
+  if (text) {
+    el.textContent = `"${text}"`;
+    el.classList.remove('hidden');
+  } else {
+    el.classList.add('hidden');
+  }
 }
 
 async function renderTimeline(transitions, journeyPayload) {
@@ -635,9 +715,23 @@ function buildTransitionDescription(transition, journeyPayload, context) {
     case 'panel_accessed':
       return 'Painel consultado por atendente';
 
+    // FASE 3.5, item C.1 — a observação do atendente (metadata.description) vai numa segunda linha,
+    // renderizada por buildTransitionSecondaryNote, não aqui.
+    case 'journey_concluded_by_agent':
+      return `Jornada concluída pelo atendente — ${resolutionCategoryLabel(metadata.resolution_category)}`;
+
+    case 'journey_escalated':
+      return `Jornada escalada para ${escalationAreaLabel(metadata.escalation_area)}`;
+
     default:
       return transition.description || EVENT_LABELS[transition.event_type] || transition.event_type;
   }
+}
+
+/** Observação livre do atendente (concluir/escalar, FASE 3.5, item C.1) — segunda linha em itálico entre aspas. */
+function buildTransitionSecondaryNote(transition) {
+  const metadata = transition.metadata || {};
+  return metadata.description || null;
 }
 
 function formatMessageTime(isoString) {
@@ -661,7 +755,8 @@ async function appendTimelineItems(list, transitions, journeyPayload) {
       <div class="history-icon history-icon--${colorClass}">${EVENT_ICONS[t.event_type] || '•'}</div>
       <div class="history-body">
         <div class="history-title">${EVENT_LABELS[t.event_type] || t.event_type}</div>
-        <div class="history-description">${escapeHtml(buildTransitionDescription(t, journeyPayload))}</div>
+        <div class="history-description">${escapeHtml(buildTransitionDescription(t, journeyPayload, context))}</div>
+        ${buildTransitionSecondaryNote(t) ? `<div class="history-secondary-note">"${escapeHtml(buildTransitionSecondaryNote(t))}"</div>` : ''}
         <div class="history-meta">${CHANNEL_ICONS[t.channel] || CHANNEL_ICON_DEFAULT} ${t.channel} · ${relativeTime(t.occurred_at)}</div>
       </div>
     `;
@@ -958,6 +1053,42 @@ function updateHeaderClock() {
   document.getElementById('header-clock').textContent = `${time} · ${date}`;
 }
 
+// ---------- Concluir/escalar jornada — modais e chamadas à API (FASE 3.5) ----------
+
+function renderModalOptions(containerId, options, inputName) {
+  const container = document.getElementById(containerId);
+  container.innerHTML = options.map(opt => `
+    <label class="panel-modal-option">
+      <input type="radio" name="${inputName}" value="${opt.id}" />
+      <span>${escapeHtml(opt.label)}</span>
+    </label>
+  `).join('');
+}
+
+function openConcludeModal() {
+  renderModalOptions('conclude-options', RESOLUTION_CATEGORIES, 'conclude-category');
+  document.getElementById('conclude-description').value = '';
+  document.getElementById('conclude-description-count').textContent = '0';
+  document.getElementById('conclude-confirm-button').disabled = true;
+  document.getElementById('conclude-modal').classList.remove('hidden');
+}
+
+function closeConcludeModal() {
+  document.getElementById('conclude-modal').classList.add('hidden');
+}
+
+function openEscalateModal() {
+  renderModalOptions('escalate-options', ESCALATION_AREAS, 'escalate-area');
+  document.getElementById('escalate-description').value = '';
+  document.getElementById('escalate-description-count').textContent = '0';
+  document.getElementById('escalate-confirm-button').disabled = true;
+  document.getElementById('escalate-modal').classList.remove('hidden');
+}
+
+function closeEscalateModal() {
+  document.getElementById('escalate-modal').classList.add('hidden');
+}
+
 // ---------- Oportunidades — dados reais via GET /opportunities (FASE 3.6) ----------
 
 const OPP_CHECK_ICON = '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="13" height="13"><polyline points="4 12 9.5 17.5 20 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -977,6 +1108,58 @@ function showToast(message, isError = false) {
 
 function formatDateTime(isoString) {
   return `${formatDateShort(isoString)} ${formatMessageTime(isoString)}`;
+}
+
+// ---------- Concluir/escalar jornada — chamadas à API (FASE 3.5) ----------
+
+async function handleConcludeConfirm() {
+  const category = document.querySelector('input[name="conclude-category"]:checked')?.value;
+  if (!category) return;
+
+  const description = document.getElementById('conclude-description').value.trim();
+  const button = document.getElementById('conclude-confirm-button');
+  button.disabled = true;
+
+  try {
+    await apiCall(`/journeys/${state.journeyId}/conclude`, {
+      method: 'POST',
+      body: { resolution_category: category, description: description || null },
+    });
+    closeConcludeModal();
+    showToast('Jornada concluída');
+    await pollJourney();
+  } catch (err) {
+    showToast(err instanceof CfeUnavailableError
+      ? 'Sistema de contexto indisponível — tente novamente em instantes.'
+      : `Não foi possível concluir: ${err.message}`, true);
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function handleEscalateConfirm() {
+  const area = document.querySelector('input[name="escalate-area"]:checked')?.value;
+  if (!area) return;
+
+  const description = document.getElementById('escalate-description').value.trim();
+  const button = document.getElementById('escalate-confirm-button');
+  button.disabled = true;
+
+  try {
+    await apiCall(`/journeys/${state.journeyId}/escalate`, {
+      method: 'POST',
+      body: { escalation_area: area, description: description || null },
+    });
+    closeEscalateModal();
+    showToast(`Jornada escalada para ${escalationAreaLabel(area)}`);
+    await pollJourney();
+  } catch (err) {
+    showToast(err instanceof CfeUnavailableError
+      ? 'Sistema de contexto indisponível — tente novamente em instantes.'
+      : `Não foi possível escalar: ${err.message}`, true);
+  } finally {
+    button.disabled = false;
+  }
 }
 
 /** Filtro de status exato tem prioridade sobre o agrupamento Todas/Ativas/Histórico (FASE 3.6, item B.6). */
@@ -1180,7 +1363,7 @@ async function handleOpportunityActionConfirm() {
   } catch (err) {
     showToast(err instanceof CfeUnavailableError
       ? 'Sistema de contexto indisponível — tente novamente em instantes.'
-      : `Não foi possível concluir: ${err.message}`, true);
+      : `Não foi possível registrar: ${err.message}`, true);
   } finally {
     button.disabled = false;
   }
@@ -1228,6 +1411,26 @@ document.addEventListener('DOMContentLoaded', () => {
   // Busca uma vez no carregamento pra popular o badge do menu lateral mesmo antes do atendente
   // entrar na tela Jornadas Ativas (ela só reflete um valor real a partir do primeiro fetch).
   fetchActiveJourneys();
+
+  // Concluir/escalar jornada (FASE 3.5)
+  document.getElementById('conclude-journey-button').addEventListener('click', openConcludeModal);
+  document.getElementById('escalate-journey-button').addEventListener('click', openEscalateModal);
+  document.getElementById('conclude-cancel-button').addEventListener('click', closeConcludeModal);
+  document.getElementById('escalate-cancel-button').addEventListener('click', closeEscalateModal);
+  document.getElementById('conclude-confirm-button').addEventListener('click', handleConcludeConfirm);
+  document.getElementById('escalate-confirm-button').addEventListener('click', handleEscalateConfirm);
+  document.getElementById('conclude-options').addEventListener('change', () => {
+    document.getElementById('conclude-confirm-button').disabled = !document.querySelector('input[name="conclude-category"]:checked');
+  });
+  document.getElementById('escalate-options').addEventListener('change', () => {
+    document.getElementById('escalate-confirm-button').disabled = !document.querySelector('input[name="escalate-area"]:checked');
+  });
+  document.getElementById('conclude-description').addEventListener('input', event => {
+    document.getElementById('conclude-description-count').textContent = event.target.value.length;
+  });
+  document.getElementById('escalate-description').addEventListener('input', event => {
+    document.getElementById('escalate-description-count').textContent = event.target.value.length;
+  });
 
   // Oportunidades (FASE 3.6): badge no carregamento + filtros + modal de ação.
   fetchOpportunitiesBadge();

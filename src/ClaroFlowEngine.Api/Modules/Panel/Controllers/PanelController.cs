@@ -20,9 +20,10 @@ public class PanelController : ControllerBase
     [EndpointDescription("Retorna todas as jornadas com status 'open', mais recentes primeiro, para a tela \"Jornadas Ativas\" do painel do atendente. Requer header X-Channel-Token válido.")]
     [ProducesResponseType(typeof(ActiveJourneysResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiError), StatusCodes.Status401Unauthorized)]
-    public async Task<IActionResult> GetActiveJourneys(CancellationToken cancellationToken)
+    public async Task<IActionResult> GetActiveJourneys(
+        [FromQuery(Name = "include_escalated")] bool includeEscalated, CancellationToken cancellationToken)
     {
-        var result = await _service.GetActiveJourneysAsync(cancellationToken);
+        var result = await _service.GetActiveJourneysAsync(includeEscalated, cancellationToken);
         return Ok(result);
     }
 
@@ -34,6 +35,36 @@ public class PanelController : ControllerBase
     public async Task<IActionResult> GetMetricsSummary(CancellationToken cancellationToken)
     {
         var result = await _service.GetMetricsSummaryAsync(cancellationToken);
+        return Ok(result);
+    }
+
+    [HttpPost("journeys/{id:guid}/conclude")]
+    [EndpointSummary("Concluir jornada pelo painel")]
+    [EndpointDescription("Encerra uma jornada 'open' com uma categoria de desfecho padronizada, registrada pelo atendente. Requer header X-Channel-Token de painel.")]
+    [ProducesResponseType(typeof(ConcludeJourneyResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiError), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiError), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiError), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiError), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiError), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> ConcludeJourney(Guid id, [FromBody] ConcludeJourneyRequest request, CancellationToken cancellationToken)
+    {
+        var result = await _service.ConcludeJourneyAsync(id, request, cancellationToken);
+        return Ok(result);
+    }
+
+    [HttpPost("journeys/{id:guid}/escalate")]
+    [EndpointSummary("Escalar jornada para outra área")]
+    [EndpointDescription("Transfere uma jornada 'open' para outra área (mockada), sem fechá-la — ela permanece registrada aguardando desfecho externo. Requer header X-Channel-Token de painel.")]
+    [ProducesResponseType(typeof(EscalateJourneyResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiError), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiError), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiError), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiError), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiError), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> EscalateJourney(Guid id, [FromBody] EscalateJourneyRequest request, CancellationToken cancellationToken)
+    {
+        var result = await _service.EscalateJourneyAsync(id, request, cancellationToken);
         return Ok(result);
     }
 }

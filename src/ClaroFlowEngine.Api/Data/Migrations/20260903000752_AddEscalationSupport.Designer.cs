@@ -3,6 +3,7 @@ using System;
 using ClaroFlowEngine.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace ClaroFlowEngine.Api.Data.Migrations
 {
     [DbContext(typeof(CfeDbContext))]
-    partial class CfeDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260903000752_AddEscalationSupport")]
+    partial class AddEscalationSupport
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -444,102 +447,6 @@ namespace ClaroFlowEngine.Api.Data.Migrations
                     b.ToTable("journey_transitions", (string)null);
                 });
 
-            modelBuilder.Entity("ClaroFlowEngine.Api.Data.Entities.Opportunity", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id")
-                        .HasDefaultValueSql("gen_random_uuid()");
-
-                    b.Property<string>("Category")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("category");
-
-                    b.Property<DateTime?>("ContactedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("contacted_at");
-
-                    b.Property<string>("ContactedBy")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("contacted_by");
-
-                    b.Property<Guid>("CustomerId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("customer_id");
-
-                    b.Property<DateTime>("DetectedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("detected_at")
-                        .HasDefaultValueSql("NOW()");
-
-                    b.Property<string>("Metadata")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("jsonb")
-                        .HasColumnName("metadata")
-                        .HasDefaultValueSql("'{}'::jsonb");
-
-                    b.Property<string>("ResolutionNotes")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
-                        .HasColumnName("resolution_notes");
-
-                    b.Property<DateTime?>("ResolvedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("resolved_at");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasDefaultValue("new")
-                        .HasColumnName("status");
-
-                    b.Property<Guid?>("TriggeringJourneyId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("triggering_journey_id");
-
-                    b.Property<string>("Urgency")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("urgency");
-
-                    b.Property<DateTime>("ValidUntil")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("valid_until");
-
-                    b.HasKey("Id")
-                        .HasName("pk_opportunities");
-
-                    b.HasIndex("CustomerId")
-                        .HasDatabaseName("idx_opp_customer");
-
-                    b.HasIndex("TriggeringJourneyId")
-                        .HasDatabaseName("ix_opportunities_triggering_journey_id");
-
-                    b.HasIndex("ValidUntil")
-                        .HasDatabaseName("idx_opp_valid_until")
-                        .HasFilter("status IN ('new', 'contacted')");
-
-                    b.HasIndex("Status", "Urgency")
-                        .HasDatabaseName("idx_opp_status_urgency")
-                        .HasFilter("status IN ('new', 'contacted')");
-
-                    b.ToTable("opportunities", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_opportunities_status", "status IN ('new', 'contacted', 'converted', 'not_relevant')");
-
-                            t.HasCheckConstraint("ck_opportunities_urgency", "urgency IN ('critical', 'high', 'medium', 'low')");
-                        });
-                });
-
             modelBuilder.Entity("ClaroFlowEngine.Api.Data.Entities.Plan", b =>
                 {
                     b.Property<Guid>("Id")
@@ -677,26 +584,6 @@ namespace ClaroFlowEngine.Api.Data.Migrations
                         .HasConstraintName("fk_journey_transitions_journey_contexts_journey_context_id");
 
                     b.Navigation("JourneyContext");
-                });
-
-            modelBuilder.Entity("ClaroFlowEngine.Api.Data.Entities.Opportunity", b =>
-                {
-                    b.HasOne("ClaroFlowEngine.Api.Data.Entities.Customer", "Customer")
-                        .WithMany()
-                        .HasForeignKey("CustomerId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_opportunities_customers_customer_id");
-
-                    b.HasOne("ClaroFlowEngine.Api.Data.Entities.JourneyContext", "TriggeringJourney")
-                        .WithMany()
-                        .HasForeignKey("TriggeringJourneyId")
-                        .OnDelete(DeleteBehavior.SetNull)
-                        .HasConstraintName("fk_opportunities_journey_contexts_triggering_journey_id");
-
-                    b.Navigation("Customer");
-
-                    b.Navigation("TriggeringJourney");
                 });
 
             modelBuilder.Entity("ClaroFlowEngine.Api.Data.Entities.Customer", b =>

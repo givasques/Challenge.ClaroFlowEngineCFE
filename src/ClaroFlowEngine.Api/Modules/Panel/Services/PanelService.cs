@@ -1,26 +1,43 @@
 using ClaroFlowEngine.Api.Common.Contracts;
+using ClaroFlowEngine.Api.Common.Errors;
+using ClaroFlowEngine.Api.Common.Services;
 using ClaroFlowEngine.Api.Data;
+using ClaroFlowEngine.Api.Data.Entities;
 using ClaroFlowEngine.Api.Modules.Panel.Dtos;
 using Microsoft.EntityFrameworkCore;
 
 namespace ClaroFlowEngine.Api.Modules.Panel.Services;
 
-/// <summary>Endpoints agregados para o menu lateral do painel do atendente (FASE 3.2) — jornadas ativas e métricas operacionais.</summary>
+/// <summary>
+/// Endpoints agregados para o menu lateral do painel do atendente (FASE 3.2) — jornadas ativas e
+/// métricas operacionais — e ações de fechamento/escalação de jornada pelo atendente (FASE 3.5).
+/// </summary>
 public class PanelService : IPanelService
 {
     private static readonly TimeSpan MetricsWindow = TimeSpan.FromDays(30);
+    private const int MaxDescriptionLength = 500;
 
     private readonly CfeDbContext _db;
+    private readonly ITransitionRecorder _transitionRecorder;
+    private readonly ICurrentChannelAccessor _currentChannel;
 
-    public PanelService(CfeDbContext db) => _db = db;
+    public PanelService(CfeDbContext db, ITransitionRecorder transitionRecorder, ICurrentChannelAccessor currentChannel)
+    {
+        _db = db;
+        _transitionRecorder = transitionRecorder;
+        _currentChannel = currentChannel;
+    }
 
-    public async Task<ActiveJourneysResponse> GetActiveJourneysAsync(CancellationToken cancellationToken)
+    public async Task<ActiveJourneysResponse> GetActiveJourneysAsync(bool includeEscalated, CancellationToken cancellationToken)
     {
         var now = DateTime.UtcNow;
 
+        // Padrão do MVP (A.8): só 'open'. include_escalated=true é opcional, pensado pra uma futura
+        // aba separada no painel — não muda o comportamento default de /journeys/active nem da
+        // contagem "Jornadas ativas" do menu lateral.
         var openJourneys = await _db.JourneyContexts
             .AsNoTracking()
-            .Where(j => j.Status == JourneyStatus.Open)
+            .Where(j => j.Status == JourneyStatus.Open || (includeEscalated && j.Status == JourneyStatus.Escalated))
             .OrderByDescending(j => j.CreatedAt)
             .Select(j => new
             {
@@ -32,6 +49,7 @@ public class PanelService : IPanelService
                 j.OriginChannel,
                 j.CreatedAt,
                 j.UpdatedAt,
+                j.Status,
             })
             .ToListAsync(cancellationToken);
 
@@ -66,7 +84,8 @@ public class PanelService : IPanelService
                 PanelLabels.Channel(currentChannel),
                 j.CreatedAt,
                 j.UpdatedAt,
-                (int)(now - j.CreatedAt).TotalMinutes);
+                (int)(now - j.CreatedAt).TotalMinutes,
+                j.Status);
         }).ToList();
 
         return new ActiveJourneysResponse(journeys, journeys.Count);
@@ -140,5 +159,87 @@ public class PanelService : IPanelService
         return durations.Count % 2 == 0
             ? (durations[mid - 1] + durations[mid]) / 2
             : durations[mid];
+    }
+
+    public async Task<ConcludeJourneyResponse> ConcludeJourneyAsync(
+        Guid journeyId, ConcludeJourneyRequest request, CancellationToken cancellationToken)
+    {
+        EnsurePanelChannel();
+
+        if (!ResolutionCategory.IsValid(request.ResolutionCategory))
+            throw new ValidationException("invalid_resolution_category", "resolution_category inválida.");
+        ValidateDescription(request.Description);
+
+        var journey = await GetOpenJourneyOrThrowAsync(journeyId, cancellationToken);
+
+        var closedAt = DateTime.UtcNow;
+        journey.Status = JourneyStatus.Concluded;
+        journey.ClosedAt = closedAt;
+        journey.UpdatedAt = closedAt;
+        journey.Payload["resolution_category"] = request.ResolutionCategory;
+        if (!string.IsNullOrWhiteSpace(request.Description))
+            journey.Payload["resolution_description"] = request.Description;
+
+        var label = ResolutionCategory.Label(request.ResolutionCategory);
+        _transitionRecorder.Record(journey.Id, Channels.Panel, TransitionEventTypes.JourneyConcludedByAgent,
+            $"Jornada concluída pelo atendente — {label}",
+            new { resolution_category = request.ResolutionCategory, description = request.Description });
+
+        await _db.SaveChangesAsync(cancellationToken);
+
+        return new ConcludeJourneyResponse(journey.Id, journey.Status, closedAt, request.ResolutionCategory, label);
+    }
+
+    public async Task<EscalateJourneyResponse> EscalateJourneyAsync(
+        Guid journeyId, EscalateJourneyRequest request, CancellationToken cancellationToken)
+    {
+        EnsurePanelChannel();
+
+        if (!EscalationArea.IsValid(request.EscalationArea))
+            throw new ValidationException("invalid_escalation_area", "escalation_area inválida.");
+        ValidateDescription(request.Description);
+
+        var journey = await GetOpenJourneyOrThrowAsync(journeyId, cancellationToken);
+
+        var escalatedAt = DateTime.UtcNow;
+        journey.Status = JourneyStatus.Escalated;
+        journey.UpdatedAt = escalatedAt;
+        journey.EscalatedAt = escalatedAt;
+        // Sem ClosedAt de propósito (A.5): a jornada não fechou, só foi transferida — continua "viva" no CFE.
+        journey.Payload["escalation_area"] = request.EscalationArea;
+        if (!string.IsNullOrWhiteSpace(request.Description))
+            journey.Payload["escalation_description"] = request.Description;
+
+        var label = EscalationArea.Label(request.EscalationArea);
+        _transitionRecorder.Record(journey.Id, Channels.Panel, TransitionEventTypes.JourneyEscalated,
+            $"Jornada escalada para {label}",
+            new { escalation_area = request.EscalationArea, description = request.Description });
+
+        await _db.SaveChangesAsync(cancellationToken);
+
+        return new EscalateJourneyResponse(journey.Id, journey.Status, escalatedAt, request.EscalationArea, label);
+    }
+
+    private void EnsurePanelChannel()
+    {
+        if (_currentChannel.Channel != Channels.Panel)
+            throw new ForbiddenException("channel_not_allowed", "Esta ação só pode ser executada pelo painel do atendente.");
+    }
+
+    private static void ValidateDescription(string? description)
+    {
+        if (description is { Length: > MaxDescriptionLength })
+            throw new ValidationException("invalid_description", $"description deve ter no máximo {MaxDescriptionLength} caracteres.");
+    }
+
+    private async Task<JourneyContext> GetOpenJourneyOrThrowAsync(Guid journeyId, CancellationToken cancellationToken)
+    {
+        var journey = await _db.JourneyContexts.FirstOrDefaultAsync(j => j.Id == journeyId, cancellationToken)
+            ?? throw new NotFoundException("journey_not_found", $"Jornada {journeyId} não encontrada.");
+
+        if (journey.Status != JourneyStatus.Open)
+            throw new ConflictException("journey_not_open", $"Jornada está no estado '{journey.Status}'.", new { status = journey.Status });
+
+        return journey;
     }
 }
