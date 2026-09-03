@@ -3,6 +3,7 @@ using System;
 using ClaroFlowEngine.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace ClaroFlowEngine.Api.Data.Migrations
 {
     [DbContext(typeof(CfeDbContext))]
-    partial class CfeDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260903031415_AddOpportunitiesTable")]
+    partial class AddOpportunitiesTable
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -339,10 +342,6 @@ namespace ClaroFlowEngine.Api.Data.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("customer_id");
 
-                    b.Property<DateTime?>("EscalatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("escalated_at");
-
                     b.Property<string>("Intent")
                         .IsRequired()
                         .HasMaxLength(50)
@@ -377,10 +376,6 @@ namespace ClaroFlowEngine.Api.Data.Migrations
                     b.HasKey("Id")
                         .HasName("pk_journey_contexts");
 
-                    b.HasIndex("Status")
-                        .HasDatabaseName("ix_journey_status_open_escalated")
-                        .HasFilter("status IN ('open', 'escalated')");
-
                     b.HasIndex("UpdatedAt")
                         .HasDatabaseName("ix_journey_open_updated")
                         .HasFilter("status = 'open'");
@@ -390,7 +385,7 @@ namespace ClaroFlowEngine.Api.Data.Migrations
 
                     b.ToTable("journey_contexts", null, t =>
                         {
-                            t.HasCheckConstraint("ck_journey_status", "status IN ('open', 'concluded', 'expired', 'abandoned', 'escalated')");
+                            t.HasCheckConstraint("ck_journey_status", "status IN ('open', 'concluded', 'expired', 'abandoned')");
                         });
                 });
 

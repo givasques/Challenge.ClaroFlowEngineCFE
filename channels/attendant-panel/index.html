@@ -43,6 +43,13 @@
           </span>
           Métricas
         </button>
+        <button type="button" class="sidebar-nav-item" id="nav-oportunidades" data-view="oportunidades">
+          <span class="sidebar-nav-icon">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="17" height="17"><path d="M12 2l2.5 6.5L21 11l-6.5 2.5L12 20l-2.5-6.5L3 11l6.5-2.5L12 2z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+          </span>
+          Oportunidades
+          <span class="sidebar-nav-badge hidden" id="opportunities-badge">0</span>
+        </button>
         <button type="button" class="sidebar-nav-item" id="nav-configuracoes" data-view="configuracoes">
           <span class="sidebar-nav-icon">
             <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="17" height="17"><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.7"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -365,6 +372,50 @@
         </div>
       </div>
 
+      <!-- Oportunidades — dados reais via GET /opportunities (FASE 3.6) -->
+      <div id="view-oportunidades" class="main-view hidden">
+        <p class="opp-intro">Insights gerados a partir de dados de jornadas.</p>
+
+        <div class="opp-toolbar">
+          <div class="opp-filters">
+            <select id="opp-filter-group" class="opp-filter-select" aria-label="Filtrar por grupo de status">
+              <option value="active" selected>Ativas</option>
+              <option value="all">Todas</option>
+              <option value="history">Histórico</option>
+            </select>
+            <select id="opp-filter-urgency" class="opp-filter-select" aria-label="Filtrar por urgência">
+              <option value="">Urgência: todas</option>
+              <option value="critical">Crítica</option>
+              <option value="high">Alta</option>
+              <option value="medium">Média</option>
+              <option value="low">Baixa</option>
+            </select>
+            <select id="opp-filter-category" class="opp-filter-select" aria-label="Filtrar por categoria">
+              <option value="">Categoria: todas</option>
+              <option value="abandoned_plan_change">Abandonaram troca de plano</option>
+              <option value="abandoned_dispute">Abandonaram contestação</option>
+              <option value="active_engaged_customer">Clientes engajados</option>
+              <option value="inactive_customer">Clientes inativos</option>
+            </select>
+            <select id="opp-filter-status" class="opp-filter-select" aria-label="Filtrar por status exato">
+              <option value="">Status: todos</option>
+              <option value="new">Novo</option>
+              <option value="contacted">Abordado</option>
+              <option value="converted">Convertido</option>
+              <option value="not_relevant">Não relevante</option>
+            </select>
+          </div>
+
+          <button type="button" class="opp-detect-button" id="opp-detect-button">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="14" height="14" aria-hidden="true"><path d="M20 11A8 8 0 104.5 14.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M20 5v6h-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Detectar novas oportunidades
+          </button>
+        </div>
+
+        <div id="opp-cards-container" class="opp-cards"></div>
+        <p id="opp-empty-message" class="opp-empty-message hidden">Nenhuma oportunidade encontrada com os filtros atuais.</p>
+      </div>
+
       <!-- Configurações (mockado — FASE 3, item C.5; seções na FASE 3.1, item B.3.3) -->
       <div id="view-configuracoes" class="main-view hidden">
         <div class="mock-banner">Esta funcionalidade está em desenvolvimento.</div>
@@ -488,6 +539,23 @@
       <div class="panel-modal-actions">
         <button type="button" class="secondary-button" id="escalate-cancel-button">Cancelar</button>
         <button type="button" class="primary-button" id="escalate-confirm-button" disabled>Escalar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal genérico de ação de oportunidade (marcar como abordada/convertida/não relevante) — FASE 3.6, item B.4 -->
+  <div id="opp-action-modal" class="panel-modal-overlay hidden">
+    <div class="panel-modal-box">
+      <div class="panel-modal-header" id="opp-action-modal-title">Marcar oportunidade como abordada</div>
+      <p class="panel-modal-question" id="opp-action-modal-subtitle"></p>
+
+      <label for="opp-action-notes" class="panel-modal-textarea-label">Observações (opcional)</label>
+      <textarea id="opp-action-notes" class="panel-modal-textarea" maxlength="500" rows="3"></textarea>
+      <div class="panel-modal-char-count"><span id="opp-action-notes-count">0</span>/500 caracteres</div>
+
+      <div class="panel-modal-actions">
+        <button type="button" class="secondary-button" id="opp-action-cancel-button">Cancelar</button>
+        <button type="button" class="primary-button" id="opp-action-confirm-button">Confirmar</button>
       </div>
     </div>
   </div>
