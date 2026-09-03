@@ -26,6 +26,8 @@ Clientes de operadoras costumam iniciar um atendimento em um canal (ex: WhatsApp
 
 A solução é uma camada de orquestração posicionada entre os canais e o backend: ela resolve a identidade unificada do cliente independentemente do identificador usado em cada canal, persiste o contexto da jornada (intenção, etapa, dados já coletados) em tempo real, e permite transferir essa jornada de um canal para outro por meio de um deep link com token, sem reintrodução de dados.
 
+Além disso, o CFE inclui um módulo de inteligência operacional: os próprios dados de jornadas são analisados para gerar oportunidades comerciais acionáveis, transformando o sistema de orquestração em uma fonte contínua de insights para atendimento e vendas.
+
 Este repositório contém um **protótipo funcional**, não um produto de produção: dados de clientes e planos são mockados (seed automático), a autenticação por canal é simulada via header, e os três canais de atendimento (chat, app, painel do atendente) são interfaces simuladas construídas para o protótipo, não integrações reais com WhatsApp Business API ou um app publicado.
 
 ---
@@ -256,6 +258,7 @@ A spec funcional deste projeto organiza os requisitos como casos de uso (UC01–
 | N/A | Jornadas ativas em tempo real (painel) | `GET /journeys/active` |
 | N/A | Métricas operacionais (painel) | `GET /metrics/summary` (TMA mediano, jornadas hoje, taxa de conclusão, canal mais usado) |
 | RNF005 | Direito ao esquecimento (Art. 18 LGPD) | `POST /customers/{cpf}/right-to-be-forgotten` + tela "Meus dados" no App |
+| UC11 | Detectar oportunidades comerciais | `POST /opportunities/detect` (4 regras) + `GET /opportunities` + ciclo `new → contacted → converted/not_relevant`, aba "Oportunidades" no painel |
 
 ---
 
@@ -294,6 +297,7 @@ O protótipo evoluiu além do MVP inicial. Já foram entregues:
 - Menu lateral do painel conectado a dados reais (jornadas ativas e métricas operacionais).
 - Integração com VLibras do Governo Federal e melhorias básicas de acessibilidade HTML.
 - Direito ao esquecimento (Art. 18 LGPD), exercível pelo cliente na área "Meus dados" do App ou pelo atendente no painel.
+- Painel de Oportunidades: detecção automática de leads comerciais a partir de jornadas históricas (troca de plano abandonada, contestação abandonada, cliente engajado, cliente inativo), com priorização por urgência e ciclo de vida controlado (novo → abordado → convertido/não relevante).
 
 O [histórico de commits e PRs](https://github.com/givasques/Challenge.ClaroFlowEngineCFE/pulls?q=is%3Apr) documenta cada entrega.
 
