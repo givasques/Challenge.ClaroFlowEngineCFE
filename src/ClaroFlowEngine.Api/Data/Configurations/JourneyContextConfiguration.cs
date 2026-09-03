@@ -34,12 +34,17 @@ public class JourneyContextConfiguration : IEntityTypeConfiguration<JourneyConte
             .HasDatabaseName("ix_journey_open_updated")
             .HasFilter("status = 'open'");
 
+        // FASE 3.5, item A.6 — acelera a tela "Jornadas Ativas" e a futura listagem com ?include_escalated=true.
+        builder.HasIndex(j => j.Status)
+            .HasDatabaseName("ix_journey_status_open_escalated")
+            .HasFilter("status IN ('open', 'escalated')");
+
         builder.HasOne(j => j.Customer)
             .WithMany(c => c.JourneyContexts)
             .HasForeignKey(j => j.CustomerId)
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.ToTable(t => t.HasCheckConstraint("ck_journey_status",
-            "status IN ('open', 'concluded', 'expired', 'abandoned')"));
+            "status IN ('open', 'concluded', 'expired', 'abandoned', 'escalated')"));
     }
 }

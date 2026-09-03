@@ -16,4 +16,10 @@ public static class TransitionEventTypes
 
     /// <summary>Direito ao esquecimento exercido (Art. 18 LGPD, FASE 3.4) — transição órfã, sem journey_context_id.</summary>
     public const string DataAnonymizationRequested = "data_anonymization_requested";
+
+    /// <summary>Jornada concluída manualmente pelo atendente via painel (FASE 3.5), com categoria de desfecho.</summary>
+    public const string JourneyConcludedByAgent = "journey_concluded_by_agent";
+
+    /// <summary>Jornada escalada para outra área via painel (FASE 3.5) — jornada permanece registrada, sem fechar.</summary>
+    public const string JourneyEscalated = "journey_escalated";
 }
