@@ -51,6 +51,14 @@
   box-sizing: border-box;
 }
 
+/* Ícones dentro de botões/links nunca recebem o clique (bugfix VLibras): garante que o alvo real do
+   clique (event.target) seja sempre o próprio botão/link, nunca o SVG decorativo dentro dele — sem
+   isso, clicar num ícone faz o VLibras (quando o avatar está aberto) verificar a classe vlibras-links
+   no elemento errado e interceptar o clique mesmo estando marcado. */
+button svg, a svg {
+  pointer-events: none;
+}
+
 /* Foco de teclado visível (FASE 3.3, item B.2.5) — garante que quem navega via Tab enxerga onde está. */
 *:focus-visible {
   outline: 2px solid var(--claro-red, #e30613);

@@ -651,6 +651,30 @@
       <div class="vw-plugin-top-wrapper"></div>
     </div>
   </div>
+  <script>
+    // Bugfix VLibras (cliques exigindo múltiplos toques): o widget intercepta o primeiro clique em
+    // qualquer botão/link enquanto o avatar está aberto, exibindo um selo "Interagir" que precisa ser
+    // clicado de novo — a menos que o elemento clicado tenha a classe "vlibras-links", que o próprio
+    // VLibras reconhece internamente como "não interceptar este clique" (checado contra event.target).
+    // Marca todo botão/link real com essa classe, incluindo os criados dinamicamente depois do load.
+    (function () {
+      var SELECTOR = 'button, a, input[type="submit"], select';
+      function mark(root) {
+        if (root.matches && root.matches(SELECTOR)) root.classList.add('vlibras-links');
+        if (root.querySelectorAll) {
+          root.querySelectorAll(SELECTOR).forEach(function (el) { el.classList.add('vlibras-links'); });
+        }
+      }
+      mark(document);
+      new MutationObserver(function (mutations) {
+        mutations.forEach(function (mutation) {
+          mutation.addedNodes.forEach(function (node) {
+            if (node.nodeType === 1) mark(node);
+          });
+        });
+      }).observe(document.body, { childList: true, subtree: true });
+    })();
+  </script>
   <script src="https://vlibras.gov.br/app/vlibras-plugin.js"></script>
   <script>
     new window.VLibras.Widget('https://vlibras.gov.br/app');
