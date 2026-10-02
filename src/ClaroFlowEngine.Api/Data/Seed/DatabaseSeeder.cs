@@ -1,5 +1,6 @@
 using ClaroFlowEngine.Api.Common.Contracts;
 using ClaroFlowEngine.Api.Data.Entities;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
 namespace ClaroFlowEngine.Api.Data.Seed;
@@ -17,6 +18,7 @@ public static class DatabaseSeeder
         await SeedIdentityLinksAsync(db, customers, cancellationToken);
         await SeedCustomerPlansAsync(db, customers, plans, cancellationToken);
         await SeedInvoicesAsync(db, customers, plans, cancellationToken);
+        await SeedPanelUsersAsync(db, cancellationToken);
 
         await db.SaveChangesAsync(cancellationToken);
     }
@@ -227,6 +229,36 @@ public static class DatabaseSeeder
                     });
                 }
             }
+        }
+    }
+
+    /// <summary>
+    /// Usuários de demonstração do painel (FASE 4.1, item D.1) — credenciais públicas e fracas de
+    /// propósito, só por ser ambiente acadêmico (ver README). Senhas passam pelo mesmo
+    /// <see cref="PasswordHasher{TUser}"/> usado em produção (Modules/Auth/Services/PasswordHashingService),
+    /// instanciado direto aqui (não via DI) porque Data/ não deve depender de Modules/* (Parte I §2 do padrão).
+    /// </summary>
+    private static async Task SeedPanelUsersAsync(CfeDbContext db, CancellationToken ct)
+    {
+        var hasher = new PasswordHasher<PanelUser>();
+        var seedUsers = new[]
+        {
+            (FullName: "Júlia Souza", Email: "julia.souza@cfe.demo", Role: PanelRole.Attendant, Password: "Atendente@2026"),
+            (FullName: "Ricardo Almeida", Email: "ricardo.almeida@cfe.demo", Role: PanelRole.Manager, Password: "Gestor@2026"),
+        };
+
+        var existingEmails = await db.PanelUsers.Select(u => u.Email).ToListAsync(ct);
+
+        foreach (var seedUser in seedUsers.Where(u => !existingEmails.Contains(u.Email)))
+        {
+            var user = new PanelUser
+            {
+                FullName = seedUser.FullName,
+                Email = seedUser.Email,
+                Role = seedUser.Role,
+            };
+            user.PasswordHash = hasher.HashPassword(user, seedUser.Password);
+            db.PanelUsers.Add(user);
         }
     }
 }

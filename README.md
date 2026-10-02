@@ -150,6 +150,16 @@ docker compose -f docker-compose.full.yml down -v
 
 Os dois arquivos declaram nomes de projeto Docker Compose explícitos (`claroflowengine-dev` e `claroflowengine-full`) e usam portas de Postgres distintas (5433 e 5434): os dois modos podem coexistir sem risco de um substituir containers do outro.
 
+### Variáveis de ambiente (login do painel)
+
+| Variável | Obrigatória | Padrão | Observação |
+|---|---|---|---|
+| `Jwt__SigningKey` | Sim | nenhum | A API não sobe sem ela (precisa ter 32+ caracteres). Nunca versionada: vem de `appsettings.Development.json` (gitignored) em dev, ou de variável de ambiente real em qualquer outro ambiente. No modo full, `docker-compose.full.yml` já define um valor de demonstração local, comentado como tal. |
+| `Jwt__ExpirationHours` | Não | `8` | Duração do token (um turno de atendimento). |
+| `PanelAuth__MaxFailedAttempts` | Não | `5` | Tentativas erradas seguidas até bloquear a conta. |
+| `PanelAuth__LockoutMinutes` | Não | `15` | Duração do bloqueio por tentativas. |
+| `PanelAuth__LoginRateLimitPerMinute` | Não | `10` | Limite de tentativas de login por IP, por minuto. |
+
 ### Testes
 
 O projeto não tem suíte de testes automatizados. Testes manuais estruturados (caminho feliz + caminhos de erro) foram executados a cada fase de desenvolvimento.
@@ -176,6 +186,21 @@ Challenge.ClaroFlowEngineCFE/
 
 ---
 
+## Acesso ao Painel do Atendente
+
+O painel exige login real (e-mail e senha, com JWT), criado automaticamente pelo seed em qualquer ambiente novo. Duas credenciais de demonstração, com perfis diferentes:
+
+| Nome | E-mail | Senha | Perfil |
+|---|---|---|---|
+| Júlia Souza | `julia.souza@cfe.demo` | `Atendente@2026` | Atendente |
+| Ricardo Almeida | `ricardo.almeida@cfe.demo` | `Gestor@2026` | Gestor |
+
+Hoje os dois perfis (atendente e gestor) têm acesso às mesmas telas; a distinção existe para suportar uma "Visão do Gestor" prevista para uma próxima entrega, restrita por perfil também no backend (não só escondida na interface).
+
+Essas credenciais são intencionalmente públicas e fracas, aceitável só por este ser um ambiente acadêmico de demonstração. Num sistema real, não existiriam credenciais documentadas publicamente: cada atendente teria sua própria conta, criada por um processo de onboarding interno.
+
+---
+
 ## Roteiros de demonstração
 
 Os três clientes de teste já vêm no seed automático. Com a stack rodando, abra o chat, o App e o painel em abas separadas.
@@ -193,7 +218,7 @@ Os três clientes de teste já vêm no seed automático. Com a stack rodando, ab
 
 1. Repita os passos 1-3 do cenário 1 com o CPF `22255588846`.
 2. **Não** clique no link do card.
-3. Abra o painel em outra aba e busque `22255588846`: deve aparecer "Em andamento".
+3. Abra o painel em outra aba, faça login com `julia.souza@cfe.demo` / `Atendente@2026` (ver [Acesso ao Painel do Atendente](#acesso-ao-painel-do-atendente)) e busque `22255588846`: deve aparecer "Em andamento".
 4. Volte ao chat, clique no link, abra o App, mas não confirme ainda.
 5. Volte ao painel **sem recarregar a página**: em até 4 segundos, o histórico deve mostrar "Jornada retomada em outro canal" sozinho (polling).
 
@@ -231,10 +256,11 @@ Os três clientes de teste já vêm no seed automático. Com a stack rodando, ab
 
 ### Cenário 6: Jornadas ativas e métricas em tempo real (painel) · ~2 min
 
-1. Repita os passos 1-3 do cenário 1 com qualquer CPF do seed, mas não conclua.
-2. No painel, clique em "Jornadas ativas" no menu lateral: a jornada recém-aberta deve aparecer na tabela, com badge de canal/intenção e tempo decorrido.
-3. Clique em "Métricas": os 4 cards devem mostrar valores calculados a partir do banco (não mais dados fictícios).
-4. Volte para "Jornadas ativas" e aguarde ~30s: a tabela deve se atualizar sozinha (visível na aba Network do navegador).
+1. Abra o painel e faça login com `julia.souza@cfe.demo` / `Atendente@2026` (ver [Acesso ao Painel do Atendente](#acesso-ao-painel-do-atendente)).
+2. Repita os passos 1-3 do cenário 1 com qualquer CPF do seed, mas não conclua.
+3. No painel, clique em "Jornadas ativas" no menu lateral: a jornada recém-aberta deve aparecer na tabela, com badge de canal/intenção e tempo decorrido.
+4. Clique em "Métricas": os 4 cards devem mostrar valores calculados a partir do banco (não mais dados fictícios).
+5. Volte para "Jornadas ativas" e aguarde ~30s: a tabela deve se atualizar sozinha (visível na aba Network do navegador).
 
 ---
 
@@ -255,6 +281,7 @@ A spec funcional deste projeto organiza os requisitos como casos de uso (UC01–
 | UC09 | Consultar histórico de jornada (painel) | `GET /context/customer/{id}` + `GET /context/{id}/transitions`, com polling |
 | UC10 | Contestar cobrança indevida | `GET /invoices/customer/{id}` + `GET /invoices/{id}` + fluxo dedicado nos 3 canais, `intent: dispute_charge` |
 | RNF003 | Operação em modo degradado quando o CFE está indisponível | Timeout + retry + banner de indisponibilidade nos 3 canais |
+| RNF004 | Login real do atendente no painel, com perfis | `POST /auth/login` (JWT, hash de senha, bloqueio por tentativas, rate limit por IP) + perfis `attendant`/`manager` |
 | N/A | Jornadas ativas em tempo real (painel) | `GET /journeys/active` |
 | N/A | Métricas operacionais (painel) | `GET /metrics/summary` (TMA mediano, jornadas hoje, taxa de conclusão, canal mais usado) |
 | RNF005 | Direito ao esquecimento (Art. 18 LGPD) | `POST /customers/{cpf}/right-to-be-forgotten` + tela "Meus dados" no App |
@@ -277,12 +304,11 @@ A spec funcional deste projeto organiza os requisitos como casos de uso (UC01–
 ## Limitações conhecidas
 
 - O bot do chat reconhece intenção por heurística de palavras-chave, não por NLP real.
-- A autenticação por canal (`X-Channel-Token`) é mockada via header, não é autenticação real (JWT, OAuth2 etc.), documentado como tal no próprio código.
+- A autenticação do WhatsApp simulado e do App (`X-Channel-Token`) é mockada via header, não é autenticação real (JWT, OAuth2 etc.), documentado como tal no próprio código. O painel do atendente já tem login real (ver [Acesso ao Painel do Atendente](#acesso-ao-painel-do-atendente)).
 - O login do App é mock: aceita qualquer credencial que atenda a um formato mínimo, sem verificação contra base real.
 - Não há cobertura de testes automatizados; a validação é manual e estruturada, uma fase por vez.
 - A regra de expiração de jornada é reativa (verificada no momento do acesso), não um job agendado em background.
 - Campos do painel do atendente como "segmento" e "vencimento" são colunas reais no banco, mas preenchidas com dado mockado via seed, sem refletir um sistema de billing real.
-- A tela "Configurações" do painel é mockada (campos desabilitados): não há sistema de usuários/autenticação de atendente no CFE ainda.
 - Os três canais simulados não têm build step nem framework de frontend: HTML/CSS/JS puro, sem testes de UI automatizados.
 
 ---
@@ -299,6 +325,7 @@ O protótipo evoluiu além do MVP inicial. Já foram entregues:
 - Direito ao esquecimento (Art. 18 LGPD), exercível pelo cliente na área "Meus dados" do App ou pelo atendente no painel.
 - Fechamento categorizado e escalação de jornadas pelo painel, com novo status `escalated` para casos transferidos a outras áreas (Financeiro, Retenção, Suporte técnico, Vendas, Ouvidoria) sem expirar automaticamente.
 - Painel de Oportunidades: detecção automática de leads comerciais a partir de jornadas históricas (troca de plano abandonada, contestação abandonada, cliente engajado, cliente inativo), com priorização por urgência e ciclo de vida controlado (novo → abordado → convertido/não relevante).
+- Login real do atendente no painel (e-mail/senha, JWT, bloqueio por tentativas, rate limit), com dois perfis (atendente e gestor) e auditoria por usuário em cada ação registrada.
 
 O [histórico de commits e PRs](https://github.com/givasques/Challenge.ClaroFlowEngineCFE/pulls?q=is%3Apr) documenta cada entrega.
 
@@ -310,7 +337,7 @@ O [histórico de commits e PRs](https://github.com/givasques/Challenge.ClaroFlow
 
 ### Decisões de escopo do MVP
 
-- **Autenticação real (RNF004)**: fora do escopo. Em produção seria provida pelos canais Claro existentes (login do App Minha Claro, WhatsApp Business). O `X-Channel-Token` é identificação simplificada entre serviços do protótipo.
+- **Autenticação real (RNF004)**: implementada para o painel do atendente (login com e-mail/senha, JWT, perfis). WhatsApp e App continuam com `X-Channel-Token`, identificação simplificada entre serviços do protótipo; em produção seriam providos pelos canais Claro existentes (login do App Minha Claro, WhatsApp Business).
 - **Stack do painel**: HTML/CSS/JS puro em vez de React (previsto no Sprint 1), o que simplificou o deployment e reduziu o tempo de MVP. Reescrita em framework moderno pode ser priorizada se o volume de funcionalidades justificar.
 
 ### Evoluções futuras possíveis
@@ -320,7 +347,7 @@ Sem compromisso de prazo; dependem de uma eventual evolução do protótipo para
 - Novos canais (Alexa, RCS, SMS, USSD, totem).
 - Novas intenções (2ª via, portabilidade, cancelamento, agendamento técnico).
 - Extração dos módulos internos para microsserviços independentes, se a escala justificar.
-- Sistema de usuários/autenticação para atendentes, habilitando a tela de Configurações do painel a deixar de ser mockada.
+- Visão exclusiva do gestor no painel, usando a mesma distinção de perfil já existente no login.
 - Integração real com WhatsApp Business API.
 
 ---
