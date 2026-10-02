@@ -133,6 +133,29 @@ const state = {
   metricsPollHandle: null,
 };
 
+// ---------- Sessão (FASE 4.1, item C.3) ----------
+// Token + dados do usuário em sessionStorage (não localStorage): fechar a aba encerra a sessão —
+// mais seguro para um posto de atendimento compartilhado entre vários atendentes.
+
+const SESSION_STORAGE_KEY = 'cfe_panel_session';
+
+function getSession() {
+  try {
+    const raw = sessionStorage.getItem(SESSION_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function setSession(token, user) {
+  sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({ token, user }));
+}
+
+function clearSession() {
+  sessionStorage.removeItem(SESSION_STORAGE_KEY);
+}
+
 // ---------- Cliente HTTP (mesmo padrão dos outros canais — ver whatsapp-sim/app.js) ----------
 
 class CfeUnavailableError extends Error {}
@@ -145,11 +168,15 @@ async function rawFetch(path, method, body, timeoutMs) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
+  // Painel migrou de X-Channel-Token fixo para JWT de sessão (FASE 4.1, item C.1). Sem sessão
+  // (ex: POST /auth/login, rota pública), nenhum header de autenticação é enviado.
+  const session = getSession();
+
   try {
     const res = await fetch(`${CFE_CONFIG.apiBaseUrl}${path}`, {
       method,
       headers: {
-        'X-Channel-Token': CFE_CONFIG.channelToken,
+        ...(session ? { Authorization: `Bearer ${session.token}` } : {}),
         ...(body ? { 'Content-Type': 'application/json' } : {}),
       },
       body: body ? JSON.stringify(body) : undefined,
@@ -187,7 +214,12 @@ async function apiCall(path, { method = 'GET', body } = {}) {
     clearDegraded();
     return result;
   } catch (err) {
-    if (err.isApiError) throw err;
+    if (err.isApiError) {
+      // Sessão inválida/expirada em qualquer chamada durante o uso (FASE 4.1, item C.1) — volta
+      // pro login direto, sem esperar o chamador original tratar o erro.
+      if (err.errorCode === 'invalid_or_expired_session') handleSessionExpired();
+      throw err;
+    }
     if (!allowRetry) throw err;
     await sleep(2000);
     const result = await rawFetch(path, method, body, 10000); // se falhar de novo, propaga
@@ -871,6 +903,222 @@ function updatePollingFooter(degraded) {
   }
 }
 
+// ---------- Login, sessão e card do usuário (FASE 4.1, itens C.2/C.3/C.4) ----------
+
+function showLoginScreen(message) {
+  stopPolling();
+  stopActiveJourneysPolling();
+  stopMetricsPolling();
+
+  document.getElementById('app-layout').classList.add('hidden');
+  document.getElementById('login-screen').classList.remove('hidden');
+
+  document.getElementById('login-email').value = '';
+  document.getElementById('login-password').value = '';
+  updateLoginSubmitState();
+
+  if (message) showLoginError(message);
+  else clearLoginError();
+
+  document.getElementById('login-email').focus();
+}
+
+function showLoginError(message) {
+  const el = document.getElementById('login-error');
+  el.textContent = message;
+  el.classList.remove('hidden');
+}
+
+function clearLoginError() {
+  document.getElementById('login-error').classList.add('hidden');
+}
+
+function updateLoginSubmitState() {
+  const email = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+  document.getElementById('login-submit-button').disabled = !email || !password;
+}
+
+function toggleLoginPasswordVisibility() {
+  const input = document.getElementById('login-password');
+  const button = document.getElementById('login-password-toggle');
+  const willShow = input.type === 'password';
+  input.type = willShow ? 'text' : 'password';
+  button.setAttribute('aria-label', willShow ? 'Ocultar senha' : 'Mostrar senha');
+}
+
+async function handleLoginSubmit(event) {
+  event.preventDefault();
+  const email = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+  const button = document.getElementById('login-submit-button');
+
+  button.disabled = true;
+  button.classList.add('is-loading');
+  clearLoginError();
+
+  try {
+    const data = await apiCall('/auth/login', { method: 'POST', body: { email, password } });
+    setSession(data.access_token, data.user);
+    await startAuthenticatedSession();
+  } catch (err) {
+    showLoginError(loginErrorMessage(err));
+  } finally {
+    button.classList.remove('is-loading');
+    updateLoginSubmitState();
+  }
+}
+
+function loginErrorMessage(err) {
+  if (err instanceof CfeUnavailableError) {
+    return 'Sistema de contexto indisponível — tente novamente em instantes.';
+  }
+  switch (err.errorCode) {
+    case 'invalid_credentials': return 'E-mail ou senha inválidos.';
+    case 'account_locked': return 'Muitas tentativas. Tente novamente em alguns minutos.';
+    case 'too_many_requests': return 'Muitas tentativas a partir desta rede. Aguarde um momento.';
+    default: return err.message || 'Não foi possível entrar. Tente novamente.';
+  }
+}
+
+/** Esconde/mostra itens de menu exclusivos de perfil (data-role="manager"/"attendant") — só
+ *  experiência de uso; a proteção real é a policy ManagerOnly no backend (FASE 4.1, item B.3/C.4). */
+function applyRoleVisibility(role) {
+  document.querySelectorAll('[data-role]').forEach(el => {
+    el.classList.toggle('hidden', el.dataset.role !== role);
+  });
+}
+
+function renderUserCard(user) {
+  document.getElementById('attendant-avatar').textContent = getInitials(user.full_name);
+  document.getElementById('attendant-name').textContent = user.full_name;
+  document.getElementById('attendant-role').textContent = user.role_label;
+}
+
+function showAppLayout() {
+  document.getElementById('login-screen').classList.add('hidden');
+  document.getElementById('app-layout').classList.remove('hidden');
+}
+
+/** Roda uma vez, logo após login bem-sucedido (ou sessão válida restaurada ao carregar a página). */
+async function startAuthenticatedSession() {
+  const session = getSession();
+  renderUserCard(session.user);
+  applyRoleVisibility(session.user.role);
+  showAppLayout();
+
+  // Pollings e buscas iniciais só começam com sessão ativa (FASE 4.1, item C.3) — antes do login,
+  // nada no painel chama a API.
+  fetchActiveJourneys();
+  fetchOpportunitiesBadge();
+  updateHeaderClock();
+  setInterval(updateHeaderClock, 60000);
+}
+
+/** Ao carregar a página: com token salvo, confirma que a sessão ainda é válida via GET /auth/me
+ *  antes de mostrar o painel (FASE 4.1, item C.3) — sem isso, um token expirado só seria detectado
+ *  na primeira ação dentro do painel. */
+async function initSession() {
+  const session = getSession();
+  if (!session) {
+    showLoginScreen();
+    return;
+  }
+
+  try {
+    const user = await apiCall('/auth/me');
+    setSession(session.token, user);
+    await startAuthenticatedSession();
+  } catch {
+    clearSession();
+    showLoginScreen();
+  }
+}
+
+function handleSessionExpired() {
+  clearSession();
+  showLoginScreen('Sua sessão expirou. Entre novamente.');
+}
+
+function handleLogout() {
+  clearSession();
+  showLoginScreen();
+}
+
+// ---------- Configurações: perfil + troca de senha (FASE 4.1, item C.5) ----------
+
+function renderSettingsProfile() {
+  const session = getSession();
+  if (!session) return;
+  const { user } = session;
+  document.getElementById('settings-profile-name').textContent = user.full_name;
+  document.getElementById('settings-profile-email').textContent = user.email;
+  document.getElementById('settings-profile-role').textContent = user.role_label;
+  document.getElementById('settings-profile-last-login').textContent =
+    user.last_login_at ? formatDateTime(user.last_login_at) : '—';
+}
+
+function isStrongPassword(password) {
+  return password.length >= 8 && /[a-zA-Z]/.test(password) && /[0-9]/.test(password);
+}
+
+async function handleChangePasswordSubmit(event) {
+  event.preventDefault();
+
+  const currentPassword = document.getElementById('current-password-input').value;
+  const newPassword = document.getElementById('new-password-input').value;
+  const confirmPassword = document.getElementById('confirm-password-input').value;
+  const errorEl = document.getElementById('change-password-error');
+  const button = document.getElementById('change-password-submit');
+
+  errorEl.classList.add('hidden');
+
+  // Mesmas regras do backend validadas no frontend primeiro (FASE 4.1, item C.5) — evita uma
+  // ida e volta à API só pra descobrir que a senha é fraca ou que a confirmação não bate.
+  if (newPassword !== confirmPassword) {
+    errorEl.textContent = 'A confirmação não bate com a nova senha.';
+    errorEl.classList.remove('hidden');
+    return;
+  }
+  if (!isStrongPassword(newPassword)) {
+    errorEl.textContent = 'A nova senha deve ter no mínimo 8 caracteres, com letras e números.';
+    errorEl.classList.remove('hidden');
+    return;
+  }
+  if (newPassword === currentPassword) {
+    errorEl.textContent = 'A nova senha deve ser diferente da atual.';
+    errorEl.classList.remove('hidden');
+    return;
+  }
+
+  button.disabled = true;
+  try {
+    await apiCall('/auth/change-password', {
+      method: 'POST',
+      body: { current_password: currentPassword, new_password: newPassword },
+    });
+    showToast('Senha alterada com sucesso');
+    event.target.reset();
+  } catch (err) {
+    errorEl.textContent = changePasswordErrorMessage(err);
+    errorEl.classList.remove('hidden');
+  } finally {
+    button.disabled = false;
+  }
+}
+
+function changePasswordErrorMessage(err) {
+  if (err instanceof CfeUnavailableError) {
+    return 'Sistema de contexto indisponível — tente novamente em instantes.';
+  }
+  switch (err.errorCode) {
+    case 'invalid_current_password': return 'Senha atual incorreta.';
+    case 'weak_password': return 'A nova senha deve ter no mínimo 8 caracteres, com letras e números.';
+    case 'password_unchanged': return 'A nova senha deve ser diferente da atual.';
+    default: return err.message || 'Não foi possível trocar a senha.';
+  }
+}
+
 // ---------- Navegação do menu lateral (FASE 3, item C.5) ----------
 
 const VIEW_HEADERS = {
@@ -918,6 +1166,11 @@ function switchView(view) {
   // Oportunidades (FASE 3.6) — sem polling automático; o atendente atualiza via botão "Detectar".
   if (view === 'oportunidades') {
     fetchOpportunities();
+  }
+
+  // Configurações (FASE 4.1, item C.5) — perfil vem da sessão já carregada, sem chamada extra à API.
+  if (view === 'configuracoes') {
+    renderSettingsProfile();
   }
 }
 
@@ -1410,15 +1663,21 @@ const OPPORTUNITY_CATEGORY_SHORT_LABELS = {
 // ---------- Bootstrap ----------
 
 document.addEventListener('DOMContentLoaded', () => {
+  // Login e sessão (FASE 4.1) — registrados antes de qualquer outra coisa, já que é a primeira tela
+  // possível. As buscas/pollings do painel em si só começam depois de initSession() confirmar sessão.
+  document.getElementById('login-form').addEventListener('submit', handleLoginSubmit);
+  document.getElementById('login-password-toggle').addEventListener('click', toggleLoginPasswordVisibility);
+  document.getElementById('login-email').addEventListener('input', updateLoginSubmitState);
+  document.getElementById('login-password').addEventListener('input', updateLoginSubmitState);
+  document.getElementById('sidebar-logout-button').addEventListener('click', handleLogout);
+  document.getElementById('settings-logout-button').addEventListener('click', handleLogout);
+  document.getElementById('change-password-form').addEventListener('submit', handleChangePasswordSubmit);
+
   document.getElementById('search-form').addEventListener('submit', handleSearch);
 
   document.querySelectorAll('.sidebar-nav-item').forEach(btn => {
     btn.addEventListener('click', () => switchView(btn.dataset.view));
   });
-
-  // Busca uma vez no carregamento pra popular o badge do menu lateral mesmo antes do atendente
-  // entrar na tela Jornadas Ativas (ela só reflete um valor real a partir do primeiro fetch).
-  fetchActiveJourneys();
 
   // Concluir/escalar jornada (FASE 3.5)
   document.getElementById('conclude-journey-button').addEventListener('click', openConcludeModal);
@@ -1440,8 +1699,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('escalate-description-count').textContent = event.target.value.length;
   });
 
-  // Oportunidades (FASE 3.6): badge no carregamento + filtros + modal de ação.
-  fetchOpportunitiesBadge();
+  // Oportunidades (FASE 3.6): filtros + modal de ação (badge inicial só depois do login).
   document.getElementById('opp-detect-button').addEventListener('click', handleDetectOpportunities);
   ['opp-filter-group', 'opp-filter-urgency', 'opp-filter-category', 'opp-filter-status'].forEach(id => {
     document.getElementById(id).addEventListener('change', fetchOpportunities);
@@ -1452,6 +1710,5 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('opp-action-notes-count').textContent = event.target.value.length;
   });
 
-  updateHeaderClock();
-  setInterval(updateHeaderClock, 60000);
+  initSession();
 });

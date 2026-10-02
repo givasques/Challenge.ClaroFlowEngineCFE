@@ -7,7 +7,36 @@
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <div class="layout">
+  <!-- Tela de login (FASE 4.1, item C.2) — mostrada sempre que não há sessão válida; .app-layout
+       começa escondido via HTML mesmo (não só JS) para nunca "piscar" o painel antes da checagem. -->
+  <div id="login-screen" class="login-screen">
+    <form id="login-form" class="login-card" novalidate>
+      <div class="login-brand">
+        <div class="sidebar-logo login-logo">claro</div>
+        <h1 class="login-title">Central de Atendimento — Claro Flow Engine</h1>
+      </div>
+
+      <div id="login-error" class="login-error hidden" role="alert"></div>
+
+      <label for="login-email" class="login-label">E-mail</label>
+      <input id="login-email" type="email" class="login-input" autocomplete="username" required />
+
+      <label for="login-password" class="login-label">Senha</label>
+      <div class="login-password-wrapper">
+        <input id="login-password" type="password" class="login-input" autocomplete="current-password" required />
+        <button type="button" class="login-password-toggle" id="login-password-toggle" aria-label="Mostrar senha">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="17" height="17" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.7"/></svg>
+        </button>
+      </div>
+
+      <button type="submit" class="login-submit-button" id="login-submit-button" disabled>
+        <span class="login-submit-spinner" aria-hidden="true"></span>
+        <span id="login-submit-text">Entrar</span>
+      </button>
+    </form>
+  </div>
+
+  <div class="layout hidden" id="app-layout">
 
     <aside class="sidebar">
       <div class="sidebar-brand">
@@ -15,14 +44,24 @@
         <div class="sidebar-brand-subtitle">Central de Atendimento</div>
       </div>
 
+      <!-- Dados do usuário logado (FASE 4.1, item C.4) — preenchidos via JS a partir de GET /auth/me. -->
       <div class="attendant-card">
-        <div class="attendant-avatar">JS</div>
+        <div class="attendant-avatar" id="attendant-avatar">--</div>
         <div class="attendant-info">
-          <div class="attendant-name">Júlia Souza</div>
+          <div class="attendant-name" id="attendant-name">—</div>
+          <div class="attendant-role" id="attendant-role">—</div>
           <div class="attendant-status"><span class="status-dot-pulse" aria-hidden="true"></span>Em atendimento</div>
         </div>
+        <button type="button" class="attendant-logout-button" id="sidebar-logout-button" aria-label="Sair">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="16" height="16" aria-hidden="true"><path d="M15 17l5-5-5-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 12H9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M12 19H6a2 2 0 01-2-2V7a2 2 0 012-2h6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
       </div>
 
+      <!-- Itens de menu exclusivos de um perfil usam data-role="manager" (ou "attendant") — a função
+           applyRoleVisibility(role), em app.js, escondo/mostra conforme o perfil logado (FASE 4.1,
+           item C.4). Nenhum item usa isso ainda nesta fase; a FASE 4.2 adiciona "Visão do Gestor"
+           com data-role="manager". A proteção real continua sendo a policy ManagerOnly no backend
+           (B.3) — esconder o item é só experiência de uso, não segurança. -->
       <nav class="sidebar-nav">
         <button type="button" class="sidebar-nav-item active" id="nav-consulta" data-view="consulta">
           <span class="sidebar-nav-icon">
@@ -416,78 +455,64 @@
         <p id="opp-empty-message" class="opp-empty-message hidden">Nenhuma oportunidade encontrada com os filtros atuais.</p>
       </div>
 
-      <!-- Configurações (mockado — FASE 3, item C.5; seções na FASE 3.1, item B.3.3) -->
+      <!-- Configurações — dados reais desde a FASE 4.1 (item C.5); layout em cards da FASE 3.1 mantido -->
       <div id="view-configuracoes" class="main-view hidden">
-        <div class="mock-banner">Esta funcionalidade está em desenvolvimento.</div>
         <div class="mock-settings-sections">
           <div class="mock-settings-card">
             <div class="mock-settings-card-header">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"></circle><path d="M4 20c0-3.3 3.6-6 8-6s8 2.7 8 6"></path></svg>
-              Perfil
+              Meu perfil
             </div>
-            <div class="mock-settings-form">
-              <label>
-                <span class="detail-label">Nome do atendente</span>
-                <input type="text" value="Júlia Souza" disabled />
-              </label>
-              <label>
-                <span class="detail-label">Email</span>
-                <input type="email" value="julia.souza@claro.com.br" disabled />
-              </label>
-              <label>
-                <span class="detail-label">Cargo</span>
-                <input type="text" value="Atendente Nível 2" disabled />
-              </label>
-            </div>
-          </div>
-
-          <div class="mock-settings-card">
-            <div class="mock-settings-card-header">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.7 21a2 2 0 01-3.4 0"></path></svg>
-              Notificações
-            </div>
-            <div class="mock-settings-form">
-              <label class="mock-settings-checkbox">
-                <input type="checkbox" checked disabled />
-                <span>Receber notificações de novas jornadas</span>
-              </label>
-              <label class="mock-settings-checkbox">
-                <input type="checkbox" checked disabled />
-                <span>Alertar quando cliente demorar mais de 5 min para responder</span>
-              </label>
-              <label class="mock-settings-checkbox">
-                <input type="checkbox" disabled />
-                <span>Notificar por email jornadas críticas</span>
-              </label>
+            <div class="settings-readonly-grid">
+              <div class="detail-item">
+                <span class="detail-label">Nome</span>
+                <span id="settings-profile-name" class="detail-value">—</span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">E-mail</span>
+                <span id="settings-profile-email" class="detail-value">—</span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">Perfil</span>
+                <span id="settings-profile-role" class="detail-value">—</span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">Último acesso</span>
+                <span id="settings-profile-last-login" class="detail-value">—</span>
+              </div>
             </div>
           </div>
 
           <div class="mock-settings-card">
             <div class="mock-settings-card-header">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><circle cx="9" cy="10" r="1"></circle><circle cx="13" cy="8" r="1"></circle><circle cx="16" cy="12" r="1"></circle><path d="M12 21a3 3 0 01-3-3c0-1 1-1 1-2a2 2 0 00-2-2H6"></path></svg>
-              Aparência
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="9" rx="2"></rect><path d="M8 11V7a4 4 0 018 0v4"></path></svg>
+              Alterar senha
             </div>
-            <div class="mock-settings-form">
-              <label>
-                <span class="detail-label">Tema</span>
-                <select disabled>
-                  <option>Claro</option>
-                  <option>Escuro</option>
-                  <option>Automático</option>
-                </select>
+            <form id="change-password-form" class="mock-settings-form" novalidate>
+              <div id="change-password-error" class="settings-form-error hidden" role="alert"></div>
+              <label for="current-password-input">
+                <span class="detail-label">Senha atual</span>
+                <input id="current-password-input" type="password" autocomplete="current-password" required />
               </label>
-              <label>
-                <span class="detail-label">Idioma</span>
-                <select disabled>
-                  <option>Português</option>
-                  <option>English</option>
-                  <option>Español</option>
-                </select>
+              <label for="new-password-input">
+                <span class="detail-label">Nova senha</span>
+                <input id="new-password-input" type="password" autocomplete="new-password" required />
               </label>
-            </div>
+              <label for="confirm-password-input">
+                <span class="detail-label">Confirmar nova senha</span>
+                <input id="confirm-password-input" type="password" autocomplete="new-password" required />
+              </label>
+              <button type="submit" class="settings-save-button" id="change-password-submit">Salvar nova senha</button>
+            </form>
           </div>
 
-          <button type="button" class="mock-settings-save" disabled>Salvar alterações</button>
+          <div class="mock-settings-card">
+            <div class="mock-settings-card-header">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 17l5-5-5-5"></path><path d="M20 12H9"></path><path d="M12 19H6a2 2 0 01-2-2V7a2 2 0 012-2h6"></path></svg>
+              Sessão
+            </div>
+            <button type="button" class="settings-logout-button" id="settings-logout-button">Sair</button>
+          </div>
         </div>
       </div>
     </main>
