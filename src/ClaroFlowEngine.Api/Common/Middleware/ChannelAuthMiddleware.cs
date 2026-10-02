@@ -36,6 +36,15 @@ public class ChannelAuthMiddleware
             return;
         }
 
+        // JWT válido (painel, FASE 4.1 — Bloco B.1) dispensa X-Channel-Token: UseAuthentication() já
+        // rodou antes deste middleware, então context.User já reflete o token, se houver um válido.
+        if (context.User.Identity?.IsAuthenticated == true)
+        {
+            currentChannel.Channel = Channels.Panel;
+            await _next(context);
+            return;
+        }
+
         var token = context.Request.Headers["X-Channel-Token"].FirstOrDefault();
         if (string.IsNullOrEmpty(token) || !_allowedTokens.Contains(token))
         {
@@ -57,7 +66,11 @@ public class ChannelAuthMiddleware
         path.StartsWithSegments("/plans") ||
         // Canais simulados (HTML/CSS/JS) servidos pela própria API no modo "full" (ver docker-compose.full.yml).
         // Arquivos estáticos não fazem sentido exigir X-Channel-Token — são as próprias páginas dos canais.
-        path.StartsWithSegments("/channels");
+        path.StartsWithSegments("/channels") ||
+        // Módulo de autenticação do painel (FASE 4.1) — proteção é inteiramente via [Authorize]/JWT,
+        // não via X-Channel-Token; sem isso, uma chamada sem token nenhum seria rejeitada por este
+        // middleware com invalid_channel_token em vez do invalid_or_expired_session esperado (A.5).
+        path.StartsWithSegments("/auth");
 }
 
 public static class ChannelAuthMiddlewareExtensions

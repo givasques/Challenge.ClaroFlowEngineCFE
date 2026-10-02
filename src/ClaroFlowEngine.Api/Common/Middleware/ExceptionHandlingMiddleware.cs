@@ -32,6 +32,8 @@ public class ExceptionHandlingMiddleware
                 ConflictException => StatusCodes.Status409Conflict,
                 GoneException => StatusCodes.Status410Gone,
                 ValidationException => StatusCodes.Status400BadRequest,
+                UnauthorizedException => StatusCodes.Status401Unauthorized,
+                AccountLockedException => 423, // Locked — sem constante dedicada em StatusCodes
                 _ => StatusCodes.Status500InternalServerError
             };
 

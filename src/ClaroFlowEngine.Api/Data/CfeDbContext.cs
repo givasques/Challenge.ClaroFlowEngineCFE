@@ -17,6 +17,7 @@ public class CfeDbContext : DbContext
     public DbSet<Invoice> Invoices => Set<Invoice>();
     public DbSet<InvoiceItem> InvoiceItems => Set<InvoiceItem>();
     public DbSet<Opportunity> Opportunities => Set<Opportunity>();
+    public DbSet<PanelUser> PanelUsers => Set<PanelUser>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
