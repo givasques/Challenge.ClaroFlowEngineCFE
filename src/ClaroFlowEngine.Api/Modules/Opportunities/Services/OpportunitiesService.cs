@@ -11,18 +11,21 @@ namespace ClaroFlowEngine.Api.Modules.Opportunities.Services;
 /// <summary>Orquestração do módulo de Oportunidades (FASE 3.6): detecção, listagem e ciclo de vida.</summary>
 public class OpportunitiesService : IOpportunitiesService
 {
-    private const string MockAttendantId = "atendente_painel";
     private const int MaxNotesLength = 500;
 
     private readonly CfeDbContext _db;
     private readonly IOpportunityDetectorService _detector;
     private readonly ICurrentChannelAccessor _currentChannel;
+    private readonly ICurrentPanelUserAccessor _currentPanelUser;
 
-    public OpportunitiesService(CfeDbContext db, IOpportunityDetectorService detector, ICurrentChannelAccessor currentChannel)
+    public OpportunitiesService(
+        CfeDbContext db, IOpportunityDetectorService detector, ICurrentChannelAccessor currentChannel,
+        ICurrentPanelUserAccessor currentPanelUser)
     {
         _db = db;
         _detector = detector;
         _currentChannel = currentChannel;
+        _currentPanelUser = currentPanelUser;
     }
 
     public async Task<DetectOpportunitiesResponse> DetectAsync(CancellationToken cancellationToken)
@@ -75,8 +78,12 @@ public class OpportunitiesService : IOpportunitiesService
 
         var customerIds = page.Select(o => o.CustomerId).Distinct().ToList();
         var phoneByCustomer = await GetPhonesAsync(customerIds, cancellationToken);
+        var contactedByIds = page.Select(o => o.ContactedBy).Where(id => id is not null).Select(id => id!).Distinct().ToList();
+        var nameByContactedBy = await GetPanelUserNamesAsync(contactedByIds, cancellationToken);
 
-        var dtos = page.Select(o => ToDto(o, phoneByCustomer.GetValueOrDefault(o.CustomerId))).ToList();
+        var dtos = page
+            .Select(o => ToDto(o, phoneByCustomer.GetValueOrDefault(o.CustomerId), nameByContactedBy.GetValueOrDefault(o.ContactedBy ?? "")))
+            .ToList();
 
         return new OpportunitiesListResponse(total, dtos);
     }
@@ -121,14 +128,17 @@ public class OpportunitiesService : IOpportunitiesService
         else
         {
             opportunity.ContactedAt = now;
-            opportunity.ContactedBy = MockAttendantId;
+            opportunity.ContactedBy = _currentPanelUser.UserId?.ToString();
             if (!string.IsNullOrWhiteSpace(notes)) opportunity.ResolutionNotes = notes;
         }
 
         await _db.SaveChangesAsync(cancellationToken);
 
         var phone = (await GetPhonesAsync([opportunity.CustomerId], cancellationToken)).GetValueOrDefault(opportunity.CustomerId);
-        return ToDto(opportunity, phone);
+        var contactedByName = opportunity.ContactedBy is null
+            ? null
+            : (await GetPanelUserNamesAsync([opportunity.ContactedBy], cancellationToken)).GetValueOrDefault(opportunity.ContactedBy);
+        return ToDto(opportunity, phone, contactedByName);
     }
 
     private void EnsurePanelChannel()
@@ -156,7 +166,25 @@ public class OpportunitiesService : IOpportunitiesService
         return phones.ToDictionary(p => p.CustomerId, p => (string?)p.Identifier);
     }
 
-    private static OpportunityDto ToDto(Opportunity o, string? phone)
+    // contacted_by guarda o id (string) do usuário do painel que abordou a oportunidade (FASE 4.1,
+    // item B.4) — resolve o nome aqui pra não obrigar o frontend a consultar /auth/me pra cada card.
+    private async Task<Dictionary<string, string>> GetPanelUserNamesAsync(List<string> userIds, CancellationToken cancellationToken)
+    {
+        if (userIds.Count == 0) return new();
+
+        var guids = userIds.Select(id => Guid.TryParse(id, out var guid) ? guid : (Guid?)null).Where(g => g is not null).Select(g => g!.Value).ToList();
+        if (guids.Count == 0) return new();
+
+        var users = await _db.PanelUsers
+            .AsNoTracking()
+            .Where(u => guids.Contains(u.Id))
+            .Select(u => new { u.Id, u.FullName })
+            .ToListAsync(cancellationToken);
+
+        return users.ToDictionary(u => u.Id.ToString(), u => u.FullName);
+    }
+
+    private static OpportunityDto ToDto(Opportunity o, string? phone, string? contactedByName = null)
     {
         var abandonedAtStep = o.Metadata.GetValueOrDefault("abandoned_at_step")?.ToString();
         var triggeringJourney = o.TriggeringJourney is null
@@ -181,6 +209,7 @@ public class OpportunitiesService : IOpportunitiesService
             OpportunityCategory.SuggestedAction(o.Category),
             o.ContactedAt,
             o.ContactedBy,
+            contactedByName,
             o.ResolvedAt,
             o.ResolutionNotes);
     }

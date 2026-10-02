@@ -1,5 +1,6 @@
 using ClaroFlowEngine.Api.Common.Contracts;
 using ClaroFlowEngine.Api.Common.Errors;
+using ClaroFlowEngine.Api.Common.Extensions;
 using ClaroFlowEngine.Api.Common.Services;
 using ClaroFlowEngine.Api.Data;
 using ClaroFlowEngine.Api.Data.Entities;
@@ -20,12 +21,16 @@ public class PanelService : IPanelService
     private readonly CfeDbContext _db;
     private readonly ITransitionRecorder _transitionRecorder;
     private readonly ICurrentChannelAccessor _currentChannel;
+    private readonly ICurrentPanelUserAccessor _currentPanelUser;
 
-    public PanelService(CfeDbContext db, ITransitionRecorder transitionRecorder, ICurrentChannelAccessor currentChannel)
+    public PanelService(
+        CfeDbContext db, ITransitionRecorder transitionRecorder, ICurrentChannelAccessor currentChannel,
+        ICurrentPanelUserAccessor currentPanelUser)
     {
         _db = db;
         _transitionRecorder = transitionRecorder;
         _currentChannel = currentChannel;
+        _currentPanelUser = currentPanelUser;
     }
 
     public async Task<ActiveJourneysResponse> GetActiveJourneysAsync(bool includeEscalated, CancellationToken cancellationToken)
@@ -183,7 +188,9 @@ public class PanelService : IPanelService
         var label = ResolutionCategory.Label(request.ResolutionCategory);
         _transitionRecorder.Record(journey.Id, Channels.Panel, TransitionEventTypes.JourneyConcludedByAgent,
             $"Jornada concluída pelo atendente — {label}",
-            new { resolution_category = request.ResolutionCategory, description = request.Description });
+            PanelUserMetadata.Merge(
+                new { resolution_category = request.ResolutionCategory, description = request.Description },
+                _currentPanelUser));
 
         await _db.SaveChangesAsync(cancellationToken);
 
@@ -213,7 +220,9 @@ public class PanelService : IPanelService
         var label = EscalationArea.Label(request.EscalationArea);
         _transitionRecorder.Record(journey.Id, Channels.Panel, TransitionEventTypes.JourneyEscalated,
             $"Jornada escalada para {label}",
-            new { escalation_area = request.EscalationArea, description = request.Description });
+            PanelUserMetadata.Merge(
+                new { escalation_area = request.EscalationArea, description = request.Description },
+                _currentPanelUser));
 
         await _db.SaveChangesAsync(cancellationToken);
 

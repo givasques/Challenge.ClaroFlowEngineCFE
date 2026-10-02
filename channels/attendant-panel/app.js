@@ -712,16 +712,24 @@ function buildTransitionDescription(transition, journeyPayload, context) {
     case 'journey_expired':
       return 'Jornada expirada — cliente sem interação há mais de 24 horas';
 
+    // FASE 4.1, item B.4 — metadata.panel_user_name só existe em transições gravadas após o login real
+    // do painel; transições antigas (ou de antes desta fase) caem no rótulo genérico "atendente".
     case 'panel_accessed':
-      return 'Painel consultado por atendente';
+      return metadata.panel_user_name ? `Painel consultado por ${metadata.panel_user_name}` : 'Painel consultado por atendente';
 
     // FASE 3.5, item C.1 — a observação do atendente (metadata.description) vai numa segunda linha,
     // renderizada por buildTransitionSecondaryNote, não aqui.
-    case 'journey_concluded_by_agent':
-      return `Jornada concluída pelo atendente — ${resolutionCategoryLabel(metadata.resolution_category)}`;
+    case 'journey_concluded_by_agent': {
+      const label = resolutionCategoryLabel(metadata.resolution_category);
+      return metadata.panel_user_name
+        ? `Jornada concluída — ${label} por ${metadata.panel_user_name}`
+        : `Jornada concluída pelo atendente — ${label}`;
+    }
 
-    case 'journey_escalated':
-      return `Jornada escalada para ${escalationAreaLabel(metadata.escalation_area)}`;
+    case 'journey_escalated': {
+      const base = `Jornada escalada para ${escalationAreaLabel(metadata.escalation_area)}`;
+      return metadata.panel_user_name ? `${base} por ${metadata.panel_user_name}` : base;
+    }
 
     default:
       return transition.description || EVENT_LABELS[transition.event_type] || transition.event_type;

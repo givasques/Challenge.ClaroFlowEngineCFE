@@ -1,6 +1,7 @@
 using ClaroFlowEngine.Api.Common.Errors;
 using ClaroFlowEngine.Api.Modules.Opportunities.Dtos;
 using ClaroFlowEngine.Api.Modules.Opportunities.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
@@ -10,6 +11,7 @@ namespace ClaroFlowEngine.Api.Modules.Opportunities.Controllers;
 [ApiController]
 [Route("opportunities")]
 [Produces("application/json")]
+[Authorize]
 public class OpportunitiesController : ControllerBase
 {
     private const int DefaultLimit = 50;
@@ -21,7 +23,7 @@ public class OpportunitiesController : ControllerBase
 
     [HttpPost("detect")]
     [EndpointSummary("Detectar oportunidades")]
-    [EndpointDescription("Executa as 4 regras de detecção (troca de plano abandonada, contestação abandonada, cliente engajado, cliente inativo) e persiste as oportunidades novas. Não duplica oportunidades já ativas do mesmo cliente/categoria. Requer header X-Channel-Token de painel.")]
+    [EndpointDescription("Executa as 4 regras de detecção (troca de plano abandonada, contestação abandonada, cliente engajado, cliente inativo) e persiste as oportunidades novas. Não duplica oportunidades já ativas do mesmo cliente/categoria. Requer autenticação JWT do painel (Authorization: Bearer).")]
     [ProducesResponseType(typeof(DetectOpportunitiesResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiError), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ApiError), StatusCodes.Status403Forbidden)]
@@ -33,7 +35,7 @@ public class OpportunitiesController : ControllerBase
 
     [HttpGet]
     [EndpointSummary("Listar oportunidades")]
-    [EndpointDescription("Lista oportunidades ordenadas por urgência (crítica primeiro) e depois por data de detecção. Por padrão retorna só status 'new' e 'contacted'; oportunidades expiradas (valid_until no passado) nunca aparecem. Requer header X-Channel-Token de painel.")]
+    [EndpointDescription("Lista oportunidades ordenadas por urgência (crítica primeiro) e depois por data de detecção. Por padrão retorna só status 'new' e 'contacted'; oportunidades expiradas (valid_until no passado) nunca aparecem. Requer autenticação JWT do painel (Authorization: Bearer).")]
     [ProducesResponseType(typeof(OpportunitiesListResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiError), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ApiError), StatusCodes.Status403Forbidden)]
@@ -54,7 +56,7 @@ public class OpportunitiesController : ControllerBase
 
     [HttpPost("{id:guid}/mark-as-contacted")]
     [EndpointSummary("Marcar oportunidade como abordada")]
-    [EndpointDescription("Transição 'new' → 'contacted'. Requer header X-Channel-Token de painel.")]
+    [EndpointDescription("Transição 'new' → 'contacted'. Requer autenticação JWT do painel (Authorization: Bearer).")]
     [ProducesResponseType(typeof(OpportunityDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiError), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ApiError), StatusCodes.Status403Forbidden)]
@@ -68,7 +70,7 @@ public class OpportunitiesController : ControllerBase
 
     [HttpPost("{id:guid}/mark-as-converted")]
     [EndpointSummary("Marcar oportunidade como convertida")]
-    [EndpointDescription("Transição 'contacted' → 'converted'. Requer header X-Channel-Token de painel.")]
+    [EndpointDescription("Transição 'contacted' → 'converted'. Requer autenticação JWT do painel (Authorization: Bearer).")]
     [ProducesResponseType(typeof(OpportunityDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiError), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ApiError), StatusCodes.Status403Forbidden)]
@@ -82,7 +84,7 @@ public class OpportunitiesController : ControllerBase
 
     [HttpPost("{id:guid}/mark-as-not-relevant")]
     [EndpointSummary("Marcar oportunidade como não relevante")]
-    [EndpointDescription("Transição 'contacted' → 'not_relevant'. Requer header X-Channel-Token de painel.")]
+    [EndpointDescription("Transição 'contacted' → 'not_relevant'. Requer autenticação JWT do painel (Authorization: Bearer).")]
     [ProducesResponseType(typeof(OpportunityDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiError), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ApiError), StatusCodes.Status403Forbidden)]

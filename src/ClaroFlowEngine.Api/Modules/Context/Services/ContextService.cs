@@ -1,5 +1,6 @@
 using ClaroFlowEngine.Api.Common.Contracts;
 using ClaroFlowEngine.Api.Common.Errors;
+using ClaroFlowEngine.Api.Common.Extensions;
 using ClaroFlowEngine.Api.Common.Services;
 using ClaroFlowEngine.Api.Configuration;
 using ClaroFlowEngine.Api.Data;
@@ -16,6 +17,7 @@ public class ContextService : IContextService
     private readonly ITransitionRecorder _transitionRecorder;
     private readonly IJourneyExpirationService _expirationService;
     private readonly ICurrentChannelAccessor _currentChannel;
+    private readonly ICurrentPanelUserAccessor _currentPanelUser;
     private readonly CfeOptions _cfeOptions;
     private readonly ILogger<ContextService> _logger;
 
@@ -24,6 +26,7 @@ public class ContextService : IContextService
         ITransitionRecorder transitionRecorder,
         IJourneyExpirationService expirationService,
         ICurrentChannelAccessor currentChannel,
+        ICurrentPanelUserAccessor currentPanelUser,
         IOptions<CfeOptions> cfeOptions,
         ILogger<ContextService> logger)
     {
@@ -31,6 +34,7 @@ public class ContextService : IContextService
         _transitionRecorder = transitionRecorder;
         _expirationService = expirationService;
         _currentChannel = currentChannel;
+        _currentPanelUser = currentPanelUser;
         _cfeOptions = cfeOptions.Value;
         _logger = logger;
     }
@@ -182,25 +186,32 @@ public class ContextService : IContextService
         // UC09 passo 5: o painel do atendente audita o acesso à jornada. Registrado só aqui (na busca inicial
         // por cliente), não em GetByIdAsync — que também é usado pelo polling do painel a cada poucos segundos;
         // gravar a cada poll inundaria o próprio histórico que o painel exibe.
-        // Deduplicado por tempo (ETAPA 2, Passo B, item 5.5): trocar de aba e voltar ao mesmo cliente em
-        // menos de PanelAccessDedupMinutes não gera uma nova entrada — só uma consulta real após esse intervalo.
+        // Deduplicado por tempo e por usuário (ETAPA 2, Passo B, item 5.5; FASE 4.1, item B.4): trocar de
+        // aba e voltar ao mesmo cliente em menos de PanelAccessDedupMinutes não gera uma nova entrada — mas
+        // se dois atendentes diferentes consultam o mesmo cliente na janela, os dois acessos ficam registrados
+        // (importa saber cada pessoa que acessou o dado). Dataset pequeno no protótipo: filtra em memória
+        // em vez de comparar dentro do JSONB via SQL.
         if (active is not null && _currentChannel.Channel == Channels.Panel)
         {
-            var lastPanelAccess = await _db.JourneyTransitions
+            var currentUserId = _currentPanelUser.UserId;
+            var panelAccesses = await _db.JourneyTransitions
                 .AsNoTracking()
                 .Where(t => t.JourneyContextId == active.Id
                     && t.EventType == TransitionEventTypes.PanelAccessed
                     && t.Channel == Channels.Panel)
                 .OrderByDescending(t => t.OccurredAt)
-                .FirstOrDefaultAsync(cancellationToken);
+                .ToListAsync(cancellationToken);
+
+            var lastAccessByCurrentUser = panelAccesses.FirstOrDefault(t =>
+                t.Metadata.GetValueOrDefault("panel_user_id")?.ToString() == currentUserId?.ToString());
 
             var dedupWindow = TimeSpan.FromMinutes(_cfeOptions.PanelAccessDedupMinutes);
-            var shouldRecord = lastPanelAccess is null || DateTime.UtcNow - lastPanelAccess.OccurredAt > dedupWindow;
+            var shouldRecord = lastAccessByCurrentUser is null || DateTime.UtcNow - lastAccessByCurrentUser.OccurredAt > dedupWindow;
 
             if (shouldRecord)
             {
                 _transitionRecorder.Record(active.Id, Channels.Panel, TransitionEventTypes.PanelAccessed,
-                    "Painel do atendente consultou esta jornada.");
+                    "Painel do atendente consultou esta jornada.", PanelUserMetadata.Merge(null, _currentPanelUser));
                 await _db.SaveChangesAsync(cancellationToken);
             }
         }

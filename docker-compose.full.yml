@@ -50,7 +50,7 @@ services:
       Cfe__JourneyInactivityTtlHours: "24"
       Cfe__AllowedChannelTokens__0: "fake-whatsapp-token"
       Cfe__AllowedChannelTokens__1: "fake-app-token"
-      Cfe__AllowedChannelTokens__2: "fake-panel-token"
+      # fake-panel-token removido (FASE 4.1, item B.1) — painel agora autentica só via JWT.
       # Valor de DEMONSTRAÇÃO LOCAL apenas — nunca usar este valor fora do modo full em máquina local
       # (FASE 4.1, item A.3). Em produção, Jwt__SigningKey vem de variável de ambiente própria da plataforma.
       Jwt__SigningKey: "local-full-mode-demo-signing-key-nao-usar-em-producao"

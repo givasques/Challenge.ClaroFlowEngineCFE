@@ -22,6 +22,7 @@ public record OpportunityDto(
     string SuggestedAction,
     DateTime? ContactedAt,
     string? ContactedBy,
+    string? ContactedByName,
     DateTime? ResolvedAt,
     string? ResolutionNotes);
 

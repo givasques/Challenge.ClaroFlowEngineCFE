@@ -10,13 +10,11 @@ namespace ClaroFlowEngine.Api.Common.Middleware;
 // Este middleware simula a intenção arquitetural (autenticação por canal) sem custo de setup de auth real.
 public class ChannelAuthMiddleware
 {
-    // Mapeamento token -> canal. Fica aqui (não em appsettings) porque AllowedChannelTokens é documentado
-    // na spec técnica como uma allowlist simples; esta é uma extensão interna para resolver ICurrentChannelAccessor.
+    // fake-panel-token removido (FASE 4.1, item B.1) — painel só autentica via JWT a partir desta fase.
     private static readonly Dictionary<string, string> TokenChannelMap = new()
     {
         ["fake-whatsapp-token"] = Channels.Whatsapp,
         ["fake-app-token"] = Channels.App,
-        ["fake-panel-token"] = Channels.Panel,
     };
 
     private readonly RequestDelegate _next;

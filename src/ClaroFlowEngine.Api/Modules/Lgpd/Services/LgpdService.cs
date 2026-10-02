@@ -24,17 +24,20 @@ public class LgpdService : ILgpdService
     private readonly CfeDbContext _db;
     private readonly ITransitionRecorder _transitionRecorder;
     private readonly ICurrentChannelAccessor _currentChannel;
+    private readonly ICurrentPanelUserAccessor _currentPanelUser;
     private readonly ILogger<LgpdService> _logger;
 
     public LgpdService(
         CfeDbContext db,
         ITransitionRecorder transitionRecorder,
         ICurrentChannelAccessor currentChannel,
+        ICurrentPanelUserAccessor currentPanelUser,
         ILogger<LgpdService> logger)
     {
         _db = db;
         _transitionRecorder = transitionRecorder;
         _currentChannel = currentChannel;
+        _currentPanelUser = currentPanelUser;
         _logger = logger;
     }
 
@@ -117,11 +120,13 @@ public class LgpdService : ILgpdService
             channel: actingChannel,
             eventType: TransitionEventTypes.DataAnonymizationRequested,
             description: "Direito ao esquecimento exercido — dados pessoais anonimizados conforme Art. 18 LGPD",
-            metadata: new
-            {
-                trigger = actingChannel,
-                operations_performed = new[] { "customer_record", "identity_links", "journey_payloads", "handoff_tokens" },
-            });
+            metadata: PanelUserMetadata.Merge(
+                new
+                {
+                    trigger = actingChannel,
+                    operations_performed = new[] { "customer_record", "identity_links", "journey_payloads", "handoff_tokens" },
+                },
+                _currentPanelUser));
 
         await _db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);

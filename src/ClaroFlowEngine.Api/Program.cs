@@ -1,3 +1,4 @@
+using ClaroFlowEngine.Api.Common.Contracts;
 using ClaroFlowEngine.Api.Common.Errors;
 using ClaroFlowEngine.Api.Common.Middleware;
 using ClaroFlowEngine.Api.Common.Services;
@@ -146,7 +147,11 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         };
     });
 
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options =>
+{
+    // Usada pela FASE 4.2 (dashboard do gestor); validada nesta fase só pelo endpoint GET /manager/ping (B.3).
+    options.AddPolicy("ManagerOnly", policy => policy.RequireRole(PanelRole.Manager));
+});
 
 // Rate limiting (FASE 4.1, item A.7) — só no login, complementa o bloqueio por conta: protege contra
 // tentativas em massa vindas do mesmo IP, inclusive testando e-mails diferentes.
