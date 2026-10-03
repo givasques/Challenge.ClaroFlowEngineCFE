@@ -1,5 +1,6 @@
 using ClaroFlowEngine.Api.Common.Contracts;
 using ClaroFlowEngine.Api.Common.Errors;
+using ClaroFlowEngine.Api.Common.Extensions;
 using ClaroFlowEngine.Api.Common.Services;
 using ClaroFlowEngine.Api.Data;
 using ClaroFlowEngine.Api.Data.Entities;
@@ -195,7 +196,9 @@ public class OpportunitiesService : IOpportunitiesService
 
         return new OpportunityDto(
             o.Id,
-            new OpportunityCustomerDto(o.Customer.Id, o.Customer.FullName, o.Customer.Cpf, phone),
+            new OpportunityCustomerDto(
+                o.Customer.Id, o.Customer.FullName, CpfMasking.Mask(o.Customer.Cpf), phone,
+                o.Customer.AnonymizedAt is not null ? "Removido (LGPD)" : null),
             o.Category,
             OpportunityCategory.Label(o.Category),
             o.Urgency,

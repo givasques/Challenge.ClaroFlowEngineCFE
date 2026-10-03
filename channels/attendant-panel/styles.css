@@ -1008,10 +1008,35 @@ body {
   color: var(--text-primary);
 }
 
+.customer-hero-cpf-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+
 .customer-hero-cpf {
   font-size: 12.5px;
   color: var(--text-muted);
-  margin-top: 2px;
+}
+
+/* Revelação auditada de CPF (FASE 4.3, item A.5) */
+.reveal-cpf-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--claro-red-dark);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.reveal-cpf-button:hover,
+.reveal-cpf-button:focus-visible {
+  text-decoration: underline;
 }
 
 /* Texto simples, não mais um pill de fundo/borda — evita parecer um botão clicável (FASE 3, item D.1). */

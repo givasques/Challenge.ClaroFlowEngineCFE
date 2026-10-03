@@ -1,5 +1,6 @@
 using ClaroFlowEngine.Api.Common.Contracts;
 using ClaroFlowEngine.Api.Common.Errors;
+using ClaroFlowEngine.Api.Common.Extensions;
 using ClaroFlowEngine.Api.Common.Middleware;
 using ClaroFlowEngine.Api.Common.Services;
 using ClaroFlowEngine.Api.Configuration;
@@ -32,6 +33,9 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Host.UseSerilog((context, config) => config
     .ReadFrom.Configuration(context.Configuration)
     .Enrich.FromLogContext()
+    // FASE 4.3, item A.3: mascara CPF em qualquer propriedade de path de requisição, de qualquer
+    // logger (Serilog.AspNetCore e o log nativo "Request finished" do ASP.NET Core) — ver CpfSafePathEnricher.
+    .Enrich.With<CpfSafePathEnricher>()
     .WriteTo.Console(new Serilog.Formatting.Json.JsonFormatter())
     .WriteTo.File(
         formatter: new Serilog.Formatting.Json.JsonFormatter(),

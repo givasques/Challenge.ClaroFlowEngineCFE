@@ -355,7 +355,8 @@ public class ContextService : IContextService
             Expired: journeyStats.Count(s => s.Status == JourneyStatus.Expired));
 
         return new CustomerSummaryDto(
-            customer.Id, customer.FullName, customer.Cpf, phone, currentPlan,
-            customer.CreatedAt, preferredChannel, journeyCounts, customer.BillingDueDay, customer.Segment);
+            customer.Id, customer.FullName, CpfMasking.Mask(customer.Cpf), phone, currentPlan,
+            customer.CreatedAt, preferredChannel, journeyCounts, customer.BillingDueDay, customer.Segment,
+            customer.AnonymizedAt is not null ? "Removido (LGPD)" : null);
     }
 }

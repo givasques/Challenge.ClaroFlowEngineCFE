@@ -142,7 +142,9 @@ public class IdentityService : IIdentityService
 
         return new ResolveIdentityResponse(
             UnifiedCustomerId: customer.Id,
-            Customer: new CustomerSummaryDto(customer.Id, customer.FullName, customer.Cpf, currentPlan),
+            Customer: new CustomerSummaryDto(
+                customer.Id, customer.FullName, CpfMasking.Mask(customer.Cpf), currentPlan,
+                customer.AnonymizedAt is not null ? "Removido (LGPD)" : null),
             WasCreated: wasCreated,
             ResolvedLink: new ResolvedLinkDto(channel, identifier));
     }

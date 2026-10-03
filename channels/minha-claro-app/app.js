@@ -88,10 +88,6 @@ function formatCents(cents) {
   return (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
-function formatCpf(cpf) {
-  return cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
-}
-
 function formatDateShort(isoDate) {
   const [y, m, d] = isoDate.split('-');
   return `${d}/${m}/${y}`;
@@ -182,7 +178,7 @@ function renderConfirmation(data) {
   const { customer, plan_details: planDetails } = data;
 
   document.getElementById('customer-name').textContent = customer.full_name;
-  document.getElementById('customer-cpf').textContent = formatCpf(customer.cpf);
+  document.getElementById('customer-cpf').textContent = customer.cpf_label || customer.cpf_masked || 'Não informado';
 
   const current = planDetails && planDetails.current_plan;
   const selected = planDetails && planDetails.selected_plan;
@@ -203,7 +199,7 @@ function renderDisputeConfirmation(data) {
   const payload = journeyContext.payload || {};
 
   document.getElementById('dispute-customer-name').textContent = customer.full_name;
-  document.getElementById('dispute-customer-cpf').textContent = formatCpf(customer.cpf);
+  document.getElementById('dispute-customer-cpf').textContent = customer.cpf_label || customer.cpf_masked || 'Não informado';
 
   document.getElementById('dispute-invoice-label').textContent = invoiceDetails ? invoiceDetails.reference_label : 'Não informado';
   document.getElementById('dispute-invoice-due').textContent = invoiceDetails ? formatDateShort(invoiceDetails.due_date) : '—';

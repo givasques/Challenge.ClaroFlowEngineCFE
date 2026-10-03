@@ -63,7 +63,7 @@ public class LgpdService : ILgpdService
         var hashedCpf = Sha256Hex(sanitizedCpf);
         var customer = await _db.Customers
             .FirstOrDefaultAsync(c => c.Cpf == sanitizedCpf || c.Cpf == hashedCpf, cancellationToken)
-            ?? throw new NotFoundException("customer_not_found", $"Cliente com CPF {sanitizedCpf} não encontrado.");
+            ?? throw new NotFoundException("customer_not_found", $"Cliente com CPF {CpfMasking.Mask(sanitizedCpf)} não encontrado.");
 
         if (customer.AnonymizedAt is not null)
         {
@@ -144,6 +144,37 @@ public class LgpdService : ILgpdService
                 JourneyPayloads: "cleaned",
                 JourneysPreserved: journeys.Count,
                 TransitionsPreserved: transitionsCount));
+    }
+
+    public async Task<CpfRevealResponse> RevealCpfAsync(Guid customerId, string reason, CancellationToken cancellationToken)
+    {
+        if (!CpfRevealReason.IsValid(reason))
+            throw new ValidationException("invalid_reveal_reason", "Motivo da revelação inválido ou ausente.");
+
+        var customer = await _db.Customers.FirstOrDefaultAsync(c => c.Id == customerId, cancellationToken)
+            ?? throw new NotFoundException("customer_not_found", "Cliente não encontrado.");
+
+        if (customer.AnonymizedAt is not null)
+            throw new ConflictException("already_anonymized", $"Customer already anonymized at {customer.AnonymizedAt:O}");
+
+        var revealedAt = DateTime.UtcNow;
+
+        // Transição órfã (sem journey_context_id), mesmo padrão de data_anonymization_requested — o
+        // CPF nunca entra no metadata nem na descrição, só o motivo (FASE 4.3, item A.4).
+        _transitionRecorder.Record(
+            journeyContextId: null,
+            channel: Channels.Panel,
+            eventType: TransitionEventTypes.CustomerCpfRevealed,
+            description: "Atendente revelou o CPF completo do cliente.",
+            metadata: PanelUserMetadata.Merge(new { reason }, _currentPanelUser));
+
+        await _db.SaveChangesAsync(cancellationToken);
+
+        _logger.LogInformation(
+            "CPF revealed for customer {CustomerId} by panel user {PanelUserId}, reason {Reason}",
+            customerId, _currentPanelUser.UserId, reason);
+
+        return new CpfRevealResponse(customer.Cpf, revealedAt);
     }
 
     private static string Sha256Hex(string value)

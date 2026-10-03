@@ -112,6 +112,14 @@ const ESCALATION_AREAS = [
   { id: 'ombudsman', label: 'Ouvidoria' },
 ];
 
+// Motivos de revelação de CPF (FASE 4.3, item A.4) — ids espelham Common/Contracts/CpfRevealReason.cs.
+const CPF_REVEAL_REASONS = [
+  { id: 'identity_confirmation', label: 'Confirmação de identidade com o cliente' },
+  { id: 'customer_request', label: 'Solicitação do próprio cliente' },
+  { id: 'escalation_requirement', label: 'Exigência da área para escalação' },
+  { id: 'other', label: 'Outro' },
+];
+
 function resolutionCategoryLabel(id) {
   return RESOLUTION_CATEGORIES.find(c => c.id === id)?.label || id;
 }
@@ -131,6 +139,9 @@ const state = {
   currentView: 'consulta',
   activeJourneysPollHandle: null,
   metricsPollHandle: null,
+  // Handle do timer de 30s de exibição do CPF revelado (FASE 4.3, item A.5) — o CPF em si nunca
+  // entra aqui nem em sessionStorage, só fica no texto do elemento #customer-cpf enquanto visível.
+  cpfRevealHideHandle: null,
 };
 
 // ---------- Sessão (FASE 4.1, item C.3) ----------
@@ -495,7 +506,7 @@ function renderCustomerBlock(customer) {
 
   document.getElementById('customer-avatar').textContent = getInitials(customer.full_name);
   document.getElementById('customer-name').textContent = customer.full_name;
-  document.getElementById('customer-cpf').textContent = formatCpf(customer.cpf);
+  resetCpfReveal(customer.id, customer.cpf_masked, customer.cpf_label);
   document.getElementById('customer-phone').textContent = customer.phone ? formatPhone(customer.phone) : 'Não informado';
   document.getElementById('customer-plan').textContent = customer.current_plan
     ? `${customer.current_plan.name} — ${formatCents(customer.current_plan.monthly_price_cents)}/mês`
@@ -519,6 +530,92 @@ function renderCustomerBlock(customer) {
 
   block.classList.remove('hidden');
   renderInteractionsSummary(customer.journey_counts);
+}
+
+// ---------- Revelação auditada de CPF (FASE 4.3, item A.5) ----------
+// O CPF completo, quando revelado, fica só no texto de #customer-cpf por 30s — nunca em `state`
+// nem em sessionStorage. Trocar de cliente (resetCpfReveal) sempre cancela qualquer revelação em curso.
+
+let cpfRevealCustomerId = null;
+let cpfRevealMaskedText = null;
+
+function resetCpfReveal(customerId, cpfMasked, cpfLabel) {
+  cancelCpfRevealTimer();
+  cpfRevealCustomerId = customerId;
+  cpfRevealMaskedText = cpfLabel || cpfMasked || 'Não informado';
+
+  showMaskedCpfView();
+
+  const button = document.getElementById('reveal-cpf-button');
+  // Cliente anonimizado (cpf_label presente) não tem CPF pra revelar.
+  button.classList.toggle('hidden', !cpfMasked);
+}
+
+function showMaskedCpfView() {
+  document.getElementById('customer-cpf').textContent = cpfRevealMaskedText;
+
+  const button = document.getElementById('reveal-cpf-button');
+  button.innerHTML = '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="14" height="14" aria-hidden="true"><path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><circle cx="12" cy="12" r="2.6" stroke="currentColor" stroke-width="1.7"/></svg> Mostrar CPF completo';
+  button.setAttribute('aria-label', 'Mostrar CPF completo');
+}
+
+function cancelCpfRevealTimer() {
+  if (state.cpfRevealHideHandle) {
+    clearTimeout(state.cpfRevealHideHandle);
+    state.cpfRevealHideHandle = null;
+  }
+}
+
+function openRevealCpfModal() {
+  renderModalOptions('reveal-cpf-options', CPF_REVEAL_REASONS, 'reveal-cpf-reason');
+  document.getElementById('reveal-cpf-confirm-button').disabled = true;
+  document.getElementById('reveal-cpf-modal').classList.remove('hidden');
+}
+
+function closeRevealCpfModal() {
+  document.getElementById('reveal-cpf-modal').classList.add('hidden');
+}
+
+async function handleRevealCpfConfirm() {
+  const reason = document.querySelector('input[name="reveal-cpf-reason"]:checked')?.value;
+  if (!reason || !cpfRevealCustomerId) return;
+
+  const button = document.getElementById('reveal-cpf-confirm-button');
+  button.disabled = true;
+
+  try {
+    const result = await apiCall(`/customers/${cpfRevealCustomerId}/reveal-cpf`, {
+      method: 'POST',
+      body: { reason },
+    });
+    closeRevealCpfModal();
+    showRevealedCpf(result.cpf);
+  } catch (err) {
+    showToast(err instanceof CfeUnavailableError
+      ? 'Sistema indisponível — tente novamente em instantes.'
+      : `Não foi possível revelar o CPF: ${err.message}`, true);
+  } finally {
+    button.disabled = false;
+  }
+}
+
+function showRevealedCpf(cpf) {
+  cancelCpfRevealTimer();
+
+  document.getElementById('customer-cpf').textContent = formatCpf(cpf);
+
+  const button = document.getElementById('reveal-cpf-button');
+  button.innerHTML = '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="14" height="14" aria-hidden="true"><line x1="3" y1="3" x2="21" y2="21" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M2 12s3.5-6.5 10-6.5c1.6 0 3 .3 4.2.8M22 12s-1.2 2.3-3.4 4" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"/></svg> Ocultar';
+  button.setAttribute('aria-label', 'Ocultar CPF completo');
+
+  const customerIdAtReveal = cpfRevealCustomerId;
+  state.cpfRevealHideHandle = setTimeout(() => {
+    // Só mascara de volta se o atendente ainda estiver olhando o mesmo cliente.
+    if (cpfRevealCustomerId === customerIdAtReveal) {
+      showMaskedCpfView();
+      state.cpfRevealHideHandle = null;
+    }
+  }, 30000);
 }
 
 /** Mini-stats visuais do resumo de interações (FASE 3.1, item B.1) — um card por categoria, com
@@ -1267,10 +1364,17 @@ function renderActiveJourneysTable(journeys) {
     tr.setAttribute('role', 'button');
     tr.setAttribute('aria-label', `Consultar jornada de ${journey.customer.full_name}`);
 
-    const openJourney = () => {
+    // FASE 4.3, item A.5: o card só traz cpf_masked, que não é um CPF válido pra reusar como busca —
+    // abre a Consulta de Jornada direto pelo id do cliente, sem simular uma busca por CPF.
+    const openJourney = async () => {
       switchView('consulta');
-      document.getElementById('search-input').value = journey.customer.cpf;
-      document.getElementById('search-form').requestSubmit();
+      stopPolling();
+      hideAllResultBlocks();
+      document.getElementById('empty-state').classList.add('hidden');
+      document.getElementById('search-input').value = '';
+      clearMessage();
+      state.customerId = journey.customer.id;
+      await loadCustomerJourney();
     };
     tr.addEventListener('click', openJourney);
     tr.addEventListener('keydown', event => {
@@ -1553,7 +1657,7 @@ function buildOpportunityCard(opp, plansCatalog) {
       </span>
       <span class="opp-category">${escapeHtml(opp.category_label)}</span>
     </div>
-    <div class="opp-customer">${escapeHtml(opp.customer.full_name)} · CPF ${formatCpf(opp.customer.cpf)}</div>
+    <div class="opp-customer">${escapeHtml(opp.customer.full_name)} · CPF ${escapeHtml(opp.customer.cpf_label || opp.customer.cpf_masked || 'não informado')}</div>
     <div class="opp-meta">Detectada ${relativeTime(opp.detected_at)} · ${validityText}</div>
     <div class="opp-context-line">${buildOpportunityContextLine(opp, plansCatalog)}</div>
     <div class="opp-suggested-action">Ação sugerida: ${escapeHtml(opp.suggested_action)}</div>
@@ -1697,6 +1801,22 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   document.getElementById('escalate-description').addEventListener('input', event => {
     document.getElementById('escalate-description-count').textContent = event.target.value.length;
+  });
+
+  // Revelação auditada de CPF (FASE 4.3, item A.5)
+  document.getElementById('reveal-cpf-button').addEventListener('click', () => {
+    // Botão duplica como "Mostrar"/"Ocultar": com o CPF já visível, clicar oculta antes dos 30s.
+    if (state.cpfRevealHideHandle) {
+      cancelCpfRevealTimer();
+      showMaskedCpfView();
+    } else {
+      openRevealCpfModal();
+    }
+  });
+  document.getElementById('reveal-cpf-cancel-button').addEventListener('click', closeRevealCpfModal);
+  document.getElementById('reveal-cpf-confirm-button').addEventListener('click', handleRevealCpfConfirm);
+  document.getElementById('reveal-cpf-options').addEventListener('change', () => {
+    document.getElementById('reveal-cpf-confirm-button').disabled = !document.querySelector('input[name="reveal-cpf-reason"]:checked');
   });
 
   // Oportunidades (FASE 3.6): filtros + modal de ação (badge inicial só depois do login).

@@ -22,4 +22,7 @@ public static class TransitionEventTypes
 
     /// <summary>Jornada escalada para outra área via painel (FASE 3.5) — jornada permanece registrada, sem fechar.</summary>
     public const string JourneyEscalated = "journey_escalated";
+
+    /// <summary>CPF completo revelado pelo atendente no painel (FASE 4.3, item A.4) — transição órfã, sem journey_context_id.</summary>
+    public const string CustomerCpfRevealed = "customer_cpf_revealed";
 }

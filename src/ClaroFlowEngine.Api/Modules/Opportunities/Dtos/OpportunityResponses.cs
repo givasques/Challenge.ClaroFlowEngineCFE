@@ -26,7 +26,7 @@ public record OpportunityDto(
     DateTime? ResolvedAt,
     string? ResolutionNotes);
 
-public record OpportunityCustomerDto(Guid Id, string FullName, string Cpf, string? Phone);
+public record OpportunityCustomerDto(Guid Id, string FullName, string? CpfMasked, string? Phone, string? CpfLabel = null);
 
 public record OpportunityTriggeringJourneyDto(Guid Id, string Intent, string? AbandonedAtStep);
 

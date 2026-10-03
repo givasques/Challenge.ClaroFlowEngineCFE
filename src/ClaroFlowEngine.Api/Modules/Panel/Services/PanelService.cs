@@ -50,6 +50,7 @@ public class PanelService : IPanelService
                 j.CustomerId,
                 CustomerFullName = j.Customer.FullName,
                 CustomerCpf = j.Customer.Cpf,
+                CustomerAnonymizedAt = j.Customer.AnonymizedAt,
                 j.Intent,
                 j.OriginChannel,
                 j.CreatedAt,
@@ -80,7 +81,9 @@ public class PanelService : IPanelService
             var currentChannel = currentChannelById.GetValueOrDefault(j.Id, j.OriginChannel);
             return new ActiveJourneyDto(
                 j.Id,
-                new ActiveJourneyCustomerDto(j.CustomerId, j.CustomerFullName, j.CustomerCpf),
+                new ActiveJourneyCustomerDto(
+                    j.CustomerId, j.CustomerFullName, CpfMasking.Mask(j.CustomerCpf),
+                    j.CustomerAnonymizedAt is not null ? "Removido (LGPD)" : null),
                 j.Intent,
                 PanelLabels.Intent(j.Intent),
                 j.OriginChannel,

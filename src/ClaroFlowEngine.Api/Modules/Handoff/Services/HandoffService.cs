@@ -161,7 +161,10 @@ public class HandoffService : IHandoffService
         return new ResolveTokenResponse(
             UnifiedCustomerId: journey.CustomerId,
             JourneyContext: new ResolvedJourneyDto(journey.Id, journey.Intent, journey.CurrentStep, journey.Payload, journey.Status),
-            Customer: new HandoffCustomerDto(journey.Customer.FullName, journey.Customer.Cpf),
+            Customer: new HandoffCustomerDto(
+                journey.Customer.FullName,
+                CpfMasking.Mask(journey.Customer.Cpf),
+                journey.Customer.AnonymizedAt is not null ? "Removido (LGPD)" : null),
             PlanDetails: planDetails,
             InvoiceDetails: invoiceDetails);
     }

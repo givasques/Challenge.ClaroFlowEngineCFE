@@ -18,7 +18,7 @@ public record ActiveJourneyDto(
     // Sempre 'open' hoje; só varia quando ?include_escalated=true é usado (FASE 3.5, item A.8).
     string Status);
 
-public record ActiveJourneyCustomerDto(Guid Id, string FullName, string Cpf);
+public record ActiveJourneyCustomerDto(Guid Id, string FullName, string? CpfMasked, string? CpfLabel = null);
 
 /// <summary>Resposta de GET /metrics/summary — indicadores agregados dos últimos 30 dias (exceto "jornadas hoje").</summary>
 public record MetricsSummaryResponse(
