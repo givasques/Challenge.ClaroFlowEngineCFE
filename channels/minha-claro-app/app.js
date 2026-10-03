@@ -74,6 +74,31 @@ async function apiCall(path, { method = 'GET', body } = {}) {
   }
 }
 
+// ---------- Sessão do App (FASE 4.3, item B.5) ----------
+// Guarda a conta logada depois que o backend confirma que ela é a dona da jornada (resolve bem-sucedido) —
+// usada pela portabilidade de dados (Bloco C) pra exportar sem depender de identificador digitado.
+// Não havia mecanismo de sessão no App antes desta fase (confirmado no Bloco P); sessionStorage, não
+// localStorage, pelo mesmo motivo do painel: fechar a aba encerra a sessão.
+
+const APP_SESSION_STORAGE_KEY = 'cfe_app_session';
+
+function setAppSession(identifier) {
+  try {
+    sessionStorage.setItem(APP_SESSION_STORAGE_KEY, JSON.stringify({ identifier }));
+  } catch {
+    // sessionStorage indisponível (ex: modo privado) — a sessão simplesmente não persiste.
+  }
+}
+
+function getAppSession() {
+  try {
+    const raw = sessionStorage.getItem(APP_SESSION_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
 // ---------- Navegação entre telas ----------
 
 function showScreen(name) {
@@ -155,6 +180,7 @@ async function attemptResolve() {
     );
     state.journeyId = data.journey_context.id;
     state.intent = data.journey_context.intent;
+    setAppSession(state.identifier);
 
     if (state.intent === 'dispute_charge') {
       renderDisputeConfirmation(data);
@@ -169,9 +195,27 @@ async function attemptResolve() {
       showScreen('unavailable');
       return;
     }
+    // FASE 4.3, item B.5: conta logada não é a dona da jornada — link continua válido, nenhum dado
+    // da jornada aparece; o cliente pode tentar de novo com outra conta (volta ao login, token na URL).
+    if (err.status === 403) {
+      renderWrongAccount(err);
+      showScreen('wrong-account');
+      return;
+    }
     renderSessionExpired(err);
     showScreen('session-expired');
   }
+}
+
+function renderWrongAccount(err) {
+  document.getElementById('wrong-account-message').textContent = err.message;
+}
+
+function handleEnterWithAnotherAccount() {
+  document.getElementById('login-username').value = '';
+  document.getElementById('login-password').value = '';
+  document.getElementById('login-error').classList.add('hidden');
+  showScreen('login');
 }
 
 function renderConfirmation(data) {
@@ -328,6 +372,11 @@ function renderSessionExpired(err) {
       title: 'Solicitação finalizada',
       message: 'Esta solicitação já foi finalizada. Se precisar de algo, é só nos chamar novamente.',
     },
+    // FASE 4.3, item B.4 — token cancelado após várias tentativas de login com a conta errada.
+    token_revoked: {
+      title: 'Link cancelado',
+      message: 'Este link foi cancelado por segurança após várias tentativas com a conta incorreta. Inicie um novo atendimento.',
+    },
   };
   const fallback = { title: 'Sessão expirada', message: 'Não foi possível recuperar sua sessão.' };
   const { title, message } = byErrorCode[err.errorCode] || fallback;
@@ -479,4 +528,5 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('cancel-dispute-button').addEventListener('click', () => closeJourney('abandoned'));
   document.getElementById('retry-button').addEventListener('click', () => state.lastFailedAction && state.lastFailedAction());
   document.getElementById('forgot-password-link').addEventListener('click', event => event.preventDefault()); // link visual, sem ação real (login é mockado)
+  document.getElementById('wrong-account-retry-button').addEventListener('click', handleEnterWithAnotherAccount);
 });

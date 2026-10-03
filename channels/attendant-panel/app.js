@@ -15,6 +15,9 @@ const EVENT_ICONS = {
   // FASE 3.5, item C.2 — ícones distintos pra conclusão manual (mão + check) e escalação (seta ↗).
   journey_concluded_by_agent: '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="15" height="15"><path d="M2 13l4 4a2 2 0 002 1h8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 18h5a2 2 0 002-2v-1a2 2 0 00-2-2h-4l-3-2H6a2 2 0 00-2 2v3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M17 6.5l1.5 1.5L22 4.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   journey_escalated: '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="15" height="15"><line x1="7" y1="17" x2="17" y2="7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><polyline points="8 7 17 7 17 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  // FASE 4.3, item B.4 — alerta (triângulo) para tentativa bloqueada, bloqueio (cadeado) para link cancelado.
+  handoff_owner_mismatch: '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="15" height="15"><path d="M12 4.5l8.5 14.5H3.5L12 4.5z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><line x1="12" y1="10.5" x2="12" y2="14.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="17" r="0.9" fill="currentColor"/></svg>',
+  handoff_token_revoked: '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="15" height="15"><rect x="5" y="10.5" width="14" height="9.5" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M8 10.5V7.5a4 4 0 018 0v3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><line x1="9" y1="14" x2="15" y2="18" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>',
 };
 
 // Classe de cor por tipo de evento — ver variáveis --event-* em styles.css.
@@ -31,6 +34,9 @@ const EVENT_COLOR_CLASS = {
   panel_accessed: 'event-panel',
   journey_concluded_by_agent: 'event-concluded-agent',
   journey_escalated: 'event-escalated',
+  // Âmbar (mesma cor de deep_link_generated) para tentativa bloqueada, vermelho (mesma de abandonada) para link cancelado.
+  handoff_owner_mismatch: 'event-handoff',
+  handoff_token_revoked: 'event-abandoned',
 };
 
 const EVENT_LABELS = {
@@ -46,6 +52,8 @@ const EVENT_LABELS = {
   panel_accessed: 'Painel consultou esta jornada',
   journey_concluded_by_agent: 'Concluída pelo atendente',
   journey_escalated: 'Escalada para outra área',
+  handoff_owner_mismatch: 'Tentativa de acesso bloqueada',
+  handoff_token_revoked: 'Link de continuação cancelado',
 };
 
 const STATUS_LABELS = {

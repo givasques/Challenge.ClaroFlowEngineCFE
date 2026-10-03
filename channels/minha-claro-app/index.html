@@ -307,6 +307,20 @@
         <a id="reopen-chat-link" class="primary-button" href="#">Abrir chat da Claro novamente</a>
       </section>
 
+      <!-- Conta logada não é a dona da jornada (FASE 4.3, item B.5) -->
+      <section id="screen-wrong-account" class="screen hidden">
+        <div class="state-icon state-icon-error">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="32" height="32">
+            <circle cx="12" cy="8" r="3.5" stroke="white" stroke-width="2.2"/>
+            <path d="M4.5 20c1.6-3.6 4.6-5.5 7.5-5.5s5.9 1.9 7.5 5.5" stroke="white" stroke-width="2.2" stroke-linecap="round"/>
+            <line x1="4" y1="4" x2="20" y2="20" stroke="white" stroke-width="2.2" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <h1>Não foi possível abrir este atendimento</h1>
+        <p id="wrong-account-message"></p>
+        <button type="button" id="wrong-account-retry-button" class="primary-button">Entrar com outra conta</button>
+      </section>
+
       <!-- CFE indisponível -->
       <section id="screen-unavailable" class="screen hidden">
         <div class="state-icon state-icon-error">

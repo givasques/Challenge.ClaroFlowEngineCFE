@@ -86,16 +86,21 @@ public static class DatabaseSeeder
     private static async Task SeedIdentityLinksAsync(
         CfeDbContext db, Dictionary<string, Customer> customers, CancellationToken ct)
     {
-        // Vincula o CPF de cada cliente ao canal "cpf" e um telefone fictício ao canal "whatsapp",
-        // simulando um cliente que já iniciou contato por telefone antes do protótipo.
+        // Vincula o CPF de cada cliente ao canal "cpf", um telefone fictício ao canal "whatsapp"
+        // (cliente que já iniciou contato por telefone antes do protótipo) e uma conta do App
+        // (FASE 4.3, item B.2) — simula que a Claro já sabe qual conta do App Minha Claro é de qual
+        // cliente, premissa de que o CFE confia na autenticação do App numa implantação real.
         var seedLinks = new[]
         {
             (Cpf: "11144477735", Channel: Channels.Cpf, Identifier: "11144477735"),
             (Cpf: "11144477735", Channel: Channels.Whatsapp, Identifier: "5511999990001"),
+            (Cpf: "11144477735", Channel: Channels.App, Identifier: "ana.silva"),
             (Cpf: "22255588846", Channel: Channels.Cpf, Identifier: "22255588846"),
             (Cpf: "22255588846", Channel: Channels.Whatsapp, Identifier: "5511999990002"),
+            (Cpf: "22255588846", Channel: Channels.App, Identifier: "carlos.mendes"),
             (Cpf: "33366699957", Channel: Channels.Cpf, Identifier: "33366699957"),
             (Cpf: "33366699957", Channel: Channels.Whatsapp, Identifier: "5511999990003"),
+            (Cpf: "33366699957", Channel: Channels.App, Identifier: "mariana.souza"),
         };
 
         var existingLinks = await db.IdentityLinks

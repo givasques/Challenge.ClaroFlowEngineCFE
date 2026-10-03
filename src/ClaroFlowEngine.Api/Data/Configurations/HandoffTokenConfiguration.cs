@@ -17,6 +17,7 @@ public class HandoffTokenConfiguration : IEntityTypeConfiguration<HandoffToken>
 
         builder.Property(t => t.TargetChannel).HasMaxLength(20).IsRequired();
         builder.Property(t => t.CreatedAt).HasDefaultValueSql("NOW()");
+        builder.Property(t => t.OwnerMismatchAttempts).HasDefaultValue(0);
 
         builder.HasOne(t => t.JourneyContext)
             .WithMany(j => j.HandoffTokens)

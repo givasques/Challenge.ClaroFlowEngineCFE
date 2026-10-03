@@ -25,4 +25,10 @@ public static class TransitionEventTypes
 
     /// <summary>CPF completo revelado pelo atendente no painel (FASE 4.3, item A.4) — transição órfã, sem journey_context_id.</summary>
     public const string CustomerCpfRevealed = "customer_cpf_revealed";
+
+    /// <summary>Tentativa de abrir o link de continuação com conta que não é a dona da jornada, bloqueada (FASE 4.3, item B.4).</summary>
+    public const string HandoffOwnerMismatch = "handoff_owner_mismatch";
+
+    /// <summary>Token de handoff revogado após atingir o limite de tentativas de outra conta (FASE 4.3, item B.4).</summary>
+    public const string HandoffTokenRevoked = "handoff_token_revoked";
 }

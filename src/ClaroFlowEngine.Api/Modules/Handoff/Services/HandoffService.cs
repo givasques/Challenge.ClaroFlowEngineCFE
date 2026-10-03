@@ -97,7 +97,15 @@ public class HandoffService : IHandoffService
             ?? throw new NotFoundException("token_not_found", "Token de handoff não encontrado.");
 
         if (handoffToken.UsedAt is not null)
+        {
+            // Distingue "já usado normalmente" de "revogado por tentativas com conta errada" (FASE 4.3, item B.4) —
+            // o contador nunca é zerado, então atingir o limite aqui significa que foi este o motivo da revogação.
+            if (handoffToken.OwnerMismatchAttempts >= _cfeOptions.HandoffMaxOwnerMismatchAttempts)
+                throw new GoneException("token_revoked",
+                    "Este link foi cancelado por segurança após várias tentativas com a conta incorreta. Inicie um novo atendimento.");
+
             throw new GoneException("token_already_used", "Este link já foi utilizado.");
+        }
 
         if (handoffToken.ExpiresAt < DateTime.UtcNow)
             throw new GoneException("token_expired", "Este link expirou.");
@@ -115,37 +123,35 @@ public class HandoffService : IHandoffService
             throw new GoneException("journey_closed", "A jornada associada a este link já foi encerrada.");
 
         // A partir daqui, journey.Status == Open.
+
+        // FASE 4.3, item B.3: identifier passa a ser obrigatório — é a conta do App (ou o telefone do
+        // WhatsApp) que acabou de "logar" no canal de destino, usada para confirmar que quem abriu o
+        // link é o dono da jornada. As checagens de token/jornada acima continuam primeiro e na mesma
+        // ordem; só depois delas, e antes de marcar o token como usado, entra a checagem de dono.
+        if (string.IsNullOrWhiteSpace(identifier))
+            throw new ValidationException("missing_identifier", "identifier é obrigatório.");
+
+        // O handoff nunca cria vínculo novo (B.3) — o vínculo já existe previamente (seed, no protótipo;
+        // cadastro real da Claro, numa implantação real). Sem vínculo ou vínculo de outro cliente, a
+        // conta não é reconhecida como dona desta jornada; nos dois casos o token NÃO é marcado como usado.
+        var link = await _db.IdentityLinks.AsNoTracking()
+            .FirstOrDefaultAsync(l => l.Channel == handoffToken.TargetChannel && l.Identifier == identifier, cancellationToken);
+
+        if (link is null)
+        {
+            await RegisterOwnerMismatchAsync(handoffToken, journey, "app_account_not_recognized",
+                "Não reconhecemos esta conta do App. Entre com a conta vinculada ao seu cadastro Claro.", cancellationToken);
+        }
+
+        if (link!.CustomerId != journey.CustomerId)
+        {
+            await RegisterOwnerMismatchAsync(handoffToken, journey, "handoff_customer_mismatch",
+                "Este link pertence a outra conta. Entre com a conta que iniciou o atendimento.", cancellationToken);
+        }
+
         await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
 
         handoffToken.UsedAt = DateTime.UtcNow;
-
-        // Vincula o identificador do canal de destino ao cliente, se informado (UC06 passo 5).
-        // Opcional: o contrato documentado de GET /context/resolve só exige "token"; "identifier" é uma
-        // extensão aditiva para quando o canal de destino (ex: login mockado do App) já capturou um valor.
-        if (!string.IsNullOrWhiteSpace(identifier))
-        {
-            if (IdentifierFormat.IsValidIdentifier(handoffToken.TargetChannel, identifier))
-            {
-                var linkExists = await _db.IdentityLinks.AnyAsync(
-                    l => l.Channel == handoffToken.TargetChannel && l.Identifier == identifier, cancellationToken);
-
-                if (!linkExists)
-                {
-                    _db.IdentityLinks.Add(new IdentityLink
-                    {
-                        CustomerId = journey.CustomerId,
-                        Channel = handoffToken.TargetChannel,
-                        Identifier = identifier,
-                    });
-                }
-            }
-            else
-            {
-                _logger.LogWarning(
-                    "Identifier informado no resolve do handoff tem formato inválido para o canal {Channel}; ignorado.",
-                    handoffToken.TargetChannel);
-            }
-        }
 
         _transitionRecorder.Record(journey.Id, handoffToken.TargetChannel, TransitionEventTypes.JourneyResumed,
             "Cliente abriu o deep link. Contexto recuperado pelo CFE.", new { token = handoffToken.Token });
@@ -167,6 +173,39 @@ public class HandoffService : IHandoffService
                 journey.Customer.AnonymizedAt is not null ? "Removido (LGPD)" : null),
             PlanDetails: planDetails,
             InvoiceDetails: invoiceDetails);
+    }
+
+    /// <summary>
+    /// Registra a tentativa bloqueada (FASE 4.3, item B.4) e, ao atingir o limite, revoga o token
+    /// (marca como usado e registra o cancelamento). Sempre lança: 403 (motivo da recusa recebido)
+    /// ou, ao atingir o limite, 410 token_revoked — o chamador nunca segue adiante depois de chamar isto.
+    /// </summary>
+    private async Task RegisterOwnerMismatchAsync(
+        HandoffToken handoffToken, JourneyContext journey, string mismatchErrorCode, string mismatchMessage, CancellationToken cancellationToken)
+    {
+        handoffToken.OwnerMismatchAttempts++;
+
+        _transitionRecorder.Record(journey.Id, handoffToken.TargetChannel, TransitionEventTypes.HandoffOwnerMismatch,
+            "Tentativa de abrir o link de continuação com outra conta foi bloqueada.",
+            new { attempt = handoffToken.OwnerMismatchAttempts });
+
+        if (handoffToken.OwnerMismatchAttempts >= _cfeOptions.HandoffMaxOwnerMismatchAttempts)
+        {
+            handoffToken.UsedAt = DateTime.UtcNow;
+            _transitionRecorder.Record(journey.Id, handoffToken.TargetChannel, TransitionEventTypes.HandoffTokenRevoked,
+                "Link de continuação cancelado após múltiplas tentativas com outra conta.", null);
+
+            _logger.LogWarning(
+                "Handoff token revoked for journey {JourneyId} after {Attempts} owner mismatch attempts",
+                journey.Id, handoffToken.OwnerMismatchAttempts);
+
+            await _db.SaveChangesAsync(cancellationToken);
+            throw new GoneException("token_revoked",
+                "Este link foi cancelado por segurança após várias tentativas com a conta incorreta. Inicie um novo atendimento.");
+        }
+
+        await _db.SaveChangesAsync(cancellationToken);
+        throw new ForbiddenException(mismatchErrorCode, mismatchMessage);
     }
 
     public async Task<PlansResponse> GetActivePlansAsync(CancellationToken cancellationToken)
