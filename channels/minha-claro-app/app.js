@@ -416,7 +416,70 @@ function openMyDataScreen() {
   state.screenBeforeMyData = state.currentScreen;
   document.getElementById('my-data-cpf-input').value = '';
   document.getElementById('my-data-submit-button').disabled = true;
+  renderMyDataExportBlock();
   showScreen('my-data');
+}
+
+// ---------- Portabilidade dos dados — Art. 18, V da LGPD (FASE 4.3, item C.4) ----------
+
+/** Mostra "Baixar meus dados" com cliente logado (sessão do App, FASE 4.3 item B.5), ou o botão
+ * desabilitado "Entre na sua conta..." sem sessão — a tela "Meus dados" abre independente de login. */
+function renderMyDataExportBlock() {
+  const session = getAppSession();
+  document.getElementById('my-data-export-button').classList.toggle('hidden', !session);
+  document.getElementById('my-data-export-logged-out-button').classList.toggle('hidden', Boolean(session));
+}
+
+/** Padrão de download dos 3 canais a partir desta fase (FASE 4.3, item C.6): fetch com o header de
+ * autenticação do canal, blob + createObjectURL + <a download>, nome vindo do Content-Disposition. */
+async function downloadJsonFile(path, body) {
+  const res = await fetch(`${CFE_CONFIG.apiBaseUrl}${path}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Channel-Token': CFE_CONFIG.channelToken,
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const data = await res.json().catch(() => null);
+    const err = new Error((data && data.message) || `HTTP ${res.status}`);
+    err.isApiError = true;
+    err.status = res.status;
+    err.errorCode = data && data.error_code;
+    throw err;
+  }
+
+  const disposition = res.headers.get('Content-Disposition') || '';
+  const match = disposition.match(/filename="?([^"]+)"?/);
+  const fileName = match ? match[1] : 'dados-cliente.json';
+
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+async function handleExportMyData() {
+  const session = getAppSession();
+  if (!session) return;
+
+  const button = document.getElementById('my-data-export-button');
+  button.disabled = true;
+
+  try {
+    await downloadJsonFile('/customers/data-export', { app_account: session.identifier });
+  } catch (err) {
+    alert(`Não foi possível baixar seus dados: ${err.message}`);
+  } finally {
+    button.disabled = false;
+  }
 }
 
 function closeMyDataScreen() {
@@ -510,6 +573,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   document.getElementById('my-data-cancel-modal-button').addEventListener('click', closeConfirmModal);
   document.getElementById('my-data-confirm-button').addEventListener('click', exerciseRightToBeForgotten);
+  document.getElementById('my-data-export-button').addEventListener('click', handleExportMyData);
 
   const params = new URLSearchParams(window.location.search);
   state.token = params.get('token');

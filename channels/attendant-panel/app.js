@@ -515,6 +515,7 @@ function renderCustomerBlock(customer) {
   document.getElementById('customer-avatar').textContent = getInitials(customer.full_name);
   document.getElementById('customer-name').textContent = customer.full_name;
   resetCpfReveal(customer.id, customer.cpf_masked, customer.cpf_label);
+  resetExportDataButton(customer.id, customer.cpf_label);
   document.getElementById('customer-phone').textContent = customer.phone ? formatPhone(customer.phone) : 'Não informado';
   document.getElementById('customer-plan').textContent = customer.current_plan
     ? `${customer.current_plan.name} — ${formatCents(customer.current_plan.monthly_price_cents)}/mês`
@@ -624,6 +625,83 @@ function showRevealedCpf(cpf) {
       state.cpfRevealHideHandle = null;
     }
   }, 30000);
+}
+
+// ---------- Exportação de dados do cliente — portabilidade, Art. 18, V da LGPD (FASE 4.3, item C.5) ----------
+
+let exportCustomerId = null;
+
+function resetExportDataButton(customerId, cpfLabel) {
+  exportCustomerId = customerId;
+
+  const button = document.getElementById('export-customer-data-button');
+  const isAnonymized = Boolean(cpfLabel);
+  button.disabled = isAnonymized;
+  button.title = isAnonymized ? 'Dados já eliminados a pedido do titular' : 'Exportar dados (LGPD)';
+}
+
+function openExportDataModal() {
+  document.getElementById('export-data-modal').classList.remove('hidden');
+}
+
+function closeExportDataModal() {
+  document.getElementById('export-data-modal').classList.add('hidden');
+}
+
+/** Padrão de download dos 3 canais a partir desta fase (FASE 4.3, item C.6): fetch com o header de
+ * autenticação do canal (aqui, JWT do painel), blob + createObjectURL + <a download>, nome do Content-Disposition. */
+async function downloadJsonFile(path, body) {
+  const session = getSession();
+  const res = await fetch(`${CFE_CONFIG.apiBaseUrl}${path}`, {
+    method: 'POST',
+    headers: {
+      ...(session ? { Authorization: `Bearer ${session.token}` } : {}),
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const data = await res.json().catch(() => null);
+    const err = new Error((data && data.message) || `HTTP ${res.status}`);
+    err.isApiError = true;
+    err.status = res.status;
+    err.errorCode = data && data.error_code;
+    throw err;
+  }
+
+  const disposition = res.headers.get('Content-Disposition') || '';
+  const match = disposition.match(/filename="?([^"]+)"?/);
+  const fileName = match ? match[1] : 'dados-cliente.json';
+
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+async function handleExportDataConfirm() {
+  if (!exportCustomerId) return;
+
+  const button = document.getElementById('export-data-confirm-button');
+  button.disabled = true;
+
+  try {
+    await downloadJsonFile('/customers/data-export', { customer_id: exportCustomerId });
+    closeExportDataModal();
+    showToast('Arquivo gerado. Envie ao cliente pelo canal oficial.');
+  } catch (err) {
+    showToast(err instanceof CfeUnavailableError
+      ? 'Sistema indisponível — tente novamente em instantes.'
+      : `Não foi possível exportar: ${err.message}`, true);
+  } finally {
+    button.disabled = false;
+  }
 }
 
 /** Mini-stats visuais do resumo de interações (FASE 3.1, item B.1) — um card por categoria, com
@@ -1826,6 +1904,11 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('reveal-cpf-options').addEventListener('change', () => {
     document.getElementById('reveal-cpf-confirm-button').disabled = !document.querySelector('input[name="reveal-cpf-reason"]:checked');
   });
+
+  // Exportação de dados do cliente (FASE 4.3, item C.5)
+  document.getElementById('export-customer-data-button').addEventListener('click', openExportDataModal);
+  document.getElementById('export-data-cancel-button').addEventListener('click', closeExportDataModal);
+  document.getElementById('export-data-confirm-button').addEventListener('click', handleExportDataConfirm);
 
   // Oportunidades (FASE 3.6): filtros + modal de ação (badge inicial só depois do login).
   document.getElementById('opp-detect-button').addEventListener('click', handleDetectOpportunities);

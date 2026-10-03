@@ -228,6 +228,14 @@
             </div>
           </div>
         </div>
+
+        <!-- Portabilidade dos dados, Art. 18, V da LGPD (FASE 4.3, item C.5) -->
+        <div class="customer-actions-row">
+          <button type="button" id="export-customer-data-button" class="customer-action-button" title="Exportar dados (LGPD)">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="15" height="15" aria-hidden="true"><path d="M12 3v12m0 0l-4-4m4 4l4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 17v2a2 2 0 002 2h10a2 2 0 002-2v-2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            Exportar dados (LGPD)
+          </button>
+        </div>
       </section>
 
       <!-- Status da Jornada -->
@@ -588,6 +596,27 @@
       <div class="panel-modal-actions">
         <button type="button" class="secondary-button" id="reveal-cpf-cancel-button">Cancelar</button>
         <button type="button" class="primary-button" id="reveal-cpf-confirm-button" disabled>Mostrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Exportação de dados do cliente — portabilidade, Art. 18, V da LGPD (FASE 4.3, item C.5) -->
+  <div id="export-data-modal" class="panel-modal-overlay hidden">
+    <div class="panel-modal-box">
+      <div class="panel-modal-header">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="18" height="18" aria-hidden="true"><path d="M12 3v12m0 0l-4-4m4 4l4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 17v2a2 2 0 002 2h10a2 2 0 002-2v-2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        Exportar dados do cliente
+      </div>
+
+      <p class="panel-modal-question">
+        Gera um arquivo com todos os dados pessoais e o histórico de atendimento deste cliente,
+        conforme o direito à portabilidade (LGPD, Art. 18, V). Confirme a identidade do cliente antes
+        de enviar o arquivo. Esta exportação fica registrada com seu nome.
+      </p>
+
+      <div class="panel-modal-actions">
+        <button type="button" class="secondary-button" id="export-data-cancel-button">Cancelar</button>
+        <button type="button" class="primary-button" id="export-data-confirm-button">Exportar</button>
       </div>
     </div>
   </div>
