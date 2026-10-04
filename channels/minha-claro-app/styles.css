@@ -646,7 +646,7 @@ body {
 }
 
 .plan-box-current {
-  opacity: 0.85;
+  opacity: 1;
 }
 
 .plan-box-new {
