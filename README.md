@@ -199,6 +199,24 @@ Hoje os dois perfis (atendente e gestor) têm acesso às mesmas telas; a distin�
 
 Essas credenciais são intencionalmente públicas e fracas, aceitável só por este ser um ambiente acadêmico de demonstração. Num sistema real, não existiriam credenciais documentadas publicamente: cada atendente teria sua própria conta, criada por um processo de onboarding interno.
 
+**Proteção de dados pessoais no painel:** o CPF do cliente aparece sempre mascarado (`***.456.789-**`). Na Consulta de Jornada, o botão "Mostrar CPF completo" revela o número por 30 segundos, mediante motivo obrigatório (confirmação de identidade, pedido do próprio cliente, exigência de escalação ou outro); a consulta fica registrada no histórico com o nome do atendente. O card do cliente também tem um botão "Exportar dados (LGPD)", que gera um arquivo com todos os dados pessoais e o histórico de atendimento do cliente (portabilidade, Art. 18, V), igualmente auditado.
+
+---
+
+## Contas do App Minha Claro (demonstração)
+
+O App confia na própria autenticação (como aconteceria com o app real da Claro numa implantação em produção): o CFE não reconfere a senha, só identifica a qual cliente a conta pertence. Por isso o seed já vincula uma conta a cada cliente de demonstração:
+
+| Cliente | Usuário do App | Senha |
+|---|---|---|
+| Ana Silva | `ana.silva` | qualquer valor com 6+ caracteres (não verificada) |
+| Carlos Mendes | `carlos.mendes` | qualquer valor com 6+ caracteres (não verificada) |
+| Mariana Souza | `mariana.souza` | qualquer valor com 6+ caracteres (não verificada) |
+
+**Regra de dono do link:** abrir o deep link do WhatsApp e logar no App só funciona com a conta vinculada ao cliente que iniciou o atendimento. Logar com outra conta mostra "Não foi possível abrir este atendimento", sem revelar nenhum dado da jornada; depois de 3 tentativas com conta errada, o link é cancelado para todos, inclusive para a dona. Clientes criados durante a própria demonstração (CPF novo digitado no chat) não têm conta do App vinculada, ver [Limitações conhecidas](#limitações-conhecidas).
+
+Na tela "Meus dados" do App, um cliente logado pode baixar uma cópia dos próprios dados (portabilidade, Art. 18, V) com o botão "Baixar meus dados".
+
 ---
 
 ## Roteiros de demonstração
@@ -211,7 +229,7 @@ Os três clientes de teste já vêm no seed automático. Com a stack rodando, ab
 2. Informe o CPF `11144477735` quando pedido.
 3. Escolha um plano (ex: "60GB") quando o bot listar as opções.
 4. Clique no botão "Continuar no App" do card que aparece.
-5. No App, faça login com qualquer usuário/senha e confirme a troca.
+5. No App, faça login com o usuário `ana.silva` (qualquer senha com 6+ caracteres; é a conta vinculada a este CPF, ver [Contas do App Minha Claro](#contas-do-app-minha-claro-demonstração)) e confirme a troca.
 6. Verifique no painel (buscando `11144477735`) que a jornada aparece como "Concluída".
 
 ### Cenário 2: Escalada humana (Carlos Mendes, CPF `22255588846`) · ~3 min
@@ -219,7 +237,7 @@ Os três clientes de teste já vêm no seed automático. Com a stack rodando, ab
 1. Repita os passos 1-3 do cenário 1 com o CPF `22255588846`.
 2. **Não** clique no link do card.
 3. Abra o painel em outra aba, faça login com `julia.souza@cfe.demo` / `Atendente@2026` (ver [Acesso ao Painel do Atendente](#acesso-ao-painel-do-atendente)) e busque `22255588846`: deve aparecer "Em andamento".
-4. Volte ao chat, clique no link, abra o App, mas não confirme ainda.
+4. Volte ao chat, clique no link, faça login no App com o usuário `carlos.mendes` (conta vinculada a este CPF), mas não confirme ainda.
 5. Volte ao painel **sem recarregar a página**: em até 4 segundos, o histórico deve mostrar "Jornada retomada em outro canal" sozinho (polling).
 
 ### Cenário 3: Abandono e expiração (Mariana Souza, CPF `33366699957`) · ~2 min
@@ -249,7 +267,7 @@ Os três clientes de teste já vêm no seed automático. Com a stack rodando, ab
 3. Escolha uma das 3 últimas faturas mostradas na lista.
 4. Descreva o problema livremente (ex: "tem um serviço que eu não contratei").
 5. Clique no botão "Continuar no App" do card que aparece.
-6. No App, faça login com qualquer usuário/senha: a fatura detalhada e sua descrição já aparecem preenchidas.
+6. No App, faça login com o usuário `ana.silva` (qualquer senha com 6+ caracteres): a fatura detalhada e sua descrição já aparecem preenchidas.
 7. Marque pelo menos um item da fatura e clique "Formalizar contestação".
 8. Confira o número de protocolo exibido na tela final.
 9. Verifique no painel (buscando `11144477735`) que a intenção aparece como "Contestação de cobrança" e a descrição do cliente fica em destaque.
@@ -261,6 +279,17 @@ Os três clientes de teste já vêm no seed automático. Com a stack rodando, ab
 3. No painel, clique em "Jornadas ativas" no menu lateral: a jornada recém-aberta deve aparecer na tabela, com badge de canal/intenção e tempo decorrido.
 4. Clique em "Métricas": os 4 cards devem mostrar valores calculados a partir do banco (não mais dados fictícios).
 5. Volte para "Jornadas ativas" e aguarde ~30s: a tabela deve se atualizar sozinha (visível na aba Network do navegador).
+
+### Cenário 7: Proteção de dados pessoais: CPF, dono do link e portabilidade (Ana Silva, CPF `11144477735`) · ~4 min
+
+1. No painel, logado como Júlia, busque `11144477735`: o CPF aparece mascarado (`***.444.777-**`).
+2. Clique em "Mostrar CPF completo", escolha um motivo e confirme: o CPF completo aparece por 30 segundos e some sozinho; o histórico da jornada (se houver) não é afetado.
+3. No chat, inicie uma troca de plano com o CPF `11144477735` e clique no link gerado ("Continuar no App").
+4. No App, tente logar com o usuário `carlos.mendes`: a tela "Não foi possível abrir este atendimento" aparece, sem nenhum dado da Ana.
+5. Ainda no App, clique "Entrar com outra conta" e logue com `ana.silva`: a jornada é retomada normalmente.
+6. No painel, busque `11144477735` de novo: o histórico mostra a tentativa bloqueada do Carlos.
+7. Ainda no App, logada como `ana.silva`, abra "Meus dados" e clique "Baixar meus dados": o JSON baixado traz o CPF completo, as identidades de canal (WhatsApp, App, CPF) e o histórico de jornadas, mostrando a identidade unificada da Ana.
+8. No painel, com a Ana ainda na tela, clique "Exportar dados (LGPD)" e confirme: outro arquivo é baixado, e a auditoria da exportação fica registrada com o nome da Júlia.
 
 ---
 
@@ -275,7 +304,7 @@ A spec funcional deste projeto organiza os requisitos como casos de uso (UC01–
 | UC03 | Registrar novo cliente | `POST /identity/resolve` com `full_name_hint` |
 | UC04 | Atualizar contexto de jornada | `PATCH /context/{id}` |
 | UC05 | Gerar deep link para handoff | `POST /handoff/generate` |
-| UC06 | Retomar jornada em outro canal | `GET /context/resolve?token=` |
+| UC06 | Retomar jornada em outro canal | `GET /context/resolve?token=&identifier=` (identifier obrigatório, verifica se a conta logada é a dona da jornada; bloqueia e revoga o link após tentativas erradas) |
 | UC07 | Encerrar jornada | `POST /context/{id}/close`; painel também pode concluir com categoria padronizada (`POST /journeys/{id}/conclude`) ou escalar para outra área sem fechar (`POST /journeys/{id}/escalate`, status `escalated`) |
 | UC08 | Expirar jornada por inatividade | Verificação reativa em todo acesso a uma jornada aberta (`IJourneyExpirationService`) |
 | UC09 | Consultar histórico de jornada (painel) | `GET /context/customer/{id}` + `GET /context/{id}/transitions`, com polling |
@@ -284,7 +313,7 @@ A spec funcional deste projeto organiza os requisitos como casos de uso (UC01–
 | RNF004 | Login real do atendente no painel, com perfis | `POST /auth/login` (JWT, hash de senha, bloqueio por tentativas, rate limit por IP) + perfis `attendant`/`manager` |
 | N/A | Jornadas ativas em tempo real (painel) | `GET /journeys/active` |
 | N/A | Métricas operacionais (painel) | `GET /metrics/summary` (TMA mediano, jornadas hoje, taxa de conclusão, canal mais usado) |
-| RNF005 | Direito ao esquecimento (Art. 18 LGPD) | `POST /customers/{cpf}/right-to-be-forgotten` + tela "Meus dados" no App |
+| RNF005 | Direito ao esquecimento, portabilidade (Art. 18 LGPD) e CPF mascarado | `POST /customers/{cpf}/right-to-be-forgotten`, `POST /customers/data-export`, `POST /customers/{id}/reveal-cpf` + telas correspondentes no App e no painel |
 | UC11 | Detectar oportunidades comerciais | `POST /opportunities/detect` (4 regras) + `GET /opportunities` + ciclo `new → contacted → converted/not_relevant`, aba "Oportunidades" no painel |
 
 ---
@@ -305,7 +334,8 @@ A spec funcional deste projeto organiza os requisitos como casos de uso (UC01–
 
 - O bot do chat reconhece intenção por heurística de palavras-chave, não por NLP real.
 - A autenticação do WhatsApp simulado e do App (`X-Channel-Token`) é mockada via header, não é autenticação real (JWT, OAuth2 etc.), documentado como tal no próprio código. O painel do atendente já tem login real (ver [Acesso ao Painel do Atendente](#acesso-ao-painel-do-atendente)).
-- O login do App é mock: aceita qualquer credencial que atenda a um formato mínimo, sem verificação contra base real.
+- O login do App é mock: aceita qualquer credencial que atenda a um formato mínimo, sem verificação contra base real. Premissa: numa implantação real na Claro, o App Minha Claro já teria autenticação própria e confiável, e o CFE só precisaria identificar a qual cliente a conta pertence (o que já faz, via identidade unificada).
+- Clientes criados durante a própria demonstração (CPF novo digitado no chat, sem conta de App pré-vinculada) não conseguem abrir o deep link pelo App. Só os 3 clientes de demonstração (Ana, Carlos, Mariana) têm essa conta pré-cadastrada pelo seed, simulando um cadastro Claro que já existiria antes do atendimento.
 - Não há cobertura de testes automatizados; a validação é manual e estruturada, uma fase por vez.
 - A regra de expiração de jornada é reativa (verificada no momento do acesso), não um job agendado em background.
 - Campos do painel do atendente como "segmento" e "vencimento" são colunas reais no banco, mas preenchidas com dado mockado via seed, sem refletir um sistema de billing real.
@@ -326,18 +356,22 @@ O protótipo evoluiu além do MVP inicial. Já foram entregues:
 - Fechamento categorizado e escalação de jornadas pelo painel, com novo status `escalated` para casos transferidos a outras áreas (Financeiro, Retenção, Suporte técnico, Vendas, Ouvidoria) sem expirar automaticamente.
 - Painel de Oportunidades: detecção automática de leads comerciais a partir de jornadas históricas (troca de plano abandonada, contestação abandonada, cliente engajado, cliente inativo), com priorização por urgência e ciclo de vida controlado (novo → abordado → convertido/não relevante).
 - Login real do atendente no painel (e-mail/senha, JWT, bloqueio por tentativas, rate limit), com dois perfis (atendente e gestor) e auditoria por usuário em cada ação registrada.
+- CPF mascarado em toda a API, nas telas e nos logs, com revelação auditada no painel (motivo obrigatório, expira em 30s).
+- Verificação de dono no handoff: o App só retoma a jornada com a conta vinculada ao cliente que a iniciou; tentativas com outra conta são bloqueadas e registradas, com o link cancelado após 3 tentativas erradas.
+- Portabilidade dos dados (Art. 18, V da LGPD): exportação em JSON pelo próprio cliente no App ou pelo atendente no painel, com auditoria.
 
 O [histórico de commits e PRs](https://github.com/givasques/Challenge.ClaroFlowEngineCFE/pulls?q=is%3Apr) documenta cada entrega.
 
 ### Atendimento aos RNFs do Sprint 1
 
 - **RNF003 (disponibilidade e notificação técnica)**: Serilog e Health Checks implementados; base pronta para integração com ferramentas de monitoring (Sentry, Datadog) em produção.
-- **RNF005 (LGPD)**: auditabilidade completa (toda transição de jornada registrada com origem, canal e timestamp), TTL em tokens de handoff e jornadas inativas, e logs estruturados via Serilog. Direito ao esquecimento (Art. 18 LGPD) implementado: `POST /customers/{cpf}/right-to-be-forgotten` anonimiza nome, CPF e identificadores de canal mantendo o histórico operacional (jornadas, transições) íntegro para auditoria, executável pelo cliente na área "Meus dados" do App ou pelo atendente no painel. Ampliação prevista: rotina automática de anonimização por política de retenção, e outros direitos do titular (portabilidade, correção, revogação de consentimento).
+- **RNF005 (LGPD)**: auditabilidade completa (toda transição de jornada registrada com origem, canal e timestamp), TTL em tokens de handoff e jornadas inativas, e logs estruturados via Serilog. Direito ao esquecimento (Art. 18 LGPD) implementado: `POST /customers/{cpf}/right-to-be-forgotten` anonimiza nome, CPF e identificadores de canal mantendo o histórico operacional (jornadas, transições) íntegro para auditoria, executável pelo cliente na área "Meus dados" do App ou pelo atendente no painel. CPF deixou de circular completo pela API, pelas telas e pelos logs: aparece sempre mascarado, com revelação pontual e auditada no painel (motivo obrigatório, expira em 30s). Direito à portabilidade (Art. 18, V) implementado: `POST /customers/data-export` gera uma cópia completa dos dados do cliente em JSON, pelo próprio cliente no App ou pelo atendente no painel, também auditado. Ampliação prevista: rotina automática de anonimização por política de retenção, e outros direitos do titular (correção, revogação de consentimento).
 - **Acessibilidade**: VLibras e ajustes básicos de HTML semântico entregues. Cobertura completa de WCAG 2.1 AA prevista para iteração futura.
 
 ### Decisões de escopo do MVP
 
 - **Autenticação real (RNF004)**: implementada para o painel do atendente (login com e-mail/senha, JWT, perfis). WhatsApp e App continuam com `X-Channel-Token`, identificação simplificada entre serviços do protótipo; em produção seriam providos pelos canais Claro existentes (login do App Minha Claro, WhatsApp Business).
+- **Premissa de confiança do App**: o CFE confia em quem o App diz que está logado (como numa implantação real na Claro, em que o App já teria autenticação própria) e usa a identidade unificada só para saber a qual cliente aquela conta pertence. Por isso o handoff recusa continuar quando a conta logada não é a mesma que iniciou o atendimento, mesmo sem reconferir a senha.
 - **Stack do painel**: HTML/CSS/JS puro em vez de React (previsto no Sprint 1), o que simplificou o deployment e reduziu o tempo de MVP. Reescrita em framework moderno pode ser priorizada se o volume de funcionalidades justificar.
 
 ### Evoluções futuras possíveis
