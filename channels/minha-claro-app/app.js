@@ -101,10 +101,24 @@ function getAppSession() {
 
 // ---------- Navegação entre telas ----------
 
+let screenShownOnce = false;
+
 function showScreen(name) {
   document.querySelectorAll('.screen').forEach(el => el.classList.add('hidden'));
-  document.getElementById(`screen-${name}`).classList.remove('hidden');
+  const screen = document.getElementById(`screen-${name}`);
+  screen.classList.remove('hidden');
   state.currentScreen = name;
+
+  // FASE 4.5, C.2: a troca de tela leva o foco ao título da tela nova. A primeira tela da página não
+  // recebe foco, para que Tab comece no link "Pular para o conteúdo".
+  if (screenShownOnce) {
+    const title = screen.querySelector('h1');
+    if (title) {
+      title.setAttribute('tabindex', '-1');
+      title.focus();
+    }
+  }
+  screenShownOnce = true;
 }
 
 // ---------- Formatação ----------
