@@ -1570,6 +1570,7 @@ function showToast(message, isError = false) {
   toast.className = `toast${isError ? ' toast--error' : ''}`;
   const icon = document.createElement('span');
   icon.className = 'toast-icon';
+  icon.setAttribute('aria-hidden', 'true');
   icon.innerHTML = isError ? TOAST_ERROR_ICON : TOAST_SUCCESS_ICON;
   const text = document.createElement('span');
   text.textContent = message;
