@@ -1,9 +1,11 @@
-/* Preferências de acessibilidade (FASE 4.5, item A.2). Atributos em <html> definidos por a11y.js. */
+/* Preferências de acessibilidade (FASE 4.5). Atributos em <html> definidos por a11y.js. */
 
+/* ---------- Tamanho do texto (A.2): a escala vem de html, todo o CSS usa rem ---------- */
 html[data-a11y-text="115"] { font-size: 115%; }
 html[data-a11y-text="130"] { font-size: 130%; }
 html[data-a11y-text="150"] { font-size: 150%; }
 
+/* ---------- Espaçamento de texto (A.2, WCAG 1.4.12) ---------- */
 html[data-a11y-spacing="wide"] body,
 html[data-a11y-spacing="wide"] body * {
   line-height: 1.8 !important;
@@ -15,6 +17,7 @@ html[data-a11y-spacing="wide"] li {
   margin-bottom: 2em !important;
 }
 
+/* ---------- Redução de animações (A.2) ---------- */
 html[data-a11y-motion="reduce"] *,
 html[data-a11y-motion="reduce"] *::before,
 html[data-a11y-motion="reduce"] *::after {
@@ -23,9 +26,98 @@ html[data-a11y-motion="reduce"] *::after {
   scroll-behavior: auto !important;
 }
 
+/* ---------- Foco reforçado (A.2) ---------- */
 html[data-a11y-focus="strong"] *:focus-visible {
   outline: 4px solid #000 !important;
   outline-offset: 3px !important;
   background-color: #fff3a0 !important;
 }
 
+/* ---------- Alto contraste (A.4): texto 7:1, bordas 2px, links sublinhados ---------- */
+html[data-a11y-contrast="high"] {
+  --page-bg: #ffffff;
+  --surface: #ffffff;
+  --surface-muted: #ffffff;
+  --surface-elevated: #ffffff;
+  --text-primary: #000000;
+  --text-secondary: #111111;
+  --text-muted: #495465;
+  --text-subtle: #495465;
+  --border-subtle: #333333;
+  --border-medium: #000000;
+  --claro-red: #8b0410;
+  --claro-red-dark: #6b030c;
+  --claro-red-hover: #6b030c;
+  --claro-red-light: #8b0410;
+  --claro-red-subtle: rgba(139, 4, 16, 0.08);
+  --sidebar-bg: #000000;
+  --sidebar-text-muted: #ffffff;
+  --sidebar-border: #ffffff;
+  --state-danger-text: #971717;
+  --state-danger-text-strong: #7a1212;
+  --state-success-text: #105f2d;
+  --state-success-icon: #105f2d;
+  --state-warning-text: #824704;
+  --state-warning-text-strong: #8f3f0e;
+  --state-high-text: #983309;
+  --state-medium-text: #7c4c05;
+  --state-info-text: #1e40af;
+  --state-info-icon: #1e40af;
+  --status-open-text: #105f2d;
+  --status-concluded-text: #1e40af;
+  --status-abandoned-text: #971717;
+  --status-expired-text: #485465;
+  --status-escalated-text: #903011;
+}
+html[data-a11y-contrast="high"] :is(input, select, textarea, button, .panel-block, .mock-metric-card, .toast, .panel-modal-box, .opp-card, .history-item) {
+  border-width: 2px;
+  border-style: solid;
+  border-color: #000000;
+}
+html[data-a11y-contrast="high"] a {
+  text-decoration: underline;
+}
+
+/* ---------- Cores para daltonismo (A.5): paleta Okabe-Ito nos indicadores de estado ---------- */
+html[data-a11y-color="colorblind"] {
+  --state-success-text: #00507f;
+  --state-success-icon: #0072b2;
+  --state-success-bg: #e6f0f8;
+  --state-success-bg-soft: #f0f7fc;
+  --state-success-hover: #cfe3f2;
+  --state-success-dot: #0072b2;
+  --state-warning-text: #7a4f00;
+  --state-warning-text-strong: #6b4300;
+  --state-warning-bg: #fdf5e0;
+  --state-warning-border: #e69f00;
+  --state-high-text: #8a4200;
+  --state-high-bg: #fdf0e8;
+  --state-medium-text: #7a4f00;
+  --state-medium-bg: #fdf5e0;
+  --state-danger-text: #8f3300;
+  --state-danger-text-strong: #7a2b00;
+  --state-danger-bg: #fdf0e8;
+  --state-danger-bg-strong: #fbe3d3;
+  --state-danger-border: #d55e00;
+  --state-info-text: #0b4a6e;
+  --state-info-icon: #0b4a6e;
+  --state-info-bg: #e8f6fd;
+  --state-info-bg-strong: #d3eefb;
+  --status-open-text: #0b4a6e;
+  --status-open-bg: #e8f6fd;
+  --status-open-dot: #56b4e9;
+  --status-concluded-text: #00507f;
+  --status-concluded-bg: #e6f0f8;
+  --status-concluded-dot: #0072b2;
+  --status-abandoned-text: #8f3300;
+  --status-abandoned-bg: #fdf0e8;
+  --status-abandoned-dot: #d55e00;
+  --status-escalated-text: #7a4f00;
+  --status-escalated-bg: #fdf5e0;
+  --status-escalated-dot: #e69f00;
+  --event-handoff: #e69f00;
+  --event-concluded-agent: #0072b2;
+  --event-abandoned: #d55e00;
+  --event-escalated: #cc79a7;
+  --event-resumed: #009e73;
+}

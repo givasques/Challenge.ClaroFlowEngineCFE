@@ -1,9 +1,11 @@
-/* Preferências de acessibilidade (FASE 4.5, item A.2). Atributos em <html> definidos por a11y.js. */
+/* Preferências de acessibilidade (FASE 4.5). Atributos em <html> definidos por a11y.js. */
 
+/* ---------- Tamanho do texto (A.2): a escala vem de html, todo o CSS usa rem ---------- */
 html[data-a11y-text="115"] { font-size: 115%; }
 html[data-a11y-text="130"] { font-size: 130%; }
 html[data-a11y-text="150"] { font-size: 150%; }
 
+/* ---------- Espaçamento de texto (A.2, WCAG 1.4.12) ---------- */
 html[data-a11y-spacing="wide"] body,
 html[data-a11y-spacing="wide"] body * {
   line-height: 1.8 !important;
@@ -15,6 +17,7 @@ html[data-a11y-spacing="wide"] li {
   margin-bottom: 2em !important;
 }
 
+/* ---------- Redução de animações (A.2) ---------- */
 html[data-a11y-motion="reduce"] *,
 html[data-a11y-motion="reduce"] *::before,
 html[data-a11y-motion="reduce"] *::after {
@@ -23,9 +26,49 @@ html[data-a11y-motion="reduce"] *::after {
   scroll-behavior: auto !important;
 }
 
+/* ---------- Foco reforçado (A.2) ---------- */
 html[data-a11y-focus="strong"] *:focus-visible {
   outline: 4px solid #000 !important;
   outline-offset: 3px !important;
   background-color: #fff3a0 !important;
 }
 
+/* ---------- Alto contraste (A.4) ---------- */
+html[data-a11y-contrast="high"] {
+  --app-bg: #ffffff;
+  --page-bg: #ffffff;
+  --surface-muted: #ffffff;
+  --surface-elevated: #ffffff;
+  --text-primary: #000000;
+  --text-secondary: #111111;
+  --text-muted: #3f4652;
+  --border-subtle: #333333;
+  --border-input: #000000;
+  --claro-red: #8b0410;
+  --claro-red-dark: #6b030c;
+  --claro-red-hover: #6b030c;
+  --claro-red-light: #8b0410;
+  --warning-text: #6b3000;
+  --warning: #7a4f00;
+  --error: #971717;
+  --success: #105f2d;
+  --neutral: #3f4652;
+  --cfe-banner-text: #2e2a94;
+  --cfe-banner-icon: #3730a3;
+}
+html[data-a11y-contrast="high"] :is(input, select, textarea, button, .plan-box, .error-message, .card, .dispute-items-view) {
+  border-width: 2px;
+  border-style: solid;
+  border-color: #000000;
+}
+html[data-a11y-contrast="high"] a {
+  text-decoration: underline;
+}
+
+/* ---------- Cores para daltonismo (A.5): Okabe-Ito nos indicadores de estado ---------- */
+html[data-a11y-color="colorblind"] {
+  --success: #0072b2;
+  --warning: #7a4f00;
+  --error: #8f3300;
+  --neutral: #6b7280;
+}
