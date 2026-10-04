@@ -36,6 +36,7 @@
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 16px;
+  --state-danger-bg-soft: #fef2f3;
 }
 
 * {
@@ -52,7 +53,7 @@ button svg, a svg {
 
 /* Foco de teclado visível (FASE 3.3, item B.2.5) — garante que quem navega via Tab enxerga onde está. */
 *:focus-visible {
-  outline: 2px solid var(--claro-red, #e30613);
+  outline: 2px solid var(--claro-red, var(--claro-red));
   outline-offset: 2px;
 }
 
@@ -113,7 +114,7 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 600;
   padding: 4px 2px 10px;
   opacity: 0.95;
@@ -133,14 +134,14 @@ body {
 
 .app-logo {
   font-weight: 900;
-  font-size: 25px;
+  font-size: 1.5625rem;
   font-style: italic;
   letter-spacing: -0.03em;
   line-height: 1;
 }
 
 .app-subtitle {
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 500;
   opacity: 0.92;
   margin-top: 3px;
@@ -194,20 +195,20 @@ body {
 }
 
 .screen h1 {
-  font-size: 20px;
+  font-size: 1.25rem;
   color: var(--text-primary);
   margin: 0 0 8px;
 }
 
 .screen p {
-  font-size: 14px;
+  font-size: 0.875rem;
   color: var(--text-secondary);
   line-height: 1.5;
 }
 
 .muted {
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 
 .screen#screen-resolving,
@@ -267,12 +268,12 @@ body {
 }
 
 .info-banner-text strong {
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--text-primary);
 }
 
 .info-banner-text span {
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--text-muted);
   line-height: 1.4;
 }
@@ -287,7 +288,7 @@ body {
 }
 
 .form label {
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 600;
   color: #374151;
   margin-top: 10px;
@@ -312,7 +313,7 @@ body {
   padding: 10px 12px 10px 36px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border-input);
-  font-size: 14px;
+  font-size: 0.875rem;
   outline: none;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
@@ -324,13 +325,13 @@ body {
 
 .error-message {
   color: var(--error);
-  font-size: 12px;
+  font-size: 0.75rem;
   margin-top: 4px;
 }
 
 .link-muted {
   text-align: center;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--text-muted);
   text-decoration: none;
   margin-top: 14px;
@@ -355,7 +356,7 @@ body {
   border: none;
   padding: 13px;
   border-radius: 11px;
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 700;
   cursor: pointer;
   margin-top: 16px;
@@ -379,7 +380,7 @@ body {
   border: 1px solid var(--border-input);
   padding: 13px;
   border-radius: 11px;
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 600;
   cursor: pointer;
   margin-top: 8px;
@@ -435,12 +436,12 @@ body {
 }
 
 .cfe-banner-text strong {
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--cfe-banner-text);
 }
 
 .cfe-banner-text span {
-  font-size: 11.5px;
+  font-size: 0.71875rem;
   color: var(--cfe-banner-text);
   opacity: 0.85;
   line-height: 1.4;
@@ -460,7 +461,7 @@ body {
 }
 
 .data-card-section-title {
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-weight: 700;
   color: var(--text-muted);
   text-transform: uppercase;
@@ -476,12 +477,12 @@ body {
 }
 
 .data-label {
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--text-muted);
 }
 
 .data-value {
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 600;
   color: var(--text-primary);
   text-align: right;
@@ -498,7 +499,7 @@ body {
   border: none;
   padding: 4px 0;
   margin-bottom: 12px;
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 600;
   color: var(--text-muted);
   cursor: pointer;
@@ -523,7 +524,7 @@ body {
 }
 
 .my-data-subtitle {
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 700;
   color: var(--text-primary);
   margin: 0 0 8px;
@@ -542,7 +543,7 @@ body {
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--text-secondary);
   line-height: 1.4;
 }
@@ -582,14 +583,14 @@ body {
 
 .modal-title {
   text-align: center;
-  font-size: 17px;
+  font-size: 1.0625rem;
   margin: 0 0 10px;
   color: var(--text-primary);
 }
 
 .modal-text {
   text-align: center;
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--text-secondary);
   line-height: 1.5;
   margin: 0 0 6px;
@@ -606,7 +607,7 @@ body {
 }
 
 .footer-link {
-  font-size: 11px;
+  font-size: 0.6875rem;
   color: var(--text-muted);
   text-decoration: none;
 }
@@ -622,7 +623,7 @@ body {
 
 .app-footer-disclaimer {
   text-align: center;
-  font-size: 10px;
+  font-size: 0.625rem;
   color: var(--text-muted);
   padding: 2px 8px 8px;
 }
@@ -649,12 +650,12 @@ body {
 }
 
 .plan-box-new {
-  background: #fef2f3;
+  background: var(--state-danger-bg-soft);
   border: 1px solid var(--claro-red);
 }
 
 .plan-box-label {
-  font-size: 10px;
+  font-size: 0.625rem;
   font-weight: 700;
   color: var(--text-muted);
   text-transform: uppercase;
@@ -662,13 +663,13 @@ body {
 }
 
 .plan-box-current .plan-box-value {
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 600;
   color: var(--text-secondary);
 }
 
 .plan-box-new .plan-box-value {
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 700;
   color: var(--claro-red);
 }
@@ -682,7 +683,7 @@ body {
 /* ---------- Contestação de cobrança (ETAPA 2 Passo C / FASE 3 Bloco A) ---------- */
 
 .dispute-reason-box {
-  background: #fef2f3;
+  background: var(--state-danger-bg-soft);
   border: 1px solid var(--claro-red);
   border-radius: var(--radius-sm);
   padding: 10px 12px;
@@ -692,7 +693,7 @@ body {
 }
 
 .dispute-reason-label {
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 700;
   color: var(--claro-red);
 }
@@ -702,7 +703,7 @@ body {
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
   padding: 10px 12px;
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--text-secondary);
   font-style: italic;
   margin: 0;
@@ -723,12 +724,12 @@ body {
 }
 
 .dispute-item-view-desc {
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--text-primary);
 }
 
 .dispute-item-view-amount {
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 600;
   color: var(--text-secondary);
   white-space: nowrap;
@@ -745,7 +746,7 @@ body {
   align-items: center;
   justify-content: space-between;
   padding: 8px 2px 2px;
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 700;
   color: var(--text-primary);
 }
@@ -763,7 +764,7 @@ body {
 }
 
 .fine-print {
-  font-size: 11px;
+  font-size: 0.6875rem;
   color: var(--text-muted);
   text-align: center;
   line-height: 1.5;
