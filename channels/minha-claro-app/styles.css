@@ -11,7 +11,7 @@
 
   --text-primary: #1a1a1a;
   --text-secondary: #4b5563;
-  --text-muted: #6b7280;
+  --text-muted: #646b78;
   --text-on-red: #ffffff;
 
   --border-subtle: #e5e7eb;
@@ -671,7 +671,7 @@ body {
 .plan-box-new .plan-box-value {
   font-size: 0.8125rem;
   font-weight: 700;
-  color: var(--claro-red);
+  color: var(--claro-red-dark);
 }
 
 .plan-arrow {
