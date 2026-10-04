@@ -1,0 +1,31 @@
+/* Preferências de acessibilidade (FASE 4.5, item A.2). Atributos em <html> definidos por a11y.js. */
+
+html[data-a11y-text="115"] { font-size: 115%; }
+html[data-a11y-text="130"] { font-size: 130%; }
+html[data-a11y-text="150"] { font-size: 150%; }
+
+html[data-a11y-spacing="wide"] body,
+html[data-a11y-spacing="wide"] body * {
+  line-height: 1.8 !important;
+  letter-spacing: 0.12em !important;
+  word-spacing: 0.16em !important;
+}
+html[data-a11y-spacing="wide"] p,
+html[data-a11y-spacing="wide"] li {
+  margin-bottom: 2em !important;
+}
+
+html[data-a11y-motion="reduce"] *,
+html[data-a11y-motion="reduce"] *::before,
+html[data-a11y-motion="reduce"] *::after {
+  animation: none !important;
+  transition: none !important;
+  scroll-behavior: auto !important;
+}
+
+html[data-a11y-focus="strong"] *:focus-visible {
+  outline: 4px solid #000 !important;
+  outline-offset: 3px !important;
+  background-color: #fff3a0 !important;
+}
+
