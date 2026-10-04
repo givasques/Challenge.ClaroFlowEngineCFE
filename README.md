@@ -219,6 +219,35 @@ Na tela "Meus dados" do App, um cliente logado pode baixar uma cópia dos própr
 
 ---
 
+## Acessibilidade
+
+O painel do atendente e o App Minha Claro têm um menu de acessibilidade. O botão "Acessibilidade" fica no cabeçalho (e na tela de login do painel), e o atalho **Alt + Shift + A** abre e fecha o menu nos dois canais. No App, o menu aparece como folha inferior dentro do frame do celular.
+
+O menu tem seis ajustes, que valem na hora e ficam gravados no navegador:
+
+| Ajuste | Opções |
+|---|---|
+| Tamanho do texto | Padrão, Grande, Maior, Muito grande (100%, 115%, 130% e 150%) |
+| Alto contraste | Texto preto ou quase preto sobre branco, bordas de 2px e links sublinhados. Texto com razão de contraste de pelo menos 7:1 |
+| Cores para daltonismo | Paleta Okabe-Ito nos indicadores de status (azul, laranja, vermelho-alaranjado e azul-céu) |
+| Espaçamento de texto | Entrelinha de 1,8 e mais espaço entre letras, palavras e parágrafos |
+| Reduzir animações | Remove transições e animações |
+| Destacar foco do teclado | Contorno de foco mais grosso, com fundo destacado |
+
+Também há um botão para abrir o tradutor VLibras, que leva o foco ao ícone do VLibras no canto da tela (o widget não abre sozinho a partir do menu), e um botão "Restaurar padrão".
+
+Sem nenhuma preferência gravada, o menu segue as preferências do sistema operacional, como redução de movimento e contraste.
+
+Outras melhorias que valem para todos, com ou sem o menu:
+
+- **Indicadores que não dependem só de cor:** o tempo das Jornadas Ativas, o nível de urgência das Oportunidades, os avisos (toasts) e as mensagens de erro têm ícone e texto. Uma tela em escala de cinza continua mostrando cada estado.
+- **Navegação por teclado completa:** link "Pular para o conteúdo" como primeiro elemento da página; linhas da tabela de Jornadas Ativas operáveis com Enter; modais com foco preso, Esc para fechar e retorno do foco ao elemento que os abriu.
+- **Leitores de tela:** avisos com função de status ou de alerta, cabeçalhos de tabela com escopo, ícones decorativos ocultos e foco no título ao trocar de tela.
+
+**Fora do escopo:** o canal WhatsApp simulado. Numa implantação real, o WhatsApp é um aplicativo de terceiros, com a acessibilidade que o próprio fornecedor oferece. O CFE não controla essa parte.
+
+---
+
 ## Roteiros de demonstração
 
 Os três clientes de teste já vêm no seed automático. Com a stack rodando, abra o chat, o App e o painel em abas separadas.
@@ -304,6 +333,7 @@ A spec funcional deste projeto organiza os requisitos como casos de uso (UC01–
 | UC03 | Registrar novo cliente | `POST /identity/resolve` com `full_name_hint` |
 | UC04 | Atualizar contexto de jornada | `PATCH /context/{id}` |
 | UC05 | Gerar deep link para handoff | `POST /handoff/generate` |
+| Acessibilidade (feedback dos professores) | Interfaces personalizadas, navegação por teclado e indicadores que não dependem só de cor | Menu de acessibilidade no painel e no App (texto, contraste, daltonismo, espaçamento, animações e foco), VLibras e teclado completo nos modais |
 | UC06 | Retomar jornada em outro canal | `GET /context/resolve?token=&identifier=` (identifier obrigatório, verifica se a conta logada é a dona da jornada; bloqueia e revoga o link após tentativas erradas) |
 | UC07 | Encerrar jornada | `POST /context/{id}/close`; painel também pode concluir com categoria padronizada (`POST /journeys/{id}/conclude`) ou escalar para outra área sem fechar (`POST /journeys/{id}/escalate`, status `escalated`) |
 | UC08 | Expirar jornada por inatividade | Verificação reativa em todo acesso a uma jornada aberta (`IJourneyExpirationService`) |
@@ -337,6 +367,9 @@ A spec funcional deste projeto organiza os requisitos como casos de uso (UC01–
 - O login do App é mock: aceita qualquer credencial que atenda a um formato mínimo, sem verificação contra base real. Premissa: numa implantação real na Claro, o App Minha Claro já teria autenticação própria e confiável, e o CFE só precisaria identificar a qual cliente a conta pertence (o que já faz, via identidade unificada).
 - Clientes criados durante a própria demonstração (CPF novo digitado no chat, sem conta de App pré-vinculada) não conseguem abrir o deep link pelo App. Só os 3 clientes de demonstração (Ana, Carlos, Mariana) têm essa conta pré-cadastrada pelo seed, simulando um cadastro Claro que já existiria antes do atendimento.
 - Não há cobertura de testes automatizados; a validação é manual e estruturada, uma fase por vez.
+- As preferências de acessibilidade ficam no navegador: não acompanham o usuário entre dispositivos.
+- A validação de acessibilidade usou varredura automática (axe-core) e navegador Chrome. Não houve teste com leitor de tela real, nem em outros navegadores.
+- O widget do VLibras carrega de um serviço externo do Governo Federal. Quando ele não está disponível, o restante do painel e do App continua funcionando.
 - A regra de expiração de jornada é reativa (verificada no momento do acesso), não um job agendado em background.
 - Campos do painel do atendente como "segmento" e "vencimento" são colunas reais no banco, mas preenchidas com dado mockado via seed, sem refletir um sistema de billing real.
 - Os três canais simulados não têm build step nem framework de frontend: HTML/CSS/JS puro, sem testes de UI automatizados.
@@ -352,6 +385,7 @@ O protótipo evoluiu além do MVP inicial. Já foram entregues:
 - Enriquecimento do painel do atendente com dados agregados, timeline contextualizada e histórico de jornadas anteriores.
 - Menu lateral do painel conectado a dados reais (jornadas ativas e métricas operacionais).
 - Integração com VLibras do Governo Federal e melhorias básicas de acessibilidade HTML.
+- Menu de acessibilidade no painel e no App, com seis ajustes (texto, contraste, cores para daltonismo, espaçamento, animações e foco), navegação completa por teclado e indicadores que não dependem só de cor.
 - Direito ao esquecimento (Art. 18 LGPD), exercível pelo cliente na área "Meus dados" do App ou pelo atendente no painel.
 - Fechamento categorizado e escalação de jornadas pelo painel, com novo status `escalated` para casos transferidos a outras áreas (Financeiro, Retenção, Suporte técnico, Vendas, Ouvidoria) sem expirar automaticamente.
 - Painel de Oportunidades: detecção automática de leads comerciais a partir de jornadas históricas (troca de plano abandonada, contestação abandonada, cliente engajado, cliente inativo), com priorização por urgência e ciclo de vida controlado (novo → abordado → convertido/não relevante).
@@ -366,7 +400,7 @@ O [histórico de commits e PRs](https://github.com/givasques/Challenge.ClaroFlow
 
 - **RNF003 (disponibilidade e notificação técnica)**: Serilog e Health Checks implementados; base pronta para integração com ferramentas de monitoring (Sentry, Datadog) em produção.
 - **RNF005 (LGPD)**: auditabilidade completa (toda transição de jornada registrada com origem, canal e timestamp), TTL em tokens de handoff e jornadas inativas, e logs estruturados via Serilog. Direito ao esquecimento (Art. 18 LGPD) implementado: `POST /customers/{cpf}/right-to-be-forgotten` anonimiza nome, CPF e identificadores de canal mantendo o histórico operacional (jornadas, transições) íntegro para auditoria, executável pelo cliente na área "Meus dados" do App ou pelo atendente no painel. CPF deixou de circular completo pela API, pelas telas e pelos logs: aparece sempre mascarado, com revelação pontual e auditada no painel (motivo obrigatório, expira em 30s). Direito à portabilidade (Art. 18, V) implementado: `POST /customers/data-export` gera uma cópia completa dos dados do cliente em JSON, pelo próprio cliente no App ou pelo atendente no painel, também auditado. Ampliação prevista: rotina automática de anonimização por política de retenção, e outros direitos do titular (correção, revogação de consentimento).
-- **Acessibilidade**: VLibras e ajustes básicos de HTML semântico entregues. Cobertura completa de WCAG 2.1 AA prevista para iteração futura.
+- **Acessibilidade**: VLibras, menu de acessibilidade com seis ajustes salvos por canal, navegação completa por teclado nos modais e formulários, e indicadores com ícone e texto além da cor. A varredura automática com axe-core não encontra violações além do próprio widget do VLibras nas telas principais. Cobertura completa de WCAG 2.1 AA, incluindo validação com leitores de tela reais, prevista para iteração futura.
 
 ### Decisões de escopo do MVP
 
@@ -382,6 +416,7 @@ Sem compromisso de prazo; dependem de uma eventual evolução do protótipo para
 - Novas intenções (2ª via, portabilidade, cancelamento, agendamento técnico).
 - Extração dos módulos internos para microsserviços independentes, se a escala justificar.
 - Visão exclusiva do gestor no painel, usando a mesma distinção de perfil já existente no login.
+- Preferências de acessibilidade salvas no perfil do usuário do painel, para acompanhar o atendente entre dispositivos.
 - Integração real com WhatsApp Business API.
 
 ---
