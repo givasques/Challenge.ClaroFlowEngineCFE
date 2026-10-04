@@ -74,7 +74,7 @@
   --state-success-bg: #dcfce7;
   --state-success-bg-soft: #f0fdf4;
   --state-success-hover: #bbf7d0;
-  --state-warning-text: #d97706;
+  --state-warning-text: #ac5e05;
   --state-warning-text-strong: #92400e;
   --state-warning-bg: #fffbeb;
   --state-warning-border: #fde68a;
@@ -2174,4 +2174,40 @@ body {
 
 .hidden {
   display: none !important;
+}
+
+/* Indicadores com ícone além da cor (FASE 4.5, item A.6). Ícones decorativos: o texto ao lado já diz o estado. */
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.toast-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+}
+.toast-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.mock-time svg {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+}
+
+.login-error::before,
+.settings-form-error::before,
+.error-message::before,
+.degraded-banner::before {
+  content: "";
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  margin-right: 8px;
+  vertical-align: -3px;
+  background-color: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 4l9 16H3z'/%3E%3Cpath d='M12 10v4'/%3E%3Ccircle cx='12' cy='17' r='0.6' fill='black'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 4l9 16H3z'/%3E%3Cpath d='M12 10v4'/%3E%3Ccircle cx='12' cy='17' r='0.6' fill='black'/%3E%3C/svg%3E") center / contain no-repeat;
 }

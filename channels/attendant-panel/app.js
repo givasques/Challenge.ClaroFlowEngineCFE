@@ -1383,7 +1383,20 @@ const ACTIVE_JOURNEYS_CHANNEL_ICONS = {
   app: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="7" y="2" width="10" height="20" rx="2"></rect><line x1="11" y1="18.5" x2="13" y2="18.5" stroke-linecap="round"></line></svg>',
 };
 
-const ACTIVE_JOURNEYS_CLOCK_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 3"></path></svg>';
+
+// Ícone e rótulo por faixa de tempo (FASE 4.5, item A.6): a cor sozinha não diz o nível.
+const ACTIVE_JOURNEYS_TIME_ICONS = {
+  'mock-time--low': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M8 12.5l2.5 2.5 5-5.5"></path></svg>',
+  'mock-time--normal': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 3"></path></svg>',
+  'mock-time--warning': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4l9 16H3z"></path><path d="M12 10v4"></path><circle cx="12" cy="17" r="0.6" fill="currentColor"></circle></svg>',
+  'mock-time--urgent': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3h8l5 5v8l-5 5H8l-5-5V8z"></path><path d="M12 8v5"></path><circle cx="12" cy="16.5" r="0.6" fill="currentColor"></circle></svg>',
+};
+const ACTIVE_JOURNEYS_TIME_LABELS = {
+  'mock-time--low': 'Recente',
+  'mock-time--normal': 'Em curso',
+  'mock-time--warning': 'Atenção',
+  'mock-time--urgent': 'Urgente',
+};
 
 /** Urgência por tempo desde o início (FASE 3.1, item B.3.1): quanto mais tempo parado, mais quente a cor. */
 function activeJourneyTimeUrgencyClass(minutes) {
@@ -1441,7 +1454,7 @@ function renderActiveJourneysTable(journeys) {
       </td>
       <td><span class="mock-badge mock-badge--intent-${journey.intent}">${ACTIVE_JOURNEYS_INTENT_ICONS[journey.intent] || ''}${escapeHtml(journey.intent_label)}</span></td>
       <td><span class="mock-badge mock-badge--channel-${journey.current_channel}">${ACTIVE_JOURNEYS_CHANNEL_ICONS[journey.current_channel] || ''}${escapeHtml(journey.current_channel_label)}</span></td>
-      <td><span class="mock-time ${urgencyClass}">${ACTIVE_JOURNEYS_CLOCK_ICON}há ${journey.minutes_since_start} min</span></td>
+      <td><span class="mock-time ${urgencyClass}">${ACTIVE_JOURNEYS_TIME_ICONS[urgencyClass]}há ${journey.minutes_since_start} min · ${ACTIVE_JOURNEYS_TIME_LABELS[urgencyClass]}</span></td>
     `;
 
     // FASE 3.3, item B.2.4: linha clicável precisa ser operável por teclado (tabindex + Enter/Espaço),
@@ -1548,11 +1561,19 @@ const OPP_X_ICON = '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.or
 // Contexto da ação em andamento no modal genérico (marcar como abordada/convertida/não relevante).
 let opportunityActionContext = null;
 
+const TOAST_SUCCESS_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="5 12.5 10 17.5 19 7"></polyline></svg>';
+const TOAST_ERROR_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><line x1="6" y1="6" x2="18" y2="18"></line><line x1="18" y1="6" x2="6" y2="18"></line></svg>';
+
 function showToast(message, isError = false) {
   const container = document.getElementById('toast-container');
   const toast = document.createElement('div');
   toast.className = `toast${isError ? ' toast--error' : ''}`;
-  toast.textContent = message;
+  const icon = document.createElement('span');
+  icon.className = 'toast-icon';
+  icon.innerHTML = isError ? TOAST_ERROR_ICON : TOAST_SUCCESS_ICON;
+  const text = document.createElement('span');
+  text.textContent = message;
+  toast.append(icon, text);
   container.appendChild(toast);
   setTimeout(() => toast.remove(), 4000);
 }
@@ -1727,6 +1748,14 @@ function buildOpportunityStatusInfo(opp) {
   return '';
 }
 
+// Ícone por nível de urgência (FASE 4.5, item A.6): antes, o ponto era igual nos 4 níveis.
+const OPPORTUNITY_URGENCY_ICONS = {
+  critical: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3h8l5 5v8l-5 5H8l-5-5V8z"></path><path d="M12 8v5"></path><circle cx="12" cy="16.5" r="0.6" fill="currentColor"></circle></svg>',
+  high: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4l9 16H3z"></path></svg>',
+  medium: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 3v18" stroke-width="2"></path></svg>',
+  low: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14"></path><path d="M6 13l6 6 6-6"></path></svg>',
+};
+
 function buildOpportunityCard(opp, plansCatalog) {
   const card = document.createElement('div');
   card.className = 'opp-card';
@@ -1738,7 +1767,7 @@ function buildOpportunityCard(opp, plansCatalog) {
   card.innerHTML = `
     <div class="opp-card-header">
       <span class="opp-urgency-badge opp-urgency--${opp.urgency}">
-        <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10"/></svg>
+        ${OPPORTUNITY_URGENCY_ICONS[opp.urgency] || ''}
         ${escapeHtml(opp.urgency_label)}
       </span>
       <span class="opp-category">${escapeHtml(opp.category_label)}</span>
