@@ -7,8 +7,11 @@
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="a11y.css" />
   <script src="a11y.js"></script>
+  <script src="a11y-ui.js" defer></script>
 </head>
 <body>
+  <a class="skip-link" href="#main">Pular para o conteúdo</a>
+
   <!-- Tela de login (FASE 4.1, item C.2) — mostrada sempre que não há sessão válida; .app-layout
        começa escondido via HTML mesmo (não só JS) para nunca "piscar" o painel antes da checagem. -->
   <div id="login-screen" class="login-screen">
@@ -34,6 +37,11 @@
       <button type="submit" class="login-submit-button" id="login-submit-button" disabled>
         <span class="login-submit-spinner" aria-hidden="true"></span>
         <span id="login-submit-text">Entrar</span>
+      </button>
+
+      <button type="button" class="a11y-toggle a11y-toggle--login" aria-keyshortcuts="Alt+Shift+A" title="Acessibilidade (Alt+Shift+A)">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="17" height="17" aria-hidden="true"><circle cx="12" cy="4.5" r="1.8" stroke="currentColor" stroke-width="1.8"/><path d="M5 8.5l7 1.5 7-1.5M12 10v4l-3 6M12 14l3 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span>Acessibilidade</span>
       </button>
     </form>
   </div>
@@ -67,33 +75,33 @@
       <nav class="sidebar-nav">
         <button type="button" class="sidebar-nav-item active" id="nav-consulta" data-view="consulta">
           <span class="sidebar-nav-icon">
-            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="17" height="17"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.8"/><line x1="21" y1="21" x2="16.5" y2="16.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="17" height="17"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.8"/><line x1="21" y1="21" x2="16.5" y2="16.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
           </span>
           Consulta de jornada
         </button>
         <button type="button" class="sidebar-nav-item" id="nav-jornadas-ativas" data-view="jornadas-ativas">
           <span class="sidebar-nav-icon">
-            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="17" height="17"><line x1="4" y1="6" x2="20" y2="6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><line x1="4" y1="12" x2="20" y2="12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><line x1="4" y1="18" x2="14" y2="18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="17" height="17"><line x1="4" y1="6" x2="20" y2="6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><line x1="4" y1="12" x2="20" y2="12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><line x1="4" y1="18" x2="14" y2="18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
           </span>
           Jornadas ativas
           <span class="sidebar-nav-badge hidden" id="active-journeys-badge">0</span>
         </button>
         <button type="button" class="sidebar-nav-item" id="nav-metricas" data-view="metricas">
           <span class="sidebar-nav-icon">
-            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="17" height="17"><line x1="5" y1="20" x2="5" y2="12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><line x1="12" y1="20" x2="12" y2="6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><line x1="19" y1="20" x2="19" y2="15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="17" height="17"><line x1="5" y1="20" x2="5" y2="12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><line x1="12" y1="20" x2="12" y2="6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><line x1="19" y1="20" x2="19" y2="15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
           </span>
           Métricas
         </button>
         <button type="button" class="sidebar-nav-item" id="nav-oportunidades" data-view="oportunidades">
           <span class="sidebar-nav-icon">
-            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="17" height="17"><path d="M12 2l2.5 6.5L21 11l-6.5 2.5L12 20l-2.5-6.5L3 11l6.5-2.5L12 2z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="17" height="17"><path d="M12 2l2.5 6.5L21 11l-6.5 2.5L12 20l-2.5-6.5L3 11l6.5-2.5L12 2z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
           </span>
           Oportunidades
           <span class="sidebar-nav-badge hidden" id="opportunities-badge">0</span>
         </button>
         <button type="button" class="sidebar-nav-item" id="nav-configuracoes" data-view="configuracoes">
           <span class="sidebar-nav-icon">
-            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="17" height="17"><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.7"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="17" height="17"><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.7"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </span>
           Configurações
         </button>
@@ -102,13 +110,19 @@
       <div class="sidebar-footer">CFE v1.0 — Modo simulação</div>
     </aside>
 
-    <main class="main">
+    <main class="main" id="main" tabindex="-1">
       <header class="main-header">
         <div>
-          <h1 id="main-title">Consulta de Jornada</h1>
+          <h1 id="main-title" tabindex="-1">Consulta de Jornada</h1>
           <p class="main-subtitle" id="main-subtitle">Consulte o contexto completo de qualquer cliente em atendimento</p>
         </div>
-        <div class="header-clock" id="header-clock" aria-live="off"></div>
+        <div class="main-header-tools">
+          <button type="button" class="a11y-toggle" aria-keyshortcuts="Alt+Shift+A" title="Acessibilidade (Alt+Shift+A)">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="17" height="17" aria-hidden="true"><circle cx="12" cy="4.5" r="1.8" stroke="currentColor" stroke-width="1.8"/><path d="M5 8.5l7 1.5 7-1.5M12 10v4l-3 6M12 14l3 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span>Acessibilidade</span>
+          </button>
+          <div class="header-clock" id="header-clock" aria-live="off"></div>
+        </div>
       </header>
 
       <div id="view-consulta" class="main-view">
@@ -120,12 +134,12 @@
       <form id="search-form" class="search-form">
         <div class="search-input-wrapper">
           <span class="search-input-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="17" height="17"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.8"/><line x1="21" y1="21" x2="16.5" y2="16.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="17" height="17"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.8"/><line x1="21" y1="21" x2="16.5" y2="16.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
           </span>
           <input id="search-input" type="text" placeholder="Digite CPF ou telefone do cliente" autocomplete="off" />
         </div>
         <button type="submit">
-          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="15" height="15"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.9"/><line x1="21" y1="21" x2="16.5" y2="16.5" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>
+          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="15" height="15"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.9"/><line x1="21" y1="21" x2="16.5" y2="16.5" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>
           Buscar
         </button>
       </form>
@@ -136,7 +150,7 @@
       <!-- Empty state -->
       <div id="empty-state" class="empty-state">
         <div class="empty-state-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="52" height="52"><circle cx="10" cy="8" r="3.5" stroke="currentColor" stroke-width="1.4"/><path d="M3.5 19c1.4-3.3 3.8-5 6.5-5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="16.5" cy="16.5" r="4" stroke="currentColor" stroke-width="1.4"/><line x1="19.3" y1="19.3" x2="22" y2="22" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="52" height="52"><circle cx="10" cy="8" r="3.5" stroke="currentColor" stroke-width="1.4"/><path d="M3.5 19c1.4-3.3 3.8-5 6.5-5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="16.5" cy="16.5" r="4" stroke="currentColor" stroke-width="1.4"/><line x1="19.3" y1="19.3" x2="22" y2="22" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
         </div>
         <h2>Nenhum cliente em consulta</h2>
         <p>Digite o CPF ou telefone do cliente no campo acima<br />para visualizar o contexto completo da jornada.</p>
@@ -177,7 +191,7 @@
         <div class="customer-detail-grid">
           <div class="detail-item">
             <span class="detail-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="14" height="14"><path d="M4 5c0-1 1-2 2-2h2l2 5-2 1.5c1 2.5 2.5 4 5 5l1.5-2 5 2v2c0 1-1 2-2 2C10 18.5 4.5 13 4 5z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="14" height="14"><path d="M4 5c0-1 1-2 2-2h2l2 5-2 1.5c1 2.5 2.5 4 5 5l1.5-2 5 2v2c0 1-1 2-2 2C10 18.5 4.5 13 4 5z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
             </span>
             <div>
               <span class="detail-label">Telefone</span>
@@ -186,7 +200,7 @@
           </div>
           <div class="detail-item">
             <span class="detail-icon" aria-hidden="true">
-              <svg viewBox="0 0 20 14" fill="currentColor" xmlns="http://www.w3.org/2000/svg" width="14" height="10"><rect x="0" y="9" width="3" height="5" rx="0.5"/><rect x="5.5" y="6" width="3" height="8" rx="0.5"/><rect x="11" y="3" width="3" height="11" rx="0.5"/><rect x="16.5" y="0" width="3" height="14" rx="0.5"/></svg>
+              <svg aria-hidden="true" viewBox="0 0 20 14" fill="currentColor" xmlns="http://www.w3.org/2000/svg" width="14" height="10"><rect x="0" y="9" width="3" height="5" rx="0.5"/><rect x="5.5" y="6" width="3" height="8" rx="0.5"/><rect x="11" y="3" width="3" height="11" rx="0.5"/><rect x="16.5" y="0" width="3" height="14" rx="0.5"/></svg>
             </span>
             <div>
               <span class="detail-label">Plano atual</span>
@@ -195,7 +209,7 @@
           </div>
           <div class="detail-item">
             <span class="detail-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="14" height="14"><rect x="3.5" y="4.5" width="17" height="16" rx="2" stroke="currentColor" stroke-width="1.6"/><line x1="3.5" y1="9.5" x2="20.5" y2="9.5" stroke="currentColor" stroke-width="1.6"/><line x1="8" y1="2.5" x2="8" y2="6.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><line x1="16" y1="2.5" x2="16" y2="6.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="14" height="14"><rect x="3.5" y="4.5" width="17" height="16" rx="2" stroke="currentColor" stroke-width="1.6"/><line x1="3.5" y1="9.5" x2="20.5" y2="9.5" stroke="currentColor" stroke-width="1.6"/><line x1="8" y1="2.5" x2="8" y2="6.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><line x1="16" y1="2.5" x2="16" y2="6.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
             </span>
             <div>
               <span class="detail-label">Vencimento</span>
@@ -204,7 +218,7 @@
           </div>
           <div class="detail-item">
             <span class="detail-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="14" height="14"><circle cx="8" cy="8" r="2.8" stroke="currentColor" stroke-width="1.5"/><circle cx="16.5" cy="9" r="2.3" stroke="currentColor" stroke-width="1.5"/><path d="M2.5 18c1-3 3.2-4.5 5.5-4.5s4.5 1.5 5.5 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M14.5 14c2 .2 3.7 1.6 4.5 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="14" height="14"><circle cx="8" cy="8" r="2.8" stroke="currentColor" stroke-width="1.5"/><circle cx="16.5" cy="9" r="2.3" stroke="currentColor" stroke-width="1.5"/><path d="M2.5 18c1-3 3.2-4.5 5.5-4.5s4.5 1.5 5.5 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M14.5 14c2 .2 3.7 1.6 4.5 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
             </span>
             <div>
               <span class="detail-label">Segmento</span>
@@ -213,7 +227,7 @@
           </div>
           <div class="detail-item">
             <span class="detail-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="14" height="14"><circle cx="12" cy="12" r="9.5" stroke="currentColor" stroke-width="1.6"/><path d="M12 7v5l3.5 2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="14" height="14"><circle cx="12" cy="12" r="9.5" stroke="currentColor" stroke-width="1.6"/><path d="M12 7v5l3.5 2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </span>
             <div>
               <span class="detail-label">Cliente desde</span>
@@ -222,7 +236,7 @@
           </div>
           <div class="detail-item">
             <span class="detail-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="14" height="14"><path d="M21 11.5a8.5 8.5 0 01-12.3 7.6L4 20l1-4.5A8.5 8.5 0 1121 11.5z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="14" height="14"><path d="M21 11.5a8.5 8.5 0 01-12.3 7.6L4 20l1-4.5A8.5 8.5 0 1121 11.5z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
             </span>
             <div>
               <span class="detail-label">Meio preferido</span>
@@ -256,7 +270,7 @@
                 <span id="journey-origin-channel"></span>
               </span>
               <span class="channel-flow-arrow" id="channel-flow-arrow" aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="15" height="15"><line x1="4" y1="12" x2="19" y2="12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><polyline points="13 6 19 12 13 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="15" height="15"><line x1="4" y1="12" x2="19" y2="12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><polyline points="13 6 19 12 13 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
               </span>
               <span class="channel-chip channel-chip-current" id="journey-current-channel-chip">
                 <span class="channel-chip-icon" id="journey-current-channel-icon"></span>
@@ -319,28 +333,28 @@
         <div id="interactions-summary-grid" class="interactions-summary-grid">
           <div id="interactions-stat-total" class="interactions-stat">
             <div class="interactions-stat-icon interactions-stat-icon--total">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="7" height="7" rx="1"></rect><rect x="13" y="4" width="7" height="7" rx="1"></rect><rect x="4" y="13" width="7" height="7" rx="1"></rect><rect x="13" y="13" width="7" height="7" rx="1"></rect></svg>
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="7" height="7" rx="1"></rect><rect x="13" y="4" width="7" height="7" rx="1"></rect><rect x="4" y="13" width="7" height="7" rx="1"></rect><rect x="13" y="13" width="7" height="7" rx="1"></rect></svg>
             </div>
             <div id="interactions-stat-total-value" class="interactions-stat-value">0</div>
             <div class="interactions-stat-label">Total</div>
           </div>
           <div id="interactions-stat-concluded" class="interactions-stat">
             <div class="interactions-stat-icon interactions-stat-icon--concluded">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"></path></svg>
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"></path></svg>
             </div>
             <div id="interactions-stat-concluded-value" class="interactions-stat-value">0</div>
             <div class="interactions-stat-label">Concluídas</div>
           </div>
           <div id="interactions-stat-abandoned" class="interactions-stat">
             <div class="interactions-stat-icon interactions-stat-icon--abandoned">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"></path><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"></path></svg>
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"></path><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"></path></svg>
             </div>
             <div id="interactions-stat-abandoned-value" class="interactions-stat-value">0</div>
             <div class="interactions-stat-label">Abandonadas</div>
           </div>
           <div id="interactions-stat-expired" class="interactions-stat">
             <div class="interactions-stat-icon interactions-stat-icon--expired">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 3"></path></svg>
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 3"></path></svg>
             </div>
             <div id="interactions-stat-expired-value" class="interactions-stat-value">0</div>
             <div class="interactions-stat-label">Expiradas</div>
@@ -372,10 +386,10 @@
         <table class="mock-table" id="active-journeys-table">
           <thead>
             <tr>
-              <th>Cliente</th>
-              <th>Intenção</th>
-              <th>Canal</th>
-              <th>Tempo desde início</th>
+              <th scope="col">Cliente</th>
+              <th scope="col">Intenção</th>
+              <th scope="col">Canal</th>
+              <th scope="col">Tempo desde início</th>
             </tr>
           </thead>
           <tbody id="active-journeys-body">
@@ -383,7 +397,7 @@
           </tbody>
         </table>
         <div id="active-journeys-empty" class="active-journeys-empty hidden">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" class="active-journeys-empty-icon"><circle cx="12" cy="12" r="10"></circle><path d="M8 12.5l2.5 2.5 5.5-6"></path></svg>
+          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" class="active-journeys-empty-icon"><circle cx="12" cy="12" r="10"></circle><path d="M8 12.5l2.5 2.5 5.5-6"></path></svg>
           <p class="active-journeys-empty-title">Nenhuma jornada em andamento no momento</p>
           <p class="active-journeys-empty-subtitle">Todas as jornadas foram concluídas ou não há novas interações agora. Esta tela atualiza automaticamente.</p>
         </div>
@@ -394,7 +408,7 @@
         <div class="mock-metrics-grid">
           <div class="mock-metric-card mock-metric-card--tma">
             <div class="mock-metric-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 3"></path></svg>
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 3"></path></svg>
             </div>
             <span class="mock-metric-label">TMA médio</span>
             <span class="mock-metric-value" id="metric-tma-value">—</span>
@@ -402,7 +416,7 @@
           </div>
           <div class="mock-metric-card mock-metric-card--volume">
             <div class="mock-metric-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10"></path><path d="M12 20V4"></path><path d="M20 20v-7"></path></svg>
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10"></path><path d="M12 20V4"></path><path d="M20 20v-7"></path></svg>
             </div>
             <span class="mock-metric-label">Jornadas hoje</span>
             <span class="mock-metric-value" id="metric-journeys-today-value">—</span>
@@ -410,7 +424,7 @@
           </div>
           <div class="mock-metric-card mock-metric-card--completion">
             <div class="mock-metric-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M8.5 12.5l2.5 2.5 4.5-5"></path></svg>
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M8.5 12.5l2.5 2.5 4.5-5"></path></svg>
             </div>
             <span class="mock-metric-label">Taxa de conclusão</span>
             <span class="mock-metric-value" id="metric-conclusion-rate-value">—</span>
@@ -418,7 +432,7 @@
           </div>
           <div class="mock-metric-card mock-metric-card--channel">
             <div class="mock-metric-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.5 8.5 0 01-12.3 7.6L4 20l1-4.5A8.5 8.5 0 1121 11.5z"></path></svg>
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.5 8.5 0 01-12.3 7.6L4 20l1-4.5A8.5 8.5 0 1121 11.5z"></path></svg>
             </div>
             <span class="mock-metric-label">Canal mais usado</span>
             <span class="mock-metric-value" id="metric-channel-value">—</span>
@@ -476,7 +490,7 @@
         <div class="mock-settings-sections">
           <div class="mock-settings-card">
             <div class="mock-settings-card-header">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"></circle><path d="M4 20c0-3.3 3.6-6 8-6s8 2.7 8 6"></path></svg>
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"></circle><path d="M4 20c0-3.3 3.6-6 8-6s8 2.7 8 6"></path></svg>
               Meu perfil
             </div>
             <div class="settings-readonly-grid">
@@ -501,7 +515,7 @@
 
           <div class="mock-settings-card">
             <div class="mock-settings-card-header">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="9" rx="2"></rect><path d="M8 11V7a4 4 0 018 0v4"></path></svg>
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="9" rx="2"></rect><path d="M8 11V7a4 4 0 018 0v4"></path></svg>
               Alterar senha
             </div>
             <form id="change-password-form" class="mock-settings-form" novalidate>
@@ -524,7 +538,7 @@
 
           <div class="mock-settings-card">
             <div class="mock-settings-card-header">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 17l5-5-5-5"></path><path d="M20 12H9"></path><path d="M12 19H6a2 2 0 01-2-2V7a2 2 0 012-2h6"></path></svg>
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 17l5-5-5-5"></path><path d="M20 12H9"></path><path d="M12 19H6a2 2 0 01-2-2V7a2 2 0 012-2h6"></path></svg>
               Sessão
             </div>
             <button type="button" class="settings-logout-button" id="settings-logout-button">Sair</button>
@@ -681,5 +695,72 @@
   <script>
     new window.VLibras.Widget('https://vlibras.gov.br/app');
   </script>
+
+  <!-- Menu de acessibilidade (FASE 4.5, item B.1). Ajustes gravados por a11y.js; interface em a11y-ui.js. -->
+  <div id="a11y-live" class="sr-only" aria-live="polite"></div>
+
+  <div id="a11y-menu" class="a11y-menu hidden" role="dialog" aria-modal="true" aria-labelledby="a11y-menu-title">
+    <div class="a11y-menu-header">
+      <h2 id="a11y-menu-title" class="a11y-menu-title">Acessibilidade</h2>
+      <button type="button" class="a11y-menu-close" data-a11y-close>Fechar</button>
+    </div>
+
+    <fieldset class="a11y-group">
+      <legend class="a11y-group-title">Tamanho do texto</legend>
+      <div class="a11y-size-options">
+        <label class="a11y-size-option"><input type="radio" name="a11y-text" value="100" /><span class="a11y-size-preview a11y-size-preview--100" aria-hidden="true">Aa</span><span>Padrão</span></label>
+        <label class="a11y-size-option"><input type="radio" name="a11y-text" value="115" /><span class="a11y-size-preview a11y-size-preview--115" aria-hidden="true">Aa</span><span>Grande</span></label>
+        <label class="a11y-size-option"><input type="radio" name="a11y-text" value="130" /><span class="a11y-size-preview a11y-size-preview--130" aria-hidden="true">Aa</span><span>Maior</span></label>
+        <label class="a11y-size-option"><input type="radio" name="a11y-text" value="150" /><span class="a11y-size-preview a11y-size-preview--150" aria-hidden="true">Aa</span><span>Muito grande</span></label>
+      </div>
+    </fieldset>
+
+    <div class="a11y-row">
+      <span class="a11y-row-label" id="a11y-lbl-contrast">Alto contraste</span>
+      <button type="button" role="switch" aria-checked="false" aria-labelledby="a11y-lbl-contrast" data-a11y-key="contrast" class="a11y-switch"><span class="a11y-switch-knob" aria-hidden="true"></span></button>
+    </div>
+
+    <div class="a11y-row">
+      <div>
+        <span class="a11y-row-label" id="a11y-lbl-color">Cores para daltonismo</span>
+        <p class="a11y-help">Troca as cores de status por uma combinação mais fácil de distinguir.</p>
+      </div>
+      <button type="button" role="switch" aria-checked="false" aria-labelledby="a11y-lbl-color" aria-describedby="a11y-help-color" data-a11y-key="colorVision" class="a11y-switch"><span class="a11y-switch-knob" aria-hidden="true"></span></button>
+    </div>
+
+    <div class="a11y-row">
+      <span class="a11y-row-label" id="a11y-lbl-spacing">Espaçamento de texto</span>
+      <button type="button" role="switch" aria-checked="false" aria-labelledby="a11y-lbl-spacing" data-a11y-key="textSpacing" class="a11y-switch"><span class="a11y-switch-knob" aria-hidden="true"></span></button>
+    </div>
+
+    <div class="a11y-row">
+      <span class="a11y-row-label" id="a11y-lbl-motion">Reduzir animações</span>
+      <button type="button" role="switch" aria-checked="false" aria-labelledby="a11y-lbl-motion" data-a11y-key="reduceMotion" class="a11y-switch"><span class="a11y-switch-knob" aria-hidden="true"></span></button>
+    </div>
+
+    <div class="a11y-row">
+      <span class="a11y-row-label" id="a11y-lbl-focus">Destacar foco do teclado</span>
+      <button type="button" role="switch" aria-checked="false" aria-labelledby="a11y-lbl-focus" data-a11y-key="focusHighlight" class="a11y-switch"><span class="a11y-switch-knob" aria-hidden="true"></span></button>
+    </div>
+
+    <div class="a11y-group">
+      <h3 class="a11y-group-title">Libras</h3>
+      <p class="a11y-help">Abre o tradutor VLibras (ícone no canto da tela).</p>
+      <button type="button" id="a11y-vlibras-button" class="a11y-button">Abrir tradutor VLibras</button>
+    </div>
+
+    <div class="a11y-group">
+      <h3 class="a11y-group-title">Atalhos de teclado</h3>
+      <ul class="a11y-shortcuts">
+        <li><kbd>Alt</kbd> + <kbd>Shift</kbd> + <kbd>A</kbd>: abre e fecha este menu</li>
+        <li><kbd>Tab</kbd> e <kbd>Shift</kbd> + <kbd>Tab</kbd>: vai e volta entre os controles</li>
+        <li><kbd>Enter</kbd> ou <kbd>Espaço</kbd>: ativa botões e chaves</li>
+        <li><kbd>Esc</kbd>: fecha menus e janelas</li>
+        <li>Primeiro <kbd>Tab</kbd> ao abrir a página: pula para o conteúdo</li>
+      </ul>
+    </div>
+
+    <button type="button" id="a11y-reset-button" class="a11y-button">Restaurar padrão</button>
+  </div>
 </body>
 </html>
