@@ -1,5 +1,4 @@
-// Painel do atendente — busca por CPF/telefone, exibe dados do cliente, status da jornada e histórico
-// completo (UC09). Somente leitura: nenhuma escrita é feita no CFE a partir daqui.
+// Central Operacional CFE — visão geral, alertas, consulta detalhada, métricas e oportunidades.
 
 const EVENT_ICONS = {
   journey_started: '<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="15" height="15"><circle cx="12" cy="12" r="9.5" stroke="currentColor" stroke-width="1.8"/><path d="M10 8.5l6 3.5-6 3.5v-7z" fill="currentColor"/></svg>',
@@ -76,6 +75,7 @@ const CHANNEL_LABELS = {
   whatsapp: 'WhatsApp',
   app: 'App Minha Claro',
   call: 'Central telefônica',
+  panel: 'Painel',
 };
 
 const INTENT_LABELS = {
@@ -91,6 +91,14 @@ const CURRENT_STEP_LABELS = {
   description_provided: 'Descrição do problema enviada',
   dispute_formalized: 'Contestação formalizada',
 };
+
+const ALERT_LEVEL_LABELS = {
+  normal: 'Normal',
+  warning: 'Atenção',
+  critical: 'Crítico',
+};
+
+const ALERT_LEVELS = new Set(Object.keys(ALERT_LEVEL_LABELS));
 
 // Rótulos amigáveis dos motivos de contestação (FASE 3, Bloco A) — ids espelham Common/Contracts/DisputeReason.cs.
 const DISPUTE_REASON_LABELS = {
@@ -140,16 +148,35 @@ const state = {
   customerId: null,
   journeyId: null,
   journeyPayload: null,
+  currentJourney: null,
   currentPlan: null,
   pollingHandle: null,
   degraded: false,
   lastUpdatedAt: null,
-  currentView: 'consulta',
+  currentView: 'visao-geral',
   activeJourneysPollHandle: null,
   metricsPollHandle: null,
   // Handle do timer de 30s de exibição do CPF revelado (FASE 4.3, item A.5) — o CPF em si nunca
   // entra aqui nem em sessionStorage, só fica no texto do elemento #customer-cpf enquanto visível.
   cpfRevealHideHandle: null,
+  alertsPollHandle: null,
+  activeJourneys: [],
+  activeJourneysLoaded: false,
+  activeJourneysRequest: null,
+  alerts: [],
+  alertsSummary: null,
+  alertsLoaded: false,
+  alertsRequest: null,
+  alertsInitialized: false,
+  knownAlerts: new Map(),
+  metrics: null,
+  metricsLoaded: false,
+  metricsRequest: null,
+  journeyPollInFlight: false,
+  customerLoadVersion: 0,
+  highlightTimeout: null,
+  activeModalId: null,
+  modalReturnFocus: null,
 };
 
 // ---------- Sessão (FASE 4.1, item C.3) ----------
@@ -257,15 +284,20 @@ function clearDegraded() {
 // ---------- Formatação ----------
 
 function formatCents(cents) {
+  if (!Number.isFinite(Number(cents))) return '—';
   return (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
 function formatCpf(cpf) {
-  return cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+  const digits = String(cpf || '').replace(/\D/g, '');
+  return digits.length === 11
+    ? digits.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4')
+    : '—';
 }
 
 function truncate(text, maxLength) {
-  return text.length > maxLength ? `${text.slice(0, maxLength)}...` : text;
+  const value = String(text || '');
+  return value.length > maxLength ? `${value.slice(0, maxLength)}...` : value;
 }
 
 // ---------- Enriquecimento de descrições da timeline (FASE 3.1, item B.2) ----------
@@ -286,7 +318,7 @@ const invoiceDetailsCache = {};
 async function getInvoiceDetails(invoiceId) {
   if (invoiceId in invoiceDetailsCache) return invoiceDetailsCache[invoiceId];
   try {
-    invoiceDetailsCache[invoiceId] = await apiCall(`/invoices/${invoiceId}`);
+    invoiceDetailsCache[invoiceId] = await apiCall(`/invoices/${encodeURIComponent(invoiceId)}`);
   } catch (err) {
     invoiceDetailsCache[invoiceId] = null;
   }
@@ -307,12 +339,15 @@ async function buildDescriptionContext(transitions, journeyPayload) {
 
 function formatPhone(digits) {
   // DDI + DDD + número (12-13 dígitos) — formata só a parte final para leitura (DDD) NNNNN-NNNN.
-  const local = digits.slice(-11);
+  const local = String(digits || '').slice(-11);
   return local.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
 }
 
 function relativeTime(isoString) {
-  const diffSec = Math.floor((Date.now() - new Date(isoString).getTime()) / 1000);
+  if (!isoString) return '—';
+  const timestamp = new Date(isoString).getTime();
+  if (Number.isNaN(timestamp)) return '—';
+  const diffSec = Math.max(0, Math.floor((Date.now() - timestamp) / 1000));
   if (diffSec < 5) return 'agora mesmo';
   if (diffSec < 60) return `há ${diffSec}s`;
   const diffMin = Math.floor(diffSec / 60);
@@ -323,12 +358,15 @@ function relativeTime(isoString) {
 }
 
 function formatDateShort(isoString) {
-  return new Date(isoString).toLocaleDateString('pt-BR');
+  if (!isoString) return '—';
+  const date = new Date(isoString);
+  return Number.isNaN(date.getTime()) ? '—' : date.toLocaleDateString('pt-BR');
 }
 
 /** "Cliente desde" em granularidade grosseira, para o badge no topo do bloco (ETAPA 2, Passo B, item 5.2). */
 function formatTenure(isoString) {
   const since = new Date(isoString);
+  if (Number.isNaN(since.getTime())) return 'Tempo de cadastro não informado';
   const now = new Date();
   let months = (now.getFullYear() - since.getFullYear()) * 12 + (now.getMonth() - since.getMonth());
   if (now.getDate() < since.getDate()) months--;
@@ -348,10 +386,108 @@ function detectSearchChannel(digits) {
 }
 
 function getInitials(fullName) {
-  const parts = fullName.trim().split(/\s+/);
+  const parts = String(fullName || '').trim().split(/\s+/).filter(Boolean);
   const first = parts[0]?.[0] || '';
   const last = parts.length > 1 ? parts[parts.length - 1][0] : '';
   return (first + last).toUpperCase();
+}
+
+function safeAlertLevel(level) {
+  return ALERT_LEVELS.has(level) ? level : 'normal';
+}
+
+function alertLevelLabel(level) {
+  return ALERT_LEVEL_LABELS[safeAlertLevel(level)];
+}
+
+function intentLabel(item) {
+  return item.intent_label || INTENT_LABELS[item.intent] || item.intent || 'Intenção não informada';
+}
+
+function currentStepLabel(item) {
+  return item.current_step_label || CURRENT_STEP_LABELS[item.current_step] ||
+    (item.current_step ? item.current_step.replaceAll('_', ' ') : 'Etapa em andamento');
+}
+
+function channelLabel(code, providedLabel) {
+  return providedLabel || CHANNEL_LABELS[code] || code || 'Canal não informado';
+}
+
+function formatDuration(minutes) {
+  const value = Math.max(0, Math.floor(Number(minutes)));
+  if (!Number.isFinite(value)) return '—';
+  if (value < 60) return `${value} min`;
+  const hours = Math.floor(value / 60);
+  const remainingMinutes = value % 60;
+  if (hours < 24) return remainingMinutes ? `${hours}h ${remainingMinutes}min` : `${hours}h`;
+  const days = Math.floor(hours / 24);
+  const remainingHours = hours % 24;
+  return remainingHours ? `${days}d ${remainingHours}h` : `${days}d`;
+}
+
+function formatLastActivity(isoString) {
+  if (!isoString) return 'Não informada';
+  return `${relativeTime(isoString)} · ${formatDateTime(isoString)}`;
+}
+
+function formatJourneyStart(isoString) {
+  if (!isoString) return 'Não informado';
+  return `${relativeTime(isoString)} · ${formatDateTime(isoString)}`;
+}
+
+function normalizedSearchText(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+}
+
+function minutesSince(isoString) {
+  if (!isoString) return null;
+  const timestamp = new Date(isoString).getTime();
+  if (Number.isNaN(timestamp)) return null;
+  return Math.max(0, Math.floor((Date.now() - timestamp) / 60000));
+}
+
+/**
+ * Os endpoints de contexto preservam o contrato histórico. Complementamos o detalhe com o snapshot
+ * operacional já carregado, mantendo payload/customer/status do contexto como fonte principal.
+ */
+function enrichJourneyForPanel(journey) {
+  if (!journey) return null;
+  const activeSnapshot = state.activeJourneys.find(item => item.id === journey.id);
+  const alertSnapshot = state.alerts.find(item => item.journey_id === journey.id);
+  // O polling global de alertas continua ativo na tela de consulta, enquanto o snapshot da fila
+  // pode estar pausado. Mesclar nessa ordem garante que uma promoção warning -> critical recente
+  // prevaleça sobre uma classificação antiga da fila sem perder os demais campos operacionais.
+  const operational = { ...(activeSnapshot || {}), ...(alertSnapshot || {}) };
+  const merged = { ...operational, ...journey };
+
+  const operationalActivityTime = new Date(operational.last_activity_at || 0).getTime();
+  const contextActivityTime = new Date(journey.updated_at || 0).getTime();
+  const contextIsNewer = Number.isFinite(contextActivityTime) && contextActivityTime > operationalActivityTime;
+  merged.last_activity_at = contextIsNewer
+    ? journey.updated_at
+    : operational.last_activity_at || journey.updated_at || journey.created_at;
+  merged.minutes_since_start = minutesSince(journey.created_at);
+  merged.minutes_since_last_activity = minutesSince(merged.last_activity_at);
+  merged.current_channel = operational.current_channel || journey.current_channel || journey.origin_channel;
+  merged.current_channel_label = operational.current_channel_label || journey.current_channel_label;
+  merged.origin_channel_label = operational.origin_channel_label || journey.origin_channel_label;
+  merged.current_step_label = operational.current_step_label || journey.current_step_label;
+  merged.intent_label = operational.intent_label || journey.intent_label;
+
+  let level = contextIsNewer ? journey.alert_level : operational.alert_level || journey.alert_level;
+  if (!level && journey.status === 'open' && merged.minutes_since_last_activity != null) {
+    const attention = Number(state.alertsSummary?.attentionThresholdMinutes);
+    const critical = Number(state.alertsSummary?.criticalThresholdMinutes);
+    if (Number.isFinite(critical) && merged.minutes_since_last_activity >= critical) level = 'critical';
+    else if (Number.isFinite(attention) && merged.minutes_since_last_activity >= attention) level = 'warning';
+  }
+  merged.alert_level = journey.status === 'open' ? safeAlertLevel(level) : 'normal';
+  merged.requires_attention = journey.status === 'open' &&
+    (merged.alert_level === 'warning' || merged.alert_level === 'critical');
+  return merged;
 }
 
 // ---------- Busca ----------
@@ -373,15 +509,16 @@ async function handleSearch(event) {
 
   showMessage('Buscando...', 'info');
 
+  let customerId;
   try {
     const identity = await apiCall(`/identity/resolve?channel=${channel}&identifier=${digits}`);
-    state.customerId = identity.unified_customer_id;
+    customerId = identity.unified_customer_id;
   } catch (err) {
     if (err instanceof CfeUnavailableError) {
       showMessage('Não foi possível buscar agora — sistema de contexto indisponível. Tente novamente em instantes.', 'error');
       return;
     }
-    if (err.errorCode === 'identity_not_found') {
+    if (err.errorCode === 'identity_not_found' || err.errorCode === 'cpf_not_found') {
       showMessage('Cliente não localizado.', 'error');
       return;
     }
@@ -389,50 +526,127 @@ async function handleSearch(event) {
     return;
   }
 
-  await loadCustomerJourney();
+  await loadCustomerJourney(customerId);
 }
 
-async function loadCustomerJourney() {
-  let data;
-  try {
-    data = await apiCall(`/context/customer/${state.customerId}?include_history=true`);
-  } catch (err) {
-    if (err instanceof CfeUnavailableError) {
-      showMessage('Sistema de contexto indisponível — tente novamente em instantes.', 'error');
-      return;
-    }
-    showMessage(`Não foi possível carregar a jornada: ${err.message}`, 'error');
-    return;
+async function loadCustomerJourney(customerId = state.customerId, requestedJourneyId = null) {
+  if (!customerId) {
+    showMessage('Cliente não informado.', 'error');
+    return false;
   }
 
+  const loadVersion = ++state.customerLoadVersion;
+  state.customerId = customerId;
+  state.journeyId = requestedJourneyId;
+  state.currentJourney = null;
+
+  let data;
+  try {
+    data = await apiCall(`/context/customer/${encodeURIComponent(customerId)}?include_history=true`);
+  } catch (err) {
+    if (loadVersion !== state.customerLoadVersion) return false;
+    if (err instanceof CfeUnavailableError) {
+      showMessage('Sistema de contexto indisponível — tente novamente em instantes.', 'error');
+      return false;
+    }
+    showMessage(`Não foi possível carregar a jornada: ${err.message}`, 'error');
+    return false;
+  }
+
+  if (loadVersion !== state.customerLoadVersion) return false;
+
+  let journey = data.journey || null;
+
+  // A consulta por cliente normalmente devolve a jornada aberta. Quando o chamador indicou um ID
+  // específico, validamos o retorno e usamos o endpoint por jornada apenas como fallback exato.
+  if (requestedJourneyId && journey?.id !== requestedJourneyId) {
+    try {
+      const exactResponse = await apiCall(`/context/${encodeURIComponent(requestedJourneyId)}`);
+      if (loadVersion !== state.customerLoadVersion) return false;
+      journey = exactResponse.journey || exactResponse;
+      if (journey.customer_id !== customerId) {
+        showMessage('A jornada selecionada não pertence ao cliente informado.', 'error');
+        return false;
+      }
+      if (!data.customer && exactResponse.customer) data.customer = exactResponse.customer;
+    } catch (err) {
+      if (loadVersion !== state.customerLoadVersion) return false;
+      showMessage(err instanceof CfeUnavailableError
+        ? 'Sistema de contexto indisponível — tente novamente em instantes.'
+        : `Não foi possível carregar a jornada selecionada: ${err.message}`, 'error');
+      return false;
+    }
+  }
+
+  journey = enrichJourneyForPanel(journey);
+
   clearMessage();
+  state.lastUpdatedAt = new Date();
 
   // Card de dados do cliente é sobre o cliente, não sobre a jornada — aparece sempre (FASE 3, item C.2).
-  renderCustomerBlock(data.customer);
+  renderCustomerBlock(data.customer || journey?.customer);
   renderPreviousJourneys(data.recent_journeys || []);
 
   const noActiveJourneyMessage = document.getElementById('no-active-journey-message');
 
-  if (!data.journey) {
+  if (!journey) {
+    state.journeyId = null;
+    state.currentJourney = null;
+    state.journeyPayload = null;
     noActiveJourneyMessage.classList.remove('hidden');
-    return;
+    return false;
   }
 
   noActiveJourneyMessage.classList.add('hidden');
-  state.journeyId = data.journey.id;
-  renderJourneyStatus(data.journey);
+  state.journeyId = journey.id;
+  state.currentJourney = journey;
+  renderJourneyStatus(journey);
 
   await refreshTransitions();
 
-  if (data.journey.status === 'open') {
+  if (journey.status === 'open' && state.currentView === 'consulta') {
     startPolling();
   }
+
+  return true;
+}
+
+async function openCustomerJourney(customerId, journeyId) {
+  if (!customerId || !journeyId) {
+    showToast('Não foi possível identificar o cliente ou a jornada.', true);
+    return false;
+  }
+
+  switchView('consulta');
+  stopPolling();
+  hideAllResultBlocks();
+  document.getElementById('empty-state').classList.add('hidden');
+  document.getElementById('search-input').value = '';
+  showMessage('Carregando cliente...', 'info');
+
+  const loaded = await loadCustomerJourney(customerId, journeyId);
+  if (!loaded || state.journeyId !== journeyId) return false;
+
+  const statusBlock = document.getElementById('status-block');
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  statusBlock.scrollIntoView({ behavior: reducedMotion ? 'auto' : 'smooth', block: 'start' });
+  statusBlock.focus({ preventScroll: true });
+  statusBlock.classList.add('panel-block--highlighted');
+
+  if (state.highlightTimeout) clearTimeout(state.highlightTimeout);
+  state.highlightTimeout = setTimeout(() => {
+    statusBlock.classList.remove('panel-block--highlighted');
+    state.highlightTimeout = null;
+  }, CFE_CONFIG.highlightDurationMs);
+
+  return true;
 }
 
 // ---------- Polling ----------
 
 function startPolling() {
   stopPolling();
+  if (state.currentView !== 'consulta' || state.currentJourney?.status !== 'open') return;
   state.pollingHandle = setInterval(pollJourney, CFE_CONFIG.pollingIntervalMs);
 }
 
@@ -444,11 +658,15 @@ function stopPolling() {
 }
 
 async function pollJourney() {
-  if (!state.journeyId) return;
+  if (!state.journeyId || state.currentView !== 'consulta' || state.journeyPollInFlight) return;
+
+  state.journeyPollInFlight = true;
 
   try {
-    const journey = await apiCall(`/context/${state.journeyId}`);
+    const contextJourney = await apiCall(`/context/${state.journeyId}`);
+    const journey = enrichJourneyForPanel(contextJourney);
     state.lastUpdatedAt = new Date();
+    state.currentJourney = journey;
     renderCustomerBlock(journey.customer);
     renderJourneyStatus(journey);
     await refreshTransitions();
@@ -464,6 +682,8 @@ async function pollJourney() {
       return; // mantém os últimos dados carregados visíveis, só avisa
     }
     console.error('Erro inesperado no polling:', err);
+  } finally {
+    state.journeyPollInFlight = false;
   }
 }
 
@@ -730,16 +950,51 @@ function renderInteractionsSummary(counts) {
 
 function renderJourneyStatus(journey) {
   state.journeyPayload = journey.payload || {};
+  state.currentJourney = journey;
   const block = document.getElementById('status-block');
 
+  const knownStatus = Object.prototype.hasOwnProperty.call(STATUS_LABELS, journey.status);
   const badge = document.getElementById('journey-status-badge');
   badge.textContent = STATUS_LABELS[journey.status] || journey.status;
-  badge.className = `status-badge status-${journey.status}`;
+  badge.className = `status-badge status-${knownStatus ? journey.status : 'unknown'}`;
 
-  document.getElementById('journey-origin-channel').textContent = journey.origin_channel;
+  document.getElementById('journey-status-title').textContent = journey.status === 'open'
+    ? 'Jornada em andamento'
+    : journey.status === 'escalated' ? 'Jornada escalada' : 'Detalhes da jornada';
+
+  document.getElementById('journey-origin-channel').textContent =
+    channelLabel(journey.origin_channel, journey.origin_channel_label);
   document.getElementById('journey-origin-channel-icon').innerHTML = CHANNEL_ICONS[journey.origin_channel] || CHANNEL_ICON_DEFAULT;
-  document.getElementById('journey-intent').textContent = INTENT_LABELS[journey.intent] || journey.intent;
-  document.getElementById('journey-last-update').textContent = relativeTime(journey.updated_at);
+  document.getElementById('journey-intent').textContent = intentLabel(journey);
+  document.getElementById('journey-current-step').textContent = currentStepLabel(journey);
+  document.getElementById('journey-started-at').textContent = formatJourneyStart(journey.created_at);
+  document.getElementById('journey-last-activity').textContent = formatLastActivity(journey.last_activity_at);
+  document.getElementById('journey-total-duration').textContent = formatDuration(journey.minutes_since_start);
+  document.getElementById('journey-inactivity-duration').textContent = formatDuration(journey.minutes_since_last_activity);
+
+  setCurrentChannelDisplay(
+    journey.origin_channel,
+    journey.current_channel,
+    journey.current_channel_label,
+  );
+
+  const alertBox = document.getElementById('journey-operational-alert');
+  const alertText = document.getElementById('journey-operational-alert-text');
+  const alertLevel = safeAlertLevel(journey.alert_level);
+  const hasOperationalAlert = journey.status === 'open' &&
+    (journey.requires_attention === true || alertLevel === 'warning' || alertLevel === 'critical');
+
+  alertBox.classList.toggle('hidden', !hasOperationalAlert);
+  alertBox.classList.remove('journey-operational-alert--warning', 'journey-operational-alert--critical');
+  if (hasOperationalAlert) {
+    alertBox.classList.add(`journey-operational-alert--${alertLevel}`);
+    const duration = formatDuration(journey.minutes_since_last_activity);
+    alertText.textContent = alertLevel === 'critical'
+      ? `ATENÇÃO: esta jornada está sem atividade há ${duration}.`
+      : `Esta jornada está sem atividade há ${duration}.`;
+  } else {
+    alertText.textContent = '';
+  }
 
   // Motivo + descrição do cliente em destaque, quando presentes (contestação de cobrança — FASE 3, Bloco A).
   const descriptionBlock = document.getElementById('customer-description-block');
@@ -766,8 +1021,22 @@ function renderJourneyStatus(journey) {
   descriptionBlock.classList.toggle('hidden', !reason && !description);
 
   renderJourneyActionsAndResolution(journey.status, payload);
+  document.getElementById('journey-actions-row').classList.toggle(
+    'journey-actions-row--attention',
+    hasOperationalAlert,
+  );
 
   block.classList.remove('hidden');
+}
+
+function setCurrentChannelDisplay(originChannel, currentChannel, currentChannelLabel) {
+  const code = currentChannel || originChannel;
+  document.getElementById('journey-current-channel').textContent = channelLabel(code, currentChannelLabel);
+  document.getElementById('journey-current-channel-icon').innerHTML = CHANNEL_ICONS[code] || CHANNEL_ICON_DEFAULT;
+
+  const sameChannel = !code || code === originChannel;
+  document.getElementById('channel-flow-arrow').classList.toggle('hidden', sameChannel);
+  document.getElementById('journey-current-channel-chip').classList.toggle('hidden', sameChannel);
 }
 
 /**
@@ -818,15 +1087,14 @@ async function renderTimeline(transitions, journeyPayload) {
   const list = document.getElementById('history-list');
   list.innerHTML = '';
 
-  // "Canal atual" (spec-funcional §8.3): o canal da transição mais recente, não o de origem.
-  // Se coincidir com o canal de origem, esconde o segundo chip + seta (evita "WhatsApp -> WhatsApp").
+  // Mantém o canal sincronizado durante o polling do detalhe. A consulta do próprio painel é
+  // observacional e nunca passa a representar o canal em que a jornada está sendo conduzida.
   if (transitions.length > 0) {
-    const current = transitions[0].channel;
-    const origin = document.getElementById('journey-origin-channel').textContent;
-    document.getElementById('journey-current-channel').textContent = current;
-    document.getElementById('journey-current-channel-icon').innerHTML = CHANNEL_ICONS[current] || CHANNEL_ICON_DEFAULT;
-    document.getElementById('channel-flow-arrow').classList.toggle('hidden', current === origin);
-    document.getElementById('journey-current-channel-chip').classList.toggle('hidden', current === origin);
+    const latestOperational = transitions.find(t => t.event_type !== 'panel_accessed');
+    if (latestOperational) {
+      if (state.currentJourney) state.currentJourney.current_channel = latestOperational.channel;
+      setCurrentChannelDisplay(state.currentJourney?.origin_channel, latestOperational.channel);
+    }
   }
 
   await appendTimelineItems(list, transitions, journeyPayload);
@@ -958,7 +1226,11 @@ function buildTransitionSecondaryNote(transition) {
 }
 
 function formatMessageTime(isoString) {
-  return new Date(isoString).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  if (!isoString) return '—';
+  const date = new Date(isoString);
+  return Number.isNaN(date.getTime())
+    ? '—'
+    : date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 }
 
 function escapeHtml(text) {
@@ -974,13 +1246,15 @@ async function appendTimelineItems(list, transitions, journeyPayload) {
     const li = document.createElement('li');
     li.className = 'history-item';
     const colorClass = EVENT_COLOR_CLASS[t.event_type] || 'event-closed';
+    const eventLabel = EVENT_LABELS[t.event_type] || t.event_type || 'Atividade registrada';
+    const transitionChannelLabel = channelLabel(t.channel);
     li.innerHTML = `
       <div class="history-icon history-icon--${colorClass}">${EVENT_ICONS[t.event_type] || '•'}</div>
       <div class="history-body">
-        <div class="history-title">${EVENT_LABELS[t.event_type] || t.event_type}</div>
+        <div class="history-title">${escapeHtml(eventLabel)}</div>
         <div class="history-description">${escapeHtml(buildTransitionDescription(t, journeyPayload, context))}</div>
         ${buildTransitionSecondaryNote(t) ? `<div class="history-secondary-note">"${escapeHtml(buildTransitionSecondaryNote(t))}"</div>` : ''}
-        <div class="history-meta">${CHANNEL_ICONS[t.channel] || CHANNEL_ICON_DEFAULT} ${t.channel} · ${relativeTime(t.occurred_at)}</div>
+        <div class="history-meta">${CHANNEL_ICONS[t.channel] || CHANNEL_ICON_DEFAULT} ${escapeHtml(transitionChannelLabel)} · ${escapeHtml(relativeTime(t.occurred_at))}</div>
       </div>
     `;
     list.appendChild(li);
@@ -1009,16 +1283,25 @@ function buildPreviousJourneyItem(journey) {
   const li = document.createElement('li');
   li.className = 'previous-journey-item';
 
+  const status = Object.prototype.hasOwnProperty.call(STATUS_LABELS, journey.status)
+    ? journey.status
+    : 'unknown';
+  const statusLabel = STATUS_LABELS[journey.status] || journey.status || 'Status não informado';
+  const previousIntentLabel = INTENT_LABELS[journey.intent] || journey.intent || 'Intenção não informada';
+  const originChannelLabel = channelLabel(journey.origin_channel);
+  const previousStepLabel = CURRENT_STEP_LABELS[journey.current_step] ||
+    journey.current_step || 'Etapa não informada';
+
   const summary = document.createElement('button');
   summary.type = 'button';
   summary.className = 'previous-journey-summary';
   summary.innerHTML = `
-    <span class="status-badge status-${journey.status}">${STATUS_LABELS[journey.status] || journey.status}</span>
-    <span class="previous-journey-intent">${INTENT_LABELS[journey.intent] || journey.intent}</span>
+    <span class="status-badge status-${status}">${escapeHtml(statusLabel)}</span>
+    <span class="previous-journey-intent">${escapeHtml(previousIntentLabel)}</span>
     <span class="previous-journey-meta">
       ${CHANNEL_ICONS[journey.origin_channel] || CHANNEL_ICON_DEFAULT}
-      ${CHANNEL_LABELS[journey.origin_channel] || journey.origin_channel} ·
-      ${relativeTime(journey.updated_at)} · última etapa: ${CURRENT_STEP_LABELS[journey.current_step] || journey.current_step}
+      ${escapeHtml(originChannelLabel)} ·
+      ${escapeHtml(relativeTime(journey.updated_at))} · última etapa: ${escapeHtml(previousStepLabel)}
     </span>
     <span class="previous-journey-chevron" aria-hidden="true">
       <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="14" height="14"><polyline points="6 9 12 15 18 9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -1043,7 +1326,7 @@ function buildPreviousJourneyItem(journey) {
     if (!loaded) {
       detail.innerHTML = '<p class="coming-soon">Carregando histórico...</p>';
       try {
-        const data = await apiCall(`/context/${journey.id}/transitions`);
+        const data = await apiCall(`/context/${encodeURIComponent(journey.id)}/transitions`);
         detail.innerHTML = '';
         const ul = document.createElement('ul');
         ul.className = 'history-list';
@@ -1192,7 +1475,9 @@ async function startAuthenticatedSession() {
 
   // Pollings e buscas iniciais só começam com sessão ativa (FASE 4.1, item C.3) — antes do login,
   // nada no painel chama a API.
-  fetchActiveJourneys();
+  switchView('visao-geral');
+  fetchAlerts({ notify: false });
+  startAlertsPolling();
   fetchOpportunitiesBadge();
   updateHeaderClock();
   setInterval(updateHeaderClock, 60000);
@@ -1305,14 +1590,17 @@ function changePasswordErrorMessage(err) {
 // ---------- Navegação do menu lateral (FASE 3, item C.5) ----------
 
 const VIEW_HEADERS = {
+  'visao-geral': ['Visão geral', 'Acompanhe a operação e priorize clientes que precisam de atenção'],
   consulta: ['Consulta de Jornada', 'Consulte o contexto completo de qualquer cliente em atendimento'],
-  'jornadas-ativas': ['Jornadas Ativas', 'Jornadas em andamento no momento, em todos os canais'],
+  'jornadas-ativas': ['Jornadas Ativas', 'Jornadas em andamento ou escaladas, em todos os canais'],
+  alertas: ['Alertas operacionais', 'Jornadas que estão aguardando atividade há mais tempo que o esperado'],
   metricas: ['Métricas', 'Indicadores operacionais do atendimento'],
   oportunidades: ['Oportunidades', 'Leads comerciais detectados a partir de dados de jornadas'],
   configuracoes: ['Configurações', 'Preferências do atendente'],
 };
 
-function switchView(view) {
+function switchView(view, { focusTitle = false } = {}) {
+  if (!VIEW_HEADERS[view]) return;
   const previousView = state.currentView;
   state.currentView = view;
 
@@ -1321,29 +1609,50 @@ function switchView(view) {
   if (target) target.classList.remove('hidden');
 
   document.querySelectorAll('.sidebar-nav-item').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.view === view);
+    const isActive = btn.dataset.view === view;
+    btn.classList.toggle('active', isActive);
+    if (isActive) btn.setAttribute('aria-current', 'page');
+    else btn.removeAttribute('aria-current');
   });
 
   const [title, subtitle] = VIEW_HEADERS[view] || VIEW_HEADERS.consulta;
   document.getElementById('main-title').textContent = title;
   document.getElementById('main-subtitle').textContent = subtitle;
+  if (focusTitle) document.getElementById('main-title').focus();
 
-  // Polling de cada tela só roda enquanto o atendente está nela (FASE 3.2, itens B.1/C.1) —
-  // evita chamadas em background quando ele está em outra aba do menu lateral.
-  if (view === 'jornadas-ativas') {
-    fetchActiveJourneys();
+  if (previousView === 'consulta' && view !== 'consulta') stopPolling();
+  if (view === 'consulta' && state.currentJourney?.status === 'open') startPolling();
+
+  // Visão geral e Jornadas Ativas compartilham o mesmo cache e um único polling.
+  if (view === 'jornadas-ativas' || view === 'visao-geral') {
+    fetchActiveJourneys({ showLoading: !state.activeJourneysLoaded });
     stopActiveJourneysPolling();
-    state.activeJourneysPollHandle = setInterval(fetchActiveJourneys, 30000);
-  } else if (previousView === 'jornadas-ativas') {
+    state.activeJourneysPollHandle = setInterval(
+      () => fetchActiveJourneys({ silent: true }),
+      CFE_CONFIG.operationalPollingIntervalMs,
+    );
+  } else if (previousView === 'jornadas-ativas' || previousView === 'visao-geral') {
     stopActiveJourneysPolling();
   }
 
-  if (view === 'metricas') {
-    fetchMetricsSummary();
+  if (view === 'metricas' || view === 'visao-geral') {
+    fetchMetricsSummary({ showLoading: !state.metricsLoaded });
     stopMetricsPolling();
-    state.metricsPollHandle = setInterval(fetchMetricsSummary, 60000);
-  } else if (previousView === 'metricas') {
+    state.metricsPollHandle = setInterval(
+      () => fetchMetricsSummary({ silent: true }),
+      CFE_CONFIG.metricsPollingIntervalMs,
+    );
+  } else if (previousView === 'metricas' || previousView === 'visao-geral') {
     stopMetricsPolling();
+  }
+
+  if (view === 'visao-geral') {
+    renderOverviewKpis();
+    renderQueue();
+    renderOverviewAlerts();
+  } else if (view === 'alertas') {
+    renderAlertsView();
+    fetchAlerts({ silent: state.alertsLoaded, notify: false });
   }
 
   // Oportunidades (FASE 3.6) — sem polling automático; o atendente atualiza via botão "Detectar".
@@ -1371,6 +1680,14 @@ function stopMetricsPolling() {
   }
 }
 
+function startAlertsPolling() {
+  if (state.alertsPollHandle) clearInterval(state.alertsPollHandle);
+  state.alertsPollHandle = setInterval(
+    () => fetchAlerts({ silent: true, notify: true }),
+    CFE_CONFIG.operationalPollingIntervalMs,
+  );
+}
+
 // ---------- Jornadas Ativas — dados reais via GET /journeys/active (FASE 3.2, Bloco B) ----------
 
 const ACTIVE_JOURNEYS_INTENT_ICONS = {
@@ -1391,6 +1708,8 @@ const ACTIVE_JOURNEYS_TIME_ICONS = {
   'mock-time--warning': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4l9 16H3z"></path><path d="M12 10v4"></path><circle cx="12" cy="17" r="0.6" fill="currentColor"></circle></svg>',
   'mock-time--urgent': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3h8l5 5v8l-5 5H8l-5-5V8z"></path><path d="M12 8v5"></path><circle cx="12" cy="16.5" r="0.6" fill="currentColor"></circle></svg>',
 };
+
+const ACTIVE_JOURNEYS_CLOCK_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 3"></path></svg>';
 const ACTIVE_JOURNEYS_TIME_LABELS = {
   'mock-time--low': 'Recente',
   'mock-time--normal': 'Em curso',
@@ -1398,26 +1717,56 @@ const ACTIVE_JOURNEYS_TIME_LABELS = {
   'mock-time--urgent': 'Urgente',
 };
 
-/** Urgência por tempo desde o início (FASE 3.1, item B.3.1): quanto mais tempo parado, mais quente a cor. */
-function activeJourneyTimeUrgencyClass(minutes) {
-  if (minutes > 30) return 'mock-time--urgent';
-  if (minutes > 15) return 'mock-time--warning';
-  if (minutes > 5) return 'mock-time--normal';
-  return 'mock-time--low';
+function priorityBadgeHtml(level) {
+  const safeLevel = safeAlertLevel(level);
+  return `<span class="priority-badge priority-badge--${safeLevel}"><span aria-hidden="true"></span>${alertLevelLabel(safeLevel)}</span>`;
 }
 
-/** Busca GET /journeys/active — atualiza o badge do menu lateral sempre, e a tabela só se ela estiver visível. */
-async function fetchActiveJourneys() {
-  try {
-    const data = await apiCall('/journeys/active');
-    renderActiveJourneysBadge(data.total);
-    if (state.currentView === 'jornadas-ativas') {
-      renderActiveJourneysTable(data.journeys);
-    }
-  } catch (err) {
-    // Falha silenciosa (FASE 3.2, item B.1: polling "silencioso, sem indicador visual") — mantém
-    // o último estado renderizado em vez de substituir a tela por uma mensagem de erro a cada 30s.
+/** Busca e mantém em cache jornadas abertas/escaladas. Pollings silenciosos nunca apagam o último payload válido. */
+async function fetchActiveJourneys({ silent = false, showLoading = false } = {}) {
+  if (state.activeJourneysRequest) return state.activeJourneysRequest;
+
+  if (showLoading && !state.activeJourneysLoaded) {
+    document.getElementById('active-journeys-loading').classList.remove('hidden');
+    document.getElementById('queue-loading').classList.remove('hidden');
   }
+
+  state.activeJourneysRequest = (async () => {
+    try {
+      const data = await apiCall('/journeys/active?include_escalated=true');
+      state.activeJourneys = Array.isArray(data.journeys) ? data.journeys : [];
+      state.activeJourneysLoaded = true;
+
+      const openTotal = state.activeJourneys.filter(journey => journey.status === 'open').length;
+      renderActiveJourneysBadge(openTotal);
+      renderActiveJourneysTable(state.activeJourneys);
+      renderQueue();
+      renderOverviewKpis();
+      refreshCurrentJourneyFromOperationalCache();
+
+      document.getElementById('active-journeys-loading').classList.add('hidden');
+      document.getElementById('active-journeys-error').classList.add('hidden');
+      document.getElementById('queue-loading').classList.add('hidden');
+      document.getElementById('queue-error').classList.add('hidden');
+      return data;
+    } catch (err) {
+      if (err instanceof CfeUnavailableError) {
+        state.degraded = true;
+        showDegradedBanner(true);
+      }
+      if (!state.activeJourneysLoaded && !silent) {
+        document.getElementById('active-journeys-loading').classList.add('hidden');
+        document.getElementById('queue-loading').classList.add('hidden');
+        document.getElementById('active-journeys-error').classList.remove('hidden');
+        document.getElementById('queue-error').classList.remove('hidden');
+      }
+      return null;
+    } finally {
+      state.activeJourneysRequest = null;
+    }
+  })();
+
+  return state.activeJourneysRequest;
 }
 
 /** "Jornadas ativas (N)" — badge escondido quando N é 0, conforme critério de aceite do item B.1. */
@@ -1428,23 +1777,26 @@ function renderActiveJourneysBadge(total) {
 }
 
 function renderActiveJourneysTable(journeys) {
-  const table = document.getElementById('active-journeys-table');
+  const wrapper = document.getElementById('active-journeys-table-wrapper');
   const empty = document.getElementById('active-journeys-empty');
   const tbody = document.getElementById('active-journeys-body');
 
   if (journeys.length === 0) {
-    table.classList.add('hidden');
+    wrapper.classList.add('hidden');
     empty.classList.remove('hidden');
+    tbody.innerHTML = '';
     return;
   }
 
-  table.classList.remove('hidden');
+  wrapper.classList.remove('hidden');
   empty.classList.add('hidden');
   tbody.innerHTML = '';
 
   journeys.forEach(journey => {
     const tr = document.createElement('tr');
-    const urgencyClass = activeJourneyTimeUrgencyClass(journey.minutes_since_start);
+    const intentClass = Object.prototype.hasOwnProperty.call(INTENT_LABELS, journey.intent) ? journey.intent : 'other';
+    const channelClass = Object.prototype.hasOwnProperty.call(CHANNEL_LABELS, journey.current_channel) ? journey.current_channel : 'other';
+    const statusClass = Object.prototype.hasOwnProperty.call(STATUS_LABELS, journey.status) ? journey.status : 'unknown';
     tr.innerHTML = `
       <td>
         <div class="mock-table-client">
@@ -1452,51 +1804,353 @@ function renderActiveJourneysTable(journeys) {
           <span class="mock-table-client-name">${escapeHtml(journey.customer.full_name)}</span>
         </div>
       </td>
-      <td><span class="mock-badge mock-badge--intent-${journey.intent}">${ACTIVE_JOURNEYS_INTENT_ICONS[journey.intent] || ''}${escapeHtml(journey.intent_label)}</span></td>
-      <td><span class="mock-badge mock-badge--channel-${journey.current_channel}">${ACTIVE_JOURNEYS_CHANNEL_ICONS[journey.current_channel] || ''}${escapeHtml(journey.current_channel_label)}</span></td>
-      <td><span class="mock-time ${urgencyClass}">${ACTIVE_JOURNEYS_TIME_ICONS[urgencyClass]}há ${journey.minutes_since_start} min · ${ACTIVE_JOURNEYS_TIME_LABELS[urgencyClass]}</span></td>
+      <td><span class="mock-badge mock-badge--intent-${intentClass}">${ACTIVE_JOURNEYS_INTENT_ICONS[journey.intent] || ''}${escapeHtml(intentLabel(journey))}</span></td>
+      <td>${escapeHtml(currentStepLabel(journey))}</td>
+      <td><span class="mock-badge mock-badge--channel-${channelClass}">${ACTIVE_JOURNEYS_CHANNEL_ICONS[journey.current_channel] || ''}${escapeHtml(channelLabel(journey.current_channel, journey.current_channel_label))}</span></td>
+      <td>${escapeHtml(relativeTime(journey.created_at))}</td>
+      <td>${escapeHtml(relativeTime(journey.last_activity_at))}</td>
+      <td><span class="mock-time">${ACTIVE_JOURNEYS_CLOCK_ICON}${escapeHtml(formatDuration(journey.minutes_since_last_activity))}</span></td>
+      <td>${priorityBadgeHtml(journey.alert_level)}</td>
+      <td><span class="status-badge status-${statusClass}">${escapeHtml(STATUS_LABELS[journey.status] || journey.status)}</span></td>
     `;
 
-    // FASE 3.3, item B.2.4: linha clicável precisa ser operável por teclado (tabindex + Enter/Espaço),
-    // já que <tr> não é focável nem ativável nativamente como um <button> seria.
-    tr.tabIndex = 0;
-    tr.setAttribute('role', 'button');
-    tr.setAttribute('aria-label', `Consultar jornada de ${journey.customer.full_name}`);
-
-    // FASE 4.3, item A.5: o card só traz cpf_masked, que não é um CPF válido pra reusar como busca —
-    // abre a Consulta de Jornada direto pelo id do cliente, sem simular uma busca por CPF.
-    const openJourney = async () => {
-      switchView('consulta');
-      stopPolling();
-      hideAllResultBlocks();
-      document.getElementById('empty-state').classList.add('hidden');
-      document.getElementById('search-input').value = '';
-      clearMessage();
-      state.customerId = journey.customer.id;
-      await loadCustomerJourney();
-    };
-    tr.addEventListener('click', openJourney);
-    tr.addEventListener('keydown', event => {
-      if (event.key === 'Enter' || event.key === ' ') {
-        event.preventDefault();
-        openJourney();
-      }
-    });
+    bindJourneyActivation(tr, journey);
 
     tbody.appendChild(tr);
   });
 }
 
+function bindJourneyActivation(element, journey) {
+  const customerId = journey.customer?.id;
+  const journeyId = journey.journey_id || journey.id;
+  const customerName = journey.customer?.full_name || 'cliente';
+  const openJourney = () => openCustomerJourney(customerId, journeyId);
+
+  element.tabIndex = 0;
+  element.setAttribute('role', 'button');
+  element.setAttribute('aria-label', `Abrir jornada de ${customerName}`);
+  element.addEventListener('click', openJourney);
+  element.addEventListener('keydown', event => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      openJourney();
+    }
+  });
+}
+
+function renderOverviewKpis() {
+  const openTotal = state.activeJourneysLoaded
+    ? state.activeJourneys.filter(journey => journey.status === 'open').length
+    : null;
+  const escalatedTotal = state.activeJourneysLoaded
+    ? state.activeJourneys.filter(journey => journey.status === 'escalated').length
+    : null;
+
+  document.getElementById('overview-open-value').textContent = openTotal ?? '—';
+  document.getElementById('overview-escalated-value').textContent = escalatedTotal ?? '—';
+  document.getElementById('overview-attention-value').textContent = state.alertsSummary?.total ?? '—';
+  document.getElementById('overview-critical-value').textContent = state.alertsSummary?.critical ?? '—';
+  document.getElementById('overview-today-value').textContent = state.metrics?.journeys_today ?? '—';
+}
+
+let queueSearchTimer = null;
+let queueSearchRequestId = 0;
+
+/** Só dígitos (com máscara ou não): exige 3 dígitos; senão, exige 2 letras. Espelha a regra do servidor. */
+function isQueueSearchLongEnough(term) {
+  const numeric = /\d/.test(term) && /^[\d\s()+.-]+$/.test(term);
+  return numeric ? term.replace(/\D/g, '').length >= 3 : term.length >= 2;
+}
+
+function handleQueueSearchInput() {
+  clearTimeout(queueSearchTimer);
+  queueSearchTimer = setTimeout(runQueueSearch, 300);
+}
+
+async function runQueueSearch() {
+  const term = document.getElementById('queue-filter-search').value.trim();
+  const requestId = ++queueSearchRequestId;
+
+  if (!isQueueSearchLongEnough(term)) {
+    state.queueSearch = null;
+    renderQueue();
+    return;
+  }
+
+  try {
+    const data = await apiCall('/journeys/active/search', { method: 'POST', body: { query: term } });
+    if (requestId !== queueSearchRequestId) return;
+    state.queueSearch = { term, journeys: data.journeys || [] };
+  } catch {
+    if (requestId !== queueSearchRequestId) return;
+    state.queueSearch = { term, journeys: [], failed: true };
+  }
+  renderQueue();
+}
+
+function getFilteredQueueJourneys() {
+  const term = document.getElementById('queue-filter-search').value.trim();
+  const useServerResults = state.queueSearch && state.queueSearch.term === term;
+  const source = useServerResults ? state.queueSearch.journeys : state.activeJourneys;
+  const intent = document.getElementById('queue-filter-intent').value;
+  const channel = document.getElementById('queue-filter-channel').value;
+  const priority = document.getElementById('queue-filter-priority').value;
+  const sorting = document.getElementById('queue-sort').value;
+
+  const filtered = source.filter(journey => {
+    if (journey.status !== 'open') return false;
+    if (intent && journey.intent !== intent) return false;
+    if (channel && journey.current_channel !== channel) return false;
+    if (priority && safeAlertLevel(journey.alert_level) !== priority) return false;
+    return true;
+  });
+
+  filtered.sort((a, b) => {
+    if (sorting === 'recent') return new Date(b.created_at) - new Date(a.created_at);
+    if (sorting === 'oldest') return new Date(a.created_at) - new Date(b.created_at);
+    return Number(b.minutes_since_last_activity || 0) - Number(a.minutes_since_last_activity || 0);
+  });
+  return filtered;
+}
+
+function renderQueue() {
+  if (!state.activeJourneysLoaded) return;
+
+  const allOpen = state.activeJourneys.filter(journey => journey.status === 'open');
+  const journeys = getFilteredQueueJourneys();
+  const wrapper = document.getElementById('queue-table-wrapper');
+  const empty = document.getElementById('queue-empty');
+  const tbody = document.getElementById('queue-body');
+
+  document.getElementById('queue-loading').classList.add('hidden');
+  document.getElementById('queue-error').classList.add('hidden');
+  document.getElementById('queue-count').textContent = `${journeys.length} de ${allOpen.length}`;
+  tbody.innerHTML = '';
+
+  if (journeys.length === 0) {
+    wrapper.classList.add('hidden');
+    empty.classList.remove('hidden');
+    return;
+  }
+
+  wrapper.classList.remove('hidden');
+  empty.classList.add('hidden');
+
+  journeys.forEach(journey => {
+    const row = document.createElement('tr');
+    const channelClass = Object.prototype.hasOwnProperty.call(CHANNEL_LABELS, journey.current_channel) ? journey.current_channel : 'other';
+    row.innerHTML = `
+      <td><div class="mock-table-client"><div class="mock-table-avatar">${escapeHtml(getInitials(journey.customer.full_name))}</div><span class="mock-table-client-name">${escapeHtml(journey.customer.full_name)}</span></div></td>
+      <td>${escapeHtml(intentLabel(journey))}</td>
+      <td>${escapeHtml(currentStepLabel(journey))}</td>
+      <td><span class="mock-badge mock-badge--channel-${channelClass}">${ACTIVE_JOURNEYS_CHANNEL_ICONS[journey.current_channel] || ''}${escapeHtml(channelLabel(journey.current_channel, journey.current_channel_label))}</span></td>
+      <td>${escapeHtml(relativeTime(journey.created_at))}</td>
+      <td>${escapeHtml(relativeTime(journey.last_activity_at))}</td>
+      <td><strong>${escapeHtml(formatDuration(journey.minutes_since_last_activity))}</strong></td>
+      <td>${priorityBadgeHtml(journey.alert_level)}</td>
+    `;
+    bindJourneyActivation(row, journey);
+    tbody.appendChild(row);
+  });
+}
+
+// ---------- Alertas operacionais — dados reais via GET /alerts/active ----------
+
+async function fetchAlerts({ silent = false, notify = true } = {}) {
+  if (state.alertsRequest) return state.alertsRequest;
+
+  state.alertsRequest = (async () => {
+    try {
+      const data = await apiCall('/alerts/active');
+      const alerts = Array.isArray(data.alerts) ? data.alerts : [];
+
+      reconcileKnownAlerts(alerts, notify);
+      state.alerts = alerts;
+      state.alertsSummary = {
+        total: Number(data.total ?? alerts.length),
+        warning: Number(data.warning ?? alerts.filter(alert => alert.alert_level === 'warning').length),
+        critical: Number(data.critical ?? alerts.filter(alert => alert.alert_level === 'critical').length),
+        attentionThresholdMinutes: data.attention_threshold_minutes,
+        criticalThresholdMinutes: data.critical_threshold_minutes,
+      };
+      state.alertsLoaded = true;
+
+      renderAlertCounters();
+      renderAlertsView();
+      renderOverviewAlerts();
+      renderOverviewKpis();
+      renderThresholdSettings();
+      refreshCurrentJourneyFromOperationalCache();
+
+      document.getElementById('alerts-loading').classList.add('hidden');
+      document.getElementById('overview-alerts-loading').classList.add('hidden');
+      document.getElementById('alerts-error').classList.add('hidden');
+      document.getElementById('overview-alerts-error').classList.add('hidden');
+      return data;
+    } catch (err) {
+      if (err instanceof CfeUnavailableError) {
+        state.degraded = true;
+        showDegradedBanner(true);
+      }
+      if (!state.alertsLoaded && !silent) {
+        document.getElementById('alerts-loading').classList.add('hidden');
+        document.getElementById('overview-alerts-loading').classList.add('hidden');
+        document.getElementById('alerts-error').classList.remove('hidden');
+        document.getElementById('overview-alerts-error').classList.remove('hidden');
+      }
+      return null;
+    } finally {
+      state.alertsRequest = null;
+    }
+  })();
+
+  return state.alertsRequest;
+}
+
+function reconcileKnownAlerts(alerts, notify) {
+  const nextAlerts = new Map();
+
+  alerts.forEach(alert => {
+    const level = safeAlertLevel(alert.alert_level);
+    nextAlerts.set(alert.journey_id, level);
+
+    if (!state.alertsInitialized || !notify) return;
+    const previousLevel = state.knownAlerts.get(alert.journey_id);
+    const becameWarning = previousLevel == null && level === 'warning';
+    const becameCritical = level === 'critical' && previousLevel !== 'critical';
+    if (!becameWarning && !becameCritical) return;
+
+    const customerName = alert.customer?.full_name || 'Cliente';
+    const inactivity = formatDuration(alert.minutes_since_last_activity);
+    showToast(level === 'critical'
+      ? `Jornada de ${customerName} está crítica — sem atividade há ${inactivity}.`
+      : `Jornada de ${customerName} requer atenção — sem atividade há ${inactivity}.`);
+  });
+
+  state.knownAlerts = nextAlerts;
+  state.alertsInitialized = true;
+}
+
+function renderAlertCounters() {
+  const total = state.alertsSummary?.total ?? 0;
+  const sidebarBadge = document.getElementById('alerts-badge');
+  const notificationBadge = document.getElementById('notification-badge');
+  const notificationButton = document.getElementById('notification-button');
+
+  [sidebarBadge, notificationBadge].forEach(badge => {
+    badge.textContent = total;
+    badge.classList.toggle('hidden', total === 0);
+  });
+  notificationButton.setAttribute('aria-label', total === 0
+    ? 'Abrir alertas operacionais, nenhum alerta ativo'
+    : `Abrir alertas operacionais, ${total} alerta${total === 1 ? '' : 's'} ativo${total === 1 ? '' : 's'}`);
+
+  document.getElementById('alerts-total-value').textContent = total;
+  document.getElementById('alerts-warning-value').textContent = state.alertsSummary?.warning ?? 0;
+  document.getElementById('alerts-critical-value').textContent = state.alertsSummary?.critical ?? 0;
+}
+
+function getSortedAlerts() {
+  const priority = { critical: 2, warning: 1, normal: 0 };
+  return [...state.alerts].sort((a, b) => {
+    const levelDifference = priority[safeAlertLevel(b.alert_level)] - priority[safeAlertLevel(a.alert_level)];
+    if (levelDifference !== 0) return levelDifference;
+    return Number(b.minutes_since_last_activity || 0) - Number(a.minutes_since_last_activity || 0);
+  });
+}
+
+function renderOverviewAlerts() {
+  if (!state.alertsLoaded) return;
+  const list = document.getElementById('overview-alerts-list');
+  const empty = document.getElementById('overview-alerts-empty');
+  const alerts = getSortedAlerts().slice(0, 5);
+
+  document.getElementById('overview-alerts-loading').classList.add('hidden');
+  document.getElementById('overview-alerts-error').classList.add('hidden');
+  list.innerHTML = '';
+  empty.classList.toggle('hidden', alerts.length !== 0);
+  alerts.forEach(alert => list.appendChild(buildAlertCard(alert, true)));
+}
+
+function renderAlertsView() {
+  if (!state.alertsLoaded) return;
+  const list = document.getElementById('alerts-list');
+  const empty = document.getElementById('alerts-empty');
+  const alerts = getSortedAlerts();
+
+  document.getElementById('alerts-loading').classList.add('hidden');
+  document.getElementById('alerts-error').classList.add('hidden');
+  list.innerHTML = '';
+  empty.classList.toggle('hidden', alerts.length !== 0);
+  alerts.forEach(alert => list.appendChild(buildAlertCard(alert, false)));
+}
+
+function buildAlertCard(alert, compact) {
+  const level = safeAlertLevel(alert.alert_level);
+  const lastActivityLabel = compact
+    ? relativeTime(alert.last_activity_at)
+    : formatLastActivity(alert.last_activity_at);
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = `alert-card alert-card--${level}${compact ? ' alert-card--compact' : ''}`;
+  button.setAttribute('aria-label', `Abrir jornada de ${alert.customer?.full_name || 'cliente'}, prioridade ${alertLevelLabel(level)}`);
+  button.innerHTML = `
+    <span class="alert-card-priority priority-badge priority-badge--${level}"><span aria-hidden="true"></span>${alertLevelLabel(level)}</span>
+    <span class="alert-card-avatar" aria-hidden="true">${escapeHtml(getInitials(alert.customer?.full_name))}</span>
+    <span class="alert-card-content">
+      <strong class="alert-card-customer">${escapeHtml(alert.customer?.full_name || 'Cliente')}</strong>
+      <span class="alert-card-context">${escapeHtml(intentLabel(alert))} · ${escapeHtml(channelLabel(alert.current_channel, alert.current_channel_label))}</span>
+      <span class="alert-card-step"><span>Etapa:</span> ${escapeHtml(currentStepLabel(alert))}</span>
+      <span class="alert-card-activity"><span>Última atividade:</span> ${escapeHtml(lastActivityLabel)}</span>
+    </span>
+    <span class="alert-card-inactivity"><small>Sem atividade</small><strong>${escapeHtml(formatDuration(alert.minutes_since_last_activity))}</strong></span>
+    <span class="alert-card-action">Abrir cliente <span aria-hidden="true">→</span></span>
+  `;
+  button.addEventListener('click', () => openCustomerJourney(alert.customer?.id, alert.journey_id));
+  return button;
+}
+
+function renderThresholdSettings() {
+  const attention = state.alertsSummary?.attentionThresholdMinutes;
+  const critical = state.alertsSummary?.criticalThresholdMinutes;
+  document.getElementById('settings-attention-threshold').textContent =
+    Number.isFinite(Number(attention)) ? `${attention} min` : '—';
+  document.getElementById('settings-critical-threshold').textContent =
+    Number.isFinite(Number(critical)) ? `${critical} min` : '—';
+}
+
+function refreshCurrentJourneyFromOperationalCache() {
+  if (!state.currentJourney || document.getElementById('status-block').classList.contains('hidden')) return;
+  state.currentJourney = enrichJourneyForPanel(state.currentJourney);
+  renderJourneyStatus(state.currentJourney);
+}
+
 // ---------- Métricas — dados reais via GET /metrics/summary (FASE 3.2, Bloco C) ----------
 
-/** Busca GET /metrics/summary e atualiza os 4 cards. Falha silenciosa (mesmo padrão do polling de Jornadas Ativas). */
-async function fetchMetricsSummary() {
-  try {
-    const data = await apiCall('/metrics/summary');
-    renderMetricsSummary(data);
-  } catch (err) {
-    // Silencioso — mantém os últimos valores renderizados em vez de substituir os cards por um erro.
-  }
+/** Busca GET /metrics/summary e compartilha o resultado entre Métricas e Visão geral. */
+async function fetchMetricsSummary({ silent = false } = {}) {
+  if (state.metricsRequest) return state.metricsRequest;
+
+  state.metricsRequest = (async () => {
+    try {
+      const data = await apiCall('/metrics/summary');
+      state.metrics = data;
+      state.metricsLoaded = true;
+      renderMetricsSummary(data);
+      renderOverviewKpis();
+      return data;
+    } catch (err) {
+      if (err instanceof CfeUnavailableError) {
+        state.degraded = true;
+        showDegradedBanner(true);
+      }
+      return null;
+    } finally {
+      state.metricsRequest = null;
+    }
+  })();
+
+  return state.metricsRequest;
 }
 
 /** Campos ausentes ou null viram "—" (o backend omite a chave quando o valor é null — ver relatório do Bloco A). */
@@ -1529,16 +2183,34 @@ function renderModalOptions(containerId, options, inputName) {
   `).join('');
 }
 
+function showModal(modalId, focusSelector) {
+  state.modalReturnFocus = document.activeElement;
+  state.activeModalId = modalId;
+  const modal = document.getElementById(modalId);
+  modal.classList.remove('hidden');
+  requestAnimationFrame(() => {
+    const target = focusSelector ? modal.querySelector(focusSelector) : null;
+    (target || modal.querySelector('.panel-modal-box')).focus();
+  });
+}
+
+function hideModal(modalId) {
+  document.getElementById(modalId).classList.add('hidden');
+  if (state.activeModalId === modalId) state.activeModalId = null;
+  if (state.modalReturnFocus instanceof HTMLElement) state.modalReturnFocus.focus();
+  state.modalReturnFocus = null;
+}
+
 function openConcludeModal() {
   renderModalOptions('conclude-options', RESOLUTION_CATEGORIES, 'conclude-category');
   document.getElementById('conclude-description').value = '';
   document.getElementById('conclude-description-count').textContent = '0';
   document.getElementById('conclude-confirm-button').disabled = true;
-  document.getElementById('conclude-modal').classList.remove('hidden');
+  showModal('conclude-modal', 'input[type="radio"]');
 }
 
 function closeConcludeModal() {
-  document.getElementById('conclude-modal').classList.add('hidden');
+  hideModal('conclude-modal');
 }
 
 function openEscalateModal() {
@@ -1546,11 +2218,11 @@ function openEscalateModal() {
   document.getElementById('escalate-description').value = '';
   document.getElementById('escalate-description-count').textContent = '0';
   document.getElementById('escalate-confirm-button').disabled = true;
-  document.getElementById('escalate-modal').classList.remove('hidden');
+  showModal('escalate-modal', 'input[type="radio"]');
 }
 
 function closeEscalateModal() {
-  document.getElementById('escalate-modal').classList.add('hidden');
+  hideModal('escalate-modal');
 }
 
 // ---------- Oportunidades — dados reais via GET /opportunities (FASE 3.6) ----------
@@ -1581,6 +2253,7 @@ function showToast(message, isError = false) {
 }
 
 function formatDateTime(isoString) {
+  if (!isoString) return '—';
   return `${formatDateShort(isoString)} ${formatMessageTime(isoString)}`;
 }
 
@@ -1602,6 +2275,7 @@ async function handleConcludeConfirm() {
     closeConcludeModal();
     showToast('Jornada concluída');
     await pollJourney();
+    await refreshOperationalAfterJourneyAction();
   } catch (err) {
     showToast(err instanceof CfeUnavailableError
       ? 'Sistema de contexto indisponível — tente novamente em instantes.'
@@ -1627,6 +2301,7 @@ async function handleEscalateConfirm() {
     closeEscalateModal();
     showToast(`Jornada escalada para ${escalationAreaLabel(area)}`);
     await pollJourney();
+    await refreshOperationalAfterJourneyAction();
   } catch (err) {
     showToast(err instanceof CfeUnavailableError
       ? 'Sistema de contexto indisponível — tente novamente em instantes.'
@@ -1634,6 +2309,14 @@ async function handleEscalateConfirm() {
   } finally {
     button.disabled = false;
   }
+}
+
+async function refreshOperationalAfterJourneyAction() {
+  await Promise.allSettled([
+    fetchActiveJourneys({ silent: true }),
+    fetchAlerts({ silent: true, notify: false }),
+    fetchMetricsSummary({ silent: true }),
+  ]);
 }
 
 /** Filtro de status exato tem prioridade sobre o agrupamento Todas/Ativas/Histórico (FASE 3.6, item B.6). */
@@ -1722,10 +2405,10 @@ function buildOpportunityContextLine(opp, plansCatalog) {
       return `Motivo: <strong>${escapeHtml(DISPUTE_REASON_LABELS[m.dispute_reason] || m.dispute_reason || 'não informado')}</strong>`;
     case 'active_engaged_customer': {
       const intents = (m.intents_used || []).map(i => INTENT_LABELS[i] || i).join(', ');
-      return `${m.recent_journey_count || 0} jornadas concluídas recentemente (${escapeHtml(intents)})`;
+      return `${escapeHtml(m.recent_journey_count || 0)} jornadas concluídas recentemente (${escapeHtml(intents)})`;
     }
     case 'inactive_customer':
-      return `Sem interação há <strong>${m.days_since_activity ?? '?'} dias</strong> (${m.total_journeys_last_180d || 0} jornadas nos últimos 180 dias)`;
+      return `Sem interação há <strong>${escapeHtml(m.days_since_activity ?? '?')} dias</strong> (${escapeHtml(m.total_journeys_last_180d || 0)} jornadas nos últimos 180 dias)`;
     default:
       return '';
   }
@@ -1733,17 +2416,17 @@ function buildOpportunityContextLine(opp, plansCatalog) {
 
 function buildOpportunityStatusInfo(opp) {
   if (opp.status === 'contacted') {
-    let html = `<div class="opp-status-info opp-status-info--contacted">${OPP_CHECK_ICON} Abordada em ${formatDateTime(opp.contacted_at)}</div>`;
+    let html = `<div class="opp-status-info opp-status-info--contacted">${OPP_CHECK_ICON} Abordada em ${escapeHtml(formatDateTime(opp.contacted_at))}</div>`;
     if (opp.resolution_notes) html += `<div class="opp-status-note">"${escapeHtml(opp.resolution_notes)}"</div>`;
     return html;
   }
   if (opp.status === 'converted') {
-    let html = `<div class="opp-status-info opp-status-info--converted">${OPP_CHECK_ICON} Convertida em ${formatDateTime(opp.resolved_at)}</div>`;
+    let html = `<div class="opp-status-info opp-status-info--converted">${OPP_CHECK_ICON} Convertida em ${escapeHtml(formatDateTime(opp.resolved_at))}</div>`;
     if (opp.resolution_notes) html += `<div class="opp-status-note">"${escapeHtml(opp.resolution_notes)}"</div>`;
     return html;
   }
   if (opp.status === 'not_relevant') {
-    let html = `<div class="opp-status-info opp-status-info--not-relevant">${OPP_X_ICON} Não relevante em ${formatDateTime(opp.resolved_at)}</div>`;
+    let html = `<div class="opp-status-info opp-status-info--not-relevant">${OPP_X_ICON} Não relevante em ${escapeHtml(formatDateTime(opp.resolved_at))}</div>`;
     if (opp.resolution_notes) html += `<div class="opp-status-note">"${escapeHtml(opp.resolution_notes)}"</div>`;
     return html;
   }
@@ -1762,8 +2445,12 @@ function buildOpportunityCard(opp, plansCatalog) {
   const card = document.createElement('div');
   card.className = 'opp-card';
 
-  const validityText = opp.days_remaining > 0
-    ? `Válida por mais ${opp.days_remaining} dia${opp.days_remaining === 1 ? '' : 's'}`
+  const daysRemaining = Number.isFinite(Number(opp.days_remaining))
+    ? Math.max(0, Math.floor(Number(opp.days_remaining)))
+    : 0;
+  const urgency = ['critical', 'high', 'medium', 'low'].includes(opp.urgency) ? opp.urgency : 'low';
+  const validityText = daysRemaining > 0
+    ? `Válida por mais ${daysRemaining} dia${daysRemaining === 1 ? '' : 's'}`
     : 'Expira hoje';
 
   card.innerHTML = `
@@ -1821,12 +2508,12 @@ function openOpportunityActionModal(opp, action) {
   document.getElementById('opp-action-notes').value = '';
   document.getElementById('opp-action-notes-count').textContent = '0';
   document.getElementById('opp-action-confirm-button').textContent = config.confirmLabel;
-  document.getElementById('opp-action-modal').classList.remove('hidden');
+  showModal('opp-action-modal', '#opp-action-notes');
 }
 
 function closeOpportunityActionModal() {
   opportunityActionContext = null;
-  document.getElementById('opp-action-modal').classList.add('hidden');
+  hideModal('opp-action-modal');
 }
 
 async function handleOpportunityActionConfirm() {
@@ -1838,7 +2525,7 @@ async function handleOpportunityActionConfirm() {
   button.disabled = true;
 
   try {
-    await apiCall(`/opportunities/${id}/${config.endpoint}`, { method: 'POST', body: { notes: notes || null } });
+    await apiCall(`/opportunities/${encodeURIComponent(id)}/${config.endpoint}`, { method: 'POST', body: { notes: notes || null } });
     closeOpportunityActionModal();
     showToast(config.successMessage);
     await fetchOpportunities();
@@ -1897,10 +2584,17 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('search-form').addEventListener('submit', handleSearch);
 
   document.querySelectorAll('.sidebar-nav-item').forEach(btn => {
-    btn.addEventListener('click', () => {
-      switchView(btn.dataset.view);
-      document.getElementById('main-title').focus();
-    });
+    btn.addEventListener('click', () => switchView(btn.dataset.view, { focusTitle: true }));
+  });
+
+  document.getElementById('notification-button').addEventListener('click', () =>
+    switchView('alertas', { focusTitle: true }));
+  document.getElementById('overview-open-alerts').addEventListener('click', () =>
+    switchView('alertas', { focusTitle: true }));
+
+  document.getElementById('queue-filter-search').addEventListener('input', handleQueueSearchInput);
+  ['queue-filter-intent', 'queue-filter-channel', 'queue-filter-priority', 'queue-sort'].forEach(id => {
+    document.getElementById(id).addEventListener('change', renderQueue);
   });
 
   // Concluir/escalar jornada (FASE 3.5)

@@ -13,4 +13,7 @@ const IS_ISOLATED_DEV = ['5171', '5173', '5175'].includes(window.location.port);
 const CFE_CONFIG = {
   apiBaseUrl: IS_ISOLATED_DEV ? 'http://localhost:5104' : window.location.origin,
   pollingIntervalMs: 4000,
+  operationalPollingIntervalMs: 30000,
+  metricsPollingIntervalMs: 60000,
+  highlightDurationMs: 2000,
 };

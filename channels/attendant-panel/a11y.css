@@ -35,6 +35,11 @@ html[data-a11y-focus="strong"] *:focus-visible {
 
 /* ---------- Alto contraste (A.4): texto 7:1, bordas 2px, links sublinhados ---------- */
 html[data-a11y-contrast="high"] {
+  --ops-attention-strong: #824704;
+  --ops-escalated-strong: #903011;
+  --ops-open-strong: #105f2d;
+  --ops-today-strong: #3730a3;
+  --ops-positive-text: #105f2d;
   --page-bg: #ffffff;
   --surface: #ffffff;
   --surface-muted: #ffffff;
@@ -80,6 +85,14 @@ html[data-a11y-contrast="high"] a {
 
 /* ---------- Cores para daltonismo (A.5): paleta Okabe-Ito nos indicadores de estado ---------- */
 html[data-a11y-color="colorblind"] {
+  --ops-attention: #e69f00;
+  --ops-escalated: #d55e00;
+  --ops-attention-strong: #7a4f00;
+  --ops-escalated-strong: #7a4f00;
+  --ops-open-strong: #0b4a6e;
+  --ops-today: #56b4e9;
+  --ops-today-strong: #00507f;
+  --ops-positive-text: #00507f;
   --state-success-text: #00507f;
   --state-success-icon: #0072b2;
   --state-success-bg: #e6f0f8;
