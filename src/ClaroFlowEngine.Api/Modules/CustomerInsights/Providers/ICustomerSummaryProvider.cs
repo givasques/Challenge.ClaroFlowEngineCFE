@@ -13,8 +13,16 @@ public interface ICustomerSummaryProvider
     Task<CustomerSummaryResult> GenerateAsync(CustomerPortrait portrait, CancellationToken cancellationToken);
 }
 
-/// <summary>Resultado de um provedor: conteúdo, origem e modelo (null no provedor por regras).</summary>
-public sealed record CustomerSummaryResult(CustomerSummaryContent Content, string Source, string? Model);
+/// <summary>
+/// Resultado de um provedor: conteúdo, origem e modelo (null no provedor por regras). Tokens são opcionais:
+/// só os provedores que os informam os preenchem (usados no log, A.8).
+/// </summary>
+public sealed record CustomerSummaryResult(
+    CustomerSummaryContent Content,
+    string Source,
+    string? Model,
+    int? InputTokens = null,
+    int? OutputTokens = null);
 
 /// <summary>
 /// Falha previsível de um provedor externo. <see cref="Reason"/> é o <c>fallback_reason</c> da resposta

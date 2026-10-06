@@ -29,7 +29,7 @@ public class CustomerSummaryServiceTests
     {
         using var host = new TestHost();
         await TestHost.EnsureDatabaseAsync(host.Services);
-        var customerId = await CreateCustomerAsync(host, CpfNoJourney, "Cliente Sem Historico");
+        var customerId = await TestData.CreateCustomerAsync(host, CpfNoJourney, "Cliente Sem Historico");
 
         using var scope = host.Services.CreateScope();
         var result = await scope.ServiceProvider.GetRequiredService<ICustomerSummaryService>()
@@ -47,8 +47,8 @@ public class CustomerSummaryServiceTests
     {
         using var host = new TestHost();
         await TestHost.EnsureDatabaseAsync(host.Services);
-        var customerId = await CreateCustomerAsync(host, CpfCache, "Cliente Cache");
-        await AddJourneyAsync(host, customerId, Channels.Whatsapp, minutesAgo: 30);
+        var customerId = await TestData.CreateCustomerAsync(host, CpfCache, "Cliente Cache");
+        await TestData.AddJourneyAsync(host, customerId, Channels.Whatsapp, minutesAgo: 30);
 
         using var scope = host.Services.CreateScope();
         var service = scope.ServiceProvider.GetRequiredService<ICustomerSummaryService>();
@@ -64,11 +64,11 @@ public class CustomerSummaryServiceTests
         Assert.Equal("Gerado por IA", second.SourceLabel);
 
         // Nova jornada muda a impressão digital: gera de novo, e continua guardada só uma linha de IA.
-        await AddJourneyAsync(host, customerId, Channels.App, minutesAgo: 5);
+        await TestData.AddJourneyAsync(host, customerId, Channels.App, minutesAgo: 5);
         var third = await service.GenerateAsync(customerId, false, CancellationToken.None);
         Assert.False(third.Cached);
         Assert.Equal(2, host.Provider.Calls);
-        Assert.Equal(1, await CountAiSummariesAsync(host, customerId));
+        Assert.Equal(1, await TestData.CountAiSummariesAsync(host, customerId));
     }
 
     [Fact]
@@ -76,8 +76,8 @@ public class CustomerSummaryServiceTests
     {
         using var host = new TestHost();
         await TestHost.EnsureDatabaseAsync(host.Services);
-        var customerId = await CreateCustomerAsync(host, CpfFallback, "Cliente Fallback");
-        await AddJourneyAsync(host, customerId, Channels.Whatsapp, minutesAgo: 30);
+        var customerId = await TestData.CreateCustomerAsync(host, CpfFallback, "Cliente Fallback");
+        await TestData.AddJourneyAsync(host, customerId, Channels.Whatsapp, minutesAgo: 30);
         host.Provider.Behavior = (_, _) => throw new AiProviderException("ai_invalid_response", "resposta sem campos");
 
         using var scope = host.Services.CreateScope();
@@ -88,7 +88,7 @@ public class CustomerSummaryServiceTests
         Assert.Equal("Resumo automático por regras", result.SourceLabel);
         Assert.Equal("ai_invalid_response", result.FallbackReason);
         Assert.Equal("IA indisponível no momento", result.FallbackLabel);
-        Assert.Equal(0, await CountAiSummariesAsync(host, customerId));
+        Assert.Equal(0, await TestData.CountAiSummariesAsync(host, customerId));
     }
 
     [Fact]
@@ -96,8 +96,8 @@ public class CustomerSummaryServiceTests
     {
         using var host = new TestHost(options => options.TimeoutSeconds = 1);
         await TestHost.EnsureDatabaseAsync(host.Services);
-        var customerId = await CreateCustomerAsync(host, CpfTimeout, "Cliente Timeout");
-        await AddJourneyAsync(host, customerId, Channels.Whatsapp, minutesAgo: 30);
+        var customerId = await TestData.CreateCustomerAsync(host, CpfTimeout, "Cliente Timeout");
+        await TestData.AddJourneyAsync(host, customerId, Channels.Whatsapp, minutesAgo: 30);
         host.Provider.Behavior = async (_, ct) =>
         {
             await Task.Delay(TimeSpan.FromSeconds(30), ct);
@@ -120,8 +120,8 @@ public class CustomerSummaryServiceTests
     {
         using var host = new TestHost(options => options.RequestsPerUserPerMinute = 1);
         await TestHost.EnsureDatabaseAsync(host.Services);
-        var customerId = await CreateCustomerAsync(host, CpfRateLimit, "Cliente Limite");
-        await AddJourneyAsync(host, customerId, Channels.Whatsapp, minutesAgo: 30);
+        var customerId = await TestData.CreateCustomerAsync(host, CpfRateLimit, "Cliente Limite");
+        await TestData.AddJourneyAsync(host, customerId, Channels.Whatsapp, minutesAgo: 30);
 
         using var scope = host.Services.CreateScope();
         var service = scope.ServiceProvider.GetRequiredService<ICustomerSummaryService>();
@@ -155,56 +155,20 @@ public class CustomerSummaryServiceTests
     {
         using var host = new TestHost();
         await TestHost.EnsureDatabaseAsync(host.Services);
-        var customerId = await CreateCustomerAsync(host, CpfAnonymized, "Cliente Anonimizar");
-        await AddJourneyAsync(host, customerId, Channels.Whatsapp, minutesAgo: 30);
+        var customerId = await TestData.CreateCustomerAsync(host, CpfAnonymized, "Cliente Anonimizar");
+        await TestData.AddJourneyAsync(host, customerId, Channels.Whatsapp, minutesAgo: 30);
 
         using var scope = host.Services.CreateScope();
         var service = scope.ServiceProvider.GetRequiredService<ICustomerSummaryService>();
         await service.GenerateAsync(customerId, false, CancellationToken.None);
-        Assert.Equal(1, await CountAiSummariesAsync(host, customerId));
+        Assert.Equal(1, await TestData.CountAiSummariesAsync(host, customerId));
 
         await scope.ServiceProvider.GetRequiredService<ILgpdService>()
             .ExerciseRightToBeForgottenAsync(CpfAnonymized, CancellationToken.None);
 
-        Assert.Equal(0, await CountAiSummariesAsync(host, customerId));
+        Assert.Equal(0, await TestData.CountAiSummariesAsync(host, customerId));
         var error = await Assert.ThrowsAsync<ConflictException>(
             () => service.GenerateAsync(customerId, forceRefresh: true, CancellationToken.None));
         Assert.Equal("already_anonymized", error.ErrorCode);
-    }
-
-    private static async Task<Guid> CreateCustomerAsync(TestHost host, string cpf, string fullName)
-    {
-        using var scope = host.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<CfeDbContext>();
-        var customer = new Customer { Id = Guid.NewGuid(), Cpf = cpf, FullName = fullName, Segment = "Teste", BillingDueDay = 10 };
-        db.Customers.Add(customer);
-        await db.SaveChangesAsync();
-        return customer.Id;
-    }
-
-    private static async Task AddJourneyAsync(TestHost host, Guid customerId, string channel, int minutesAgo)
-    {
-        using var scope = host.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<CfeDbContext>();
-        var created = DateTime.UtcNow.AddMinutes(-minutesAgo - 10);
-        db.JourneyContexts.Add(new JourneyContext
-        {
-            Id = Guid.NewGuid(),
-            CustomerId = customerId,
-            OriginChannel = channel,
-            Intent = "change_plan",
-            CurrentStep = "plan_selected",
-            Status = JourneyStatus.Open,
-            CreatedAt = created,
-            UpdatedAt = DateTime.UtcNow.AddMinutes(-minutesAgo),
-        });
-        await db.SaveChangesAsync();
-    }
-
-    private static async Task<int> CountAiSummariesAsync(TestHost host, Guid customerId)
-    {
-        using var scope = host.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<CfeDbContext>();
-        return await db.CustomerAiSummaries.CountAsync(s => s.CustomerId == customerId);
     }
 }

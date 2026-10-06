@@ -9,6 +9,8 @@ public static class CustomerInsightsModuleExtensions
     {
         services.AddScoped<ICustomerHistoryCollector, CustomerHistoryCollector>();
         services.AddScoped<ICustomerSummaryProvider, RuleBasedSummaryProvider>();
+        services.AddScoped<ICustomerSummaryProvider, OpenAiCompatibleSummaryProvider>();
+        services.AddHttpClient(OpenAiCompatibleSummaryProvider.HttpClientName);
         services.AddScoped<ICustomerSummaryService, CustomerSummaryService>();
         services.AddSingleton<IAiSummaryRateLimiter, AiSummaryRateLimiter>();
         return services;
