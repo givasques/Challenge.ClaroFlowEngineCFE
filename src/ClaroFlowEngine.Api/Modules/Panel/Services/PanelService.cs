@@ -316,7 +316,7 @@ public class PanelService : IPanelService
                     j.CustomerFullName,
                     CpfMasking.Mask(j.CustomerCpf),
                     j.CustomerAnonymizedAt is not null ? "Removido (LGPD)" : null,
-                    phoneByCustomer.GetValueOrDefault(j.CustomerId)),
+                    PhoneMasking.Mask(phoneByCustomer.GetValueOrDefault(j.CustomerId))),
                 j.Intent,
                 j.CurrentStep,
                 j.OriginChannel,

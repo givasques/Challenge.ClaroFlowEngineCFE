@@ -26,9 +26,9 @@ public record ActiveJourneyDto(
 
 /// <summary>
 /// Cliente exibido nas telas do painel. O CPF nunca vai completo: só a forma mascarada e o rótulo de LGPD (FASE 4.3).
-/// O telefone é o identificador do canal WhatsApp, usado na busca da fila (FASE 4.2).
+/// O telefone também sai mascarado ((11) *****-8888); a busca compara com o número completo guardado no servidor.
 /// </summary>
-public record ActiveJourneyCustomerDto(Guid Id, string FullName, string? CpfMasked, string? CpfLabel = null, string? Phone = null);
+public record ActiveJourneyCustomerDto(Guid Id, string FullName, string? CpfMasked, string? CpfLabel = null, string? PhoneMasked = null);
 
 /// <summary>Resposta de GET /alerts/active — somente jornadas abertas acima do limite de atenção (FASE 4.2).</summary>
 public record ActiveAlertsResponse(

@@ -1487,7 +1487,8 @@ async function startAuthenticatedSession() {
   }
   fetchOpportunitiesBadge();
   updateHeaderClock();
-  setInterval(updateHeaderClock, 60000);
+  clearInterval(state.clockHandle);
+  state.clockHandle = setInterval(updateHeaderClock, 60000);
 }
 
 /** Ao carregar a página: com token salvo, confirma que a sessão ainda é válida via GET /auth/me
@@ -1510,12 +1511,35 @@ async function initSession() {
   }
 }
 
+/** Encerra tudo o que a sessão anterior deixou rodando: pollings, relógio e dados da Central. Sem isso, o timer
+ *  do gestor continuava chamando /alerts/active depois do logout, e o do próximo login batia com outro perfil. */
+function endAuthenticatedSession() {
+  stopPolling();
+  stopActiveJourneysPolling();
+  stopMetricsPolling();
+  clearInterval(state.alertsPollHandle);
+  state.alertsPollHandle = null;
+  clearInterval(state.clockHandle);
+  state.clockHandle = null;
+  state.activeJourneys = [];
+  state.activeJourneysLoaded = false;
+  state.alerts = [];
+  state.alertsSummary = null;
+  state.alertsLoaded = false;
+  state.knownAlerts = new Map();
+  state.metrics = null;
+  state.metricsLoaded = false;
+  state.queueSearch = null;
+}
+
 function handleSessionExpired() {
+  endAuthenticatedSession();
   clearSession();
   showLoginScreen('Sua sessão expirou. Entre novamente.');
 }
 
 function handleLogout() {
+  endAuthenticatedSession();
   clearSession();
   showLoginScreen();
 }
