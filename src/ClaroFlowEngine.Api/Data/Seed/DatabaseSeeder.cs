@@ -20,6 +20,7 @@ public static class DatabaseSeeder
         await SeedInvoicesAsync(db, customers, plans, cancellationToken);
         await SeedPanelUsersAsync(db, cancellationToken);
         await SeedOperationalCenterScenarioAsync(db, cancellationToken);
+        await SeedRichHistoryScenarioAsync(db, cancellationToken);
 
         await db.SaveChangesAsync(cancellationToken);
     }
@@ -349,6 +350,145 @@ public static class DatabaseSeeder
         // Normal: atividade recente, só para a fila mostrar todas as prioridades.
         new("62819482112", "Helena Martins", "5511988880005", Channels.App, "change_plan", "identity_resolved", Channels.App, 1, 5),
     ];
+
+    /// <summary>
+    /// Cliente de demonstração com histórico variado nos últimos 30 dias (FASE 4.4, D.1): plano abandonado no App,
+    /// contestação escalada para o Financeiro, contestação concluída, troca concluída e oportunidade crítica aberta.
+    /// Idempotente pelo CPF. Não toca em Ana, Carlos, Mariana, nas contas do App nem no cenário da Central.
+    /// </summary>
+    private static async Task SeedRichHistoryScenarioAsync(CfeDbContext db, CancellationToken ct)
+    {
+        const string rodrigoCpf = "49100528102";
+        var existingCpfs = await db.Customers.Select(c => c.Cpf).ToListAsync(ct);
+        if (existingCpfs.Contains(rodrigoCpf)) return;
+
+        var now = DateTime.UtcNow;
+        var customer = new Customer
+        {
+            Id = Guid.NewGuid(),
+            Cpf = rodrigoCpf,
+            FullName = "Rodrigo Alves",
+            Segment = "Pessoa Física",
+            BillingDueDay = 12,
+        };
+        db.Customers.Add(customer);
+        db.IdentityLinks.Add(new IdentityLink { CustomerId = customer.Id, Channel = Channels.Cpf, Identifier = rodrigoCpf });
+        db.IdentityLinks.Add(new IdentityLink { CustomerId = customer.Id, Channel = Channels.Whatsapp, Identifier = "5511988880010" });
+
+        var plan15 = await db.Plans.FirstAsync(p => p.Code == "claro_15gb", ct);
+        db.CustomerPlans.Add(new CustomerPlan { Id = Guid.NewGuid(), CustomerId = customer.Id, PlanId = plan15.Id, Active = true, StartedAt = now.AddDays(-60) });
+
+        var firstOfMonth = new DateOnly(now.Year, now.Month, 1);
+        var invoiceHigher = NewInvoice(customer.Id, firstOfMonth.AddMonths(-1), 8990, now);
+        var invoiceDuplicate = NewInvoice(customer.Id, firstOfMonth.AddMonths(-2), 5990, now);
+        db.Invoices.AddRange(invoiceHigher, invoiceDuplicate);
+
+        // Plano abandonado no App, há 21 dias.
+        var abandoned = NewJourney(customer.Id, Channels.App, "change_plan", "plan_selected", JourneyStatus.Abandoned, now.AddDays(-21));
+        abandoned.Payload["selected_plan_code"] = "claro_30gb";
+        abandoned.ClosedAt = abandoned.UpdatedAt;
+
+        // Contestação escalada para o Financeiro, há 10 dias, sem desfecho.
+        var escalated = NewJourney(customer.Id, Channels.Whatsapp, "dispute_charge", "dispute_formalized", JourneyStatus.Escalated, now.AddDays(-10));
+        escalated.Payload["invoice_id"] = invoiceHigher.Id.ToString();
+        escalated.Payload["dispute_reason"] = "higher_than_expected";
+        escalated.Payload["escalation_area"] = "financial";
+        escalated.EscalatedAt = now.AddDays(-9);
+        escalated.UpdatedAt = now.AddDays(-9);
+
+        // Contestação concluída pela central telefônica, há 25 dias.
+        var concluded = NewJourney(customer.Id, Channels.Call, "dispute_charge", "description_provided", JourneyStatus.Concluded, now.AddDays(-25));
+        concluded.Payload["invoice_id"] = invoiceDuplicate.Id.ToString();
+        concluded.Payload["dispute_reason"] = "duplicate_charge";
+        concluded.Payload["resolution_category"] = "resolved_action_taken";
+        concluded.ClosedAt = now.AddDays(-24);
+        concluded.UpdatedAt = now.AddDays(-24);
+
+        // Troca de plano concluída pelo WhatsApp, há 14 dias.
+        var planChanged = NewJourney(customer.Id, Channels.Whatsapp, "change_plan", "plan_selected", JourneyStatus.Concluded, now.AddDays(-14));
+        planChanged.Payload["selected_plan_code"] = "claro_60gb";
+        planChanged.Payload["resolution_category"] = "resolved_answered";
+        planChanged.ClosedAt = now.AddDays(-13);
+        planChanged.UpdatedAt = now.AddDays(-13);
+
+        db.JourneyContexts.AddRange(abandoned, escalated, concluded, planChanged);
+        AddJourneyEvents(db, abandoned, Channels.App, TransitionEventTypes.JourneyClosed, Channels.App);
+        AddJourneyEvents(db, escalated, Channels.Whatsapp, TransitionEventTypes.JourneyEscalated, Channels.Panel);
+        AddJourneyEvents(db, concluded, Channels.Call, TransitionEventTypes.JourneyConcludedByAgent, Channels.Panel);
+        AddJourneyEvents(db, planChanged, Channels.Whatsapp, TransitionEventTypes.JourneyClosed, Channels.Whatsapp);
+
+        db.Opportunities.Add(new Opportunity
+        {
+            Id = Guid.NewGuid(),
+            CustomerId = customer.Id,
+            Category = OpportunityCategory.AbandonedPlanChange,
+            Urgency = OpportunityUrgency.Critical,
+            Status = OpportunityStatus.New,
+            TriggeringJourneyId = abandoned.Id,
+            Metadata = new Dictionary<string, object>(),
+            DetectedAt = now.AddDays(-2),
+            ValidUntil = now.AddDays(28),
+        });
+
+        await db.SaveChangesAsync(ct);
+    }
+
+    private static Invoice NewInvoice(Guid customerId, DateOnly referenceMonth, int totalCents, DateTime now) => new()
+    {
+        Id = Guid.NewGuid(),
+        CustomerId = customerId,
+        ReferenceMonth = referenceMonth,
+        DueDate = referenceMonth.AddDays(14),
+        TotalCents = totalCents,
+        Status = InvoiceStatus.Paid,
+        CreatedAt = now,
+    };
+
+    private static JourneyContext NewJourney(Guid customerId, string channel, string intent, string currentStep, string status, DateTime createdAt) => new()
+    {
+        Id = Guid.NewGuid(),
+        CustomerId = customerId,
+        OriginChannel = channel,
+        Intent = intent,
+        CurrentStep = currentStep,
+        Status = status,
+        CreatedAt = createdAt,
+        UpdatedAt = createdAt.AddHours(1),
+    };
+
+    private static void AddJourneyEvents(CfeDbContext db, JourneyContext journey, string originChannel, string closingEvent, string closingChannel)
+    {
+        db.JourneyTransitions.Add(new JourneyTransition
+        {
+            Id = Guid.NewGuid(),
+            JourneyContextId = journey.Id,
+            Channel = originChannel,
+            EventType = TransitionEventTypes.JourneyStarted,
+            Description = "Jornada iniciada.",
+            Metadata = new Dictionary<string, object> { ["intent"] = journey.Intent },
+            OccurredAt = journey.CreatedAt,
+        });
+        db.JourneyTransitions.Add(new JourneyTransition
+        {
+            Id = Guid.NewGuid(),
+            JourneyContextId = journey.Id,
+            Channel = originChannel,
+            EventType = TransitionEventTypes.StepUpdated,
+            Description = "Etapa atualizada.",
+            Metadata = new Dictionary<string, object> { ["current_step"] = journey.CurrentStep },
+            OccurredAt = journey.CreatedAt.AddHours(1),
+        });
+        db.JourneyTransitions.Add(new JourneyTransition
+        {
+            Id = Guid.NewGuid(),
+            JourneyContextId = journey.Id,
+            Channel = closingChannel,
+            EventType = closingEvent,
+            Description = "Evento de encerramento da jornada.",
+            Metadata = new Dictionary<string, object>(),
+            OccurredAt = journey.UpdatedAt,
+        });
+    }
 
     private sealed record OperationalDemoScenario(
         string Cpf,

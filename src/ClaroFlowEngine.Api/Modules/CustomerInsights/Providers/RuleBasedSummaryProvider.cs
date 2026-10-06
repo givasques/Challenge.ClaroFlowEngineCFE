@@ -65,7 +65,11 @@ public class RuleBasedSummaryProvider : ICustomerSummaryProvider
             .FirstOrDefault();
         if (topIntent is not null)
         {
-            var qualifier = topIntent.Count() > 1 ? "a maioria sobre" : "sobre";
+            // "a maioria" só quando passa de metade; com mais de um atendimento sem maioria, "principalmente".
+            var count = topIntent.Count();
+            var qualifier = count * 2 > portrait.Journeys.Count ? "a maioria sobre"
+                : count > 1 ? "principalmente sobre"
+                : "sobre";
             sentence += $", {qualifier} {LowerFirst(topIntent.Key)}";
         }
         sentence += ".";

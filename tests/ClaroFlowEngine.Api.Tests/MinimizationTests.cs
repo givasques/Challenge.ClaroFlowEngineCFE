@@ -20,7 +20,7 @@ public class MinimizationTests
     private static readonly string[] DemoCpfs =
     [
         "11144477735", "22255588846", "33366699957",
-        "52601815906", "08301661305", "18609139034", "99603082430", "62819482112",
+        "52601815906", "08301661305", "18609139034", "99603082430", "62819482112", "49100528102",
     ];
 
     private static readonly Regex GuidPattern = new(
