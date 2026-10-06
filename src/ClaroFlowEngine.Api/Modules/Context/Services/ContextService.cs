@@ -58,6 +58,8 @@ public class ContextService : IContextService
             var justExpired = _expirationService.TryExpireIfInactive(existing);
             if (!justExpired)
             {
+                // Tentativa de reabertura é atividade do cliente, então conta para a inatividade (FASE 4.2, A.3.3).
+                existing.UpdatedAt = DateTime.UtcNow;
                 _transitionRecorder.Record(existing.Id, request.OriginChannel, TransitionEventTypes.JourneyReopenAttempted,
                     "Tentativa de abrir nova jornada com uma já ativa para o mesmo cliente e intenção.",
                     new { attempted_origin_channel = request.OriginChannel });

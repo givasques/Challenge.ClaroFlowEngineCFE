@@ -151,7 +151,11 @@ public class HandoffService : IHandoffService
 
         await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
 
-        handoffToken.UsedAt = DateTime.UtcNow;
+        var resolvedAt = DateTime.UtcNow;
+        handoffToken.UsedAt = resolvedAt;
+        // Abrir o link é atividade da dona da jornada, então conta para a inatividade (FASE 4.2, A.3.1).
+        // Fica aqui, depois da checagem de dono: tentativa recusada não chega a este ponto e não atualiza a jornada.
+        journey.UpdatedAt = resolvedAt;
 
         _transitionRecorder.Record(journey.Id, handoffToken.TargetChannel, TransitionEventTypes.JourneyResumed,
             "Cliente abriu o deep link. Contexto recuperado pelo CFE.", new { token = handoffToken.Token });

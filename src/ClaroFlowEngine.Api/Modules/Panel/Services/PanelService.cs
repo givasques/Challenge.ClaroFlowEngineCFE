@@ -2,111 +2,104 @@ using ClaroFlowEngine.Api.Common.Contracts;
 using ClaroFlowEngine.Api.Common.Errors;
 using ClaroFlowEngine.Api.Common.Extensions;
 using ClaroFlowEngine.Api.Common.Services;
+using ClaroFlowEngine.Api.Configuration;
 using ClaroFlowEngine.Api.Data;
 using ClaroFlowEngine.Api.Data.Entities;
 using ClaroFlowEngine.Api.Modules.Panel.Dtos;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace ClaroFlowEngine.Api.Modules.Panel.Services;
 
 /// <summary>
-/// Endpoints agregados para o menu lateral do painel do atendente (FASE 3.2) — jornadas ativas e
-/// métricas operacionais — e ações de fechamento/escalação de jornada pelo atendente (FASE 3.5).
+/// Endpoints do painel do atendente e da Central operacional do gestor (FASE 4.2) — jornadas ativas, alertas
+/// de inatividade, busca da fila e métricas operacionais — e ações de fechamento/escalação (FASE 3.5).
 /// </summary>
 public class PanelService : IPanelService
 {
     private static readonly TimeSpan MetricsWindow = TimeSpan.FromDays(30);
     private const int MaxDescriptionLength = 500;
+    private const int CpfDigitsLength = 11;
+    private const int MinNumericSearchDigits = 3;
+    private const int MinNameSearchLength = 2;
 
     private readonly CfeDbContext _db;
     private readonly ITransitionRecorder _transitionRecorder;
     private readonly ICurrentChannelAccessor _currentChannel;
     private readonly ICurrentPanelUserAccessor _currentPanelUser;
+    private readonly IJourneyExpirationService _expirationService;
+    private readonly CfeOptions _cfeOptions;
 
     public PanelService(
         CfeDbContext db, ITransitionRecorder transitionRecorder, ICurrentChannelAccessor currentChannel,
-        ICurrentPanelUserAccessor currentPanelUser)
+        ICurrentPanelUserAccessor currentPanelUser, IJourneyExpirationService expirationService, IOptions<CfeOptions> cfeOptions)
     {
         _db = db;
         _transitionRecorder = transitionRecorder;
         _currentChannel = currentChannel;
         _currentPanelUser = currentPanelUser;
+        _expirationService = expirationService;
+        _cfeOptions = cfeOptions.Value;
     }
 
     public async Task<ActiveJourneysResponse> GetActiveJourneysAsync(bool includeEscalated, CancellationToken cancellationToken)
     {
+        // Padrão do MVP (A.8): só 'open'. include_escalated=true é opcional e não altera a regra de alerta:
+        // jornadas escaladas continuam fora da fila de inatividade.
+        var journeys = await GetOperationalJourneysAsync(includeEscalated, DateTime.UtcNow, null, null, cancellationToken);
+        return new ActiveJourneysResponse(journeys.Select(ToActiveJourneyDto).ToList(), journeys.Count);
+    }
+
+    public async Task<ActiveJourneysResponse> SearchActiveJourneysAsync(string query, CancellationToken cancellationToken)
+    {
+        var term = (query ?? string.Empty).Trim();
+        var isNumeric = IsNumericQuery(term);
+        var digitCount = term.Count(char.IsDigit);
+
+        if (isNumeric ? digitCount < MinNumericSearchDigits : term.Length < MinNameSearchLength)
+            throw new ValidationException("invalid_query",
+                $"Informe pelo menos {MinNumericSearchDigits} dígitos ou {MinNameSearchLength} letras para buscar.");
+
+        var journeys = await GetOperationalJourneysAsync(false, DateTime.UtcNow, null, term, cancellationToken);
+        return new ActiveJourneysResponse(journeys.Select(ToActiveJourneyDto).ToList(), journeys.Count);
+    }
+
+    public async Task<ActiveAlertsResponse> GetActiveAlertsAsync(CancellationToken cancellationToken)
+    {
+        EnsurePanelChannel();
+
         var now = DateTime.UtcNow;
+        var attentionCutoff = now.AddMinutes(-_cfeOptions.JourneyAttentionThresholdMinutes);
+        var journeys = await GetOperationalJourneysAsync(false, now, attentionCutoff, null, cancellationToken);
 
-        // Padrão do MVP (A.8): só 'open'. include_escalated=true é opcional, pensado pra uma futura
-        // aba separada no painel — não muda o comportamento default de /journeys/active nem da
-        // contagem "Jornadas ativas" do menu lateral.
-        var openJourneys = await _db.JourneyContexts
-            .AsNoTracking()
-            .Where(j => j.Status == JourneyStatus.Open || (includeEscalated && j.Status == JourneyStatus.Escalated))
-            .OrderByDescending(j => j.CreatedAt)
-            .Select(j => new
-            {
-                j.Id,
-                j.CustomerId,
-                CustomerFullName = j.Customer.FullName,
-                CustomerCpf = j.Customer.Cpf,
-                CustomerAnonymizedAt = j.Customer.AnonymizedAt,
-                j.Intent,
-                j.OriginChannel,
-                j.CreatedAt,
-                j.UpdatedAt,
-                j.Status,
-            })
-            .ToListAsync(cancellationToken);
+        var alerts = journeys
+            .Where(j => j.RequiresAttention)
+            .OrderBy(j => JourneyAlertLevel.RankOf(j.AlertLevel))
+            .ThenByDescending(j => j.MinutesSinceLastActivity)
+            .ThenBy(j => j.LastActivityAt)
+            .Select(ToActiveAlertDto)
+            .ToList();
 
-        if (openJourneys.Count == 0)
-            return new ActiveJourneysResponse([], 0);
-
-        var journeyIds = openJourneys.Select(j => j.Id).ToList();
-
-        // Canal atual = canal da transição mais recente (mesma regra usada na timeline do painel);
-        // dataset pequeno no protótipo, resolvido em memória em vez de uma subquery correlacionada por jornada.
-        var latestChannelByJourney = await _db.JourneyTransitions
-            .AsNoTracking()
-            .Where(t => t.JourneyContextId != null && journeyIds.Contains(t.JourneyContextId.Value))
-            .Select(t => new { t.JourneyContextId, t.Channel, t.OccurredAt })
-            .ToListAsync(cancellationToken);
-
-        var currentChannelById = latestChannelByJourney
-            .GroupBy(t => t.JourneyContextId!.Value)
-            .ToDictionary(g => g.Key, g => g.OrderByDescending(t => t.OccurredAt).First().Channel);
-
-        var journeys = openJourneys.Select(j =>
-        {
-            var currentChannel = currentChannelById.GetValueOrDefault(j.Id, j.OriginChannel);
-            return new ActiveJourneyDto(
-                j.Id,
-                new ActiveJourneyCustomerDto(
-                    j.CustomerId, j.CustomerFullName, CpfMasking.Mask(j.CustomerCpf),
-                    j.CustomerAnonymizedAt is not null ? "Removido (LGPD)" : null),
-                j.Intent,
-                PanelLabels.Intent(j.Intent),
-                j.OriginChannel,
-                PanelLabels.Channel(j.OriginChannel),
-                currentChannel,
-                PanelLabels.Channel(currentChannel),
-                j.CreatedAt,
-                j.UpdatedAt,
-                (int)(now - j.CreatedAt).TotalMinutes,
-                j.Status);
-        }).ToList();
-
-        return new ActiveJourneysResponse(journeys, journeys.Count);
+        return new ActiveAlertsResponse(
+            alerts,
+            alerts.Count,
+            alerts.Count(a => a.AlertLevel == JourneyAlertLevel.Warning),
+            alerts.Count(a => a.AlertLevel == JourneyAlertLevel.Critical),
+            _cfeOptions.JourneyAttentionThresholdMinutes,
+            _cfeOptions.JourneyCriticalThresholdMinutes);
     }
 
     public async Task<MetricsSummaryResponse> GetMetricsSummaryAsync(CancellationToken cancellationToken)
     {
         var now = DateTime.UtcNow;
         var windowStart = now - MetricsWindow;
-        // DateOnly.ToDateTime produz Kind=Unspecified, que o Npgsql rejeita para timestamptz — precisa ser
-        // forçado a Utc explicitamente (todas as colunas de data do CFE são timestamptz em UTC).
-        var todayStartUtc = DateTime.SpecifyKind(DateOnly.FromDateTime(now).ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);
-        var tomorrowStartUtc = todayStartUtc.AddDays(1);
+
+        // "Hoje" é o dia civil de Brasília (FASE 4.2, opção P7), não o dia UTC: a meia-noite local vira UTC
+        // explicitamente, porque DateOnly.ToDateTime produz Kind=Unspecified, que o Npgsql rejeita para timestamptz.
+        var timeZone = TimeZoneInfo.FindSystemTimeZoneById(_cfeOptions.BusinessTimeZoneId);
+        var todayLocal = DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(now, timeZone));
+        var todayStartUtc = LocalMidnightToUtc(todayLocal, timeZone);
+        var tomorrowStartUtc = LocalMidnightToUtc(todayLocal.AddDays(1), timeZone);
 
         var tmaMedianSeconds = await ComputeTmaMedianSecondsAsync(windowStart, cancellationToken);
 
@@ -232,6 +225,220 @@ public class PanelService : IPanelService
         return new EscalateJourneyResponse(journey.Id, journey.Status, escalatedAt, request.EscalationArea, label);
     }
 
+    /// <summary>
+    /// Lista de jornadas abertas com canal atual, inatividade e classificação de alerta. Usada pela fila,
+    /// pelos alertas e pela busca. Antes de classificar, aplica a expiração reativa, para não mostrar como alerta
+    /// uma jornada que já venceu.
+    /// </summary>
+    private async Task<List<OperationalJourney>> GetOperationalJourneysAsync(
+        bool includeEscalated, DateTime now, DateTime? lastActivityCutoff, string? searchTerm, CancellationToken cancellationToken)
+    {
+        await ExpireInactiveJourneysAsync(cancellationToken);
+
+        IQueryable<JourneyContext> journeysQuery = _db.JourneyContexts.AsNoTracking();
+
+        if (lastActivityCutoff is not null)
+        {
+            var cutoff = lastActivityCutoff.Value;
+            journeysQuery = journeysQuery.Where(j => j.Status == JourneyStatus.Open && j.UpdatedAt <= cutoff);
+        }
+        else
+        {
+            journeysQuery = journeysQuery.Where(
+                j => j.Status == JourneyStatus.Open || (includeEscalated && j.Status == JourneyStatus.Escalated));
+        }
+
+        if (searchTerm is not null)
+            journeysQuery = ApplyCustomerSearch(journeysQuery, searchTerm);
+
+        var journeySnapshots = await journeysQuery
+            .OrderByDescending(j => j.CreatedAt)
+            .Select(j => new
+            {
+                j.Id,
+                j.CustomerId,
+                CustomerFullName = j.Customer.FullName,
+                CustomerCpf = j.Customer.Cpf,
+                CustomerAnonymizedAt = j.Customer.AnonymizedAt,
+                j.Intent,
+                j.CurrentStep,
+                j.OriginChannel,
+                j.CreatedAt,
+                j.UpdatedAt,
+                j.Status,
+            })
+            .ToListAsync(cancellationToken);
+
+        if (journeySnapshots.Count == 0)
+            return [];
+
+        var journeyIds = journeySnapshots.Select(j => j.Id).ToList();
+        var customerIds = journeySnapshots.Select(j => j.CustomerId).Distinct().ToList();
+
+        // Canal atual = canal da transição operacional mais recente. panel_accessed não entra na lista,
+        // então abrir o painel não muda o canal da jornada.
+        var operationalActivityTypes = TransitionEventTypes.OperationalActivityTypes;
+        var operationalTransitions = await _db.JourneyTransitions
+            .AsNoTracking()
+            .Where(t => t.JourneyContextId != null
+                && journeyIds.Contains(t.JourneyContextId.Value)
+                && operationalActivityTypes.Contains(t.EventType))
+            .Select(t => new { t.JourneyContextId, t.Channel, t.OccurredAt })
+            .ToListAsync(cancellationToken);
+
+        var currentChannelById = operationalTransitions
+            .GroupBy(t => t.JourneyContextId!.Value)
+            .ToDictionary(g => g.Key, g => g.OrderByDescending(t => t.OccurredAt).First().Channel);
+
+        // Telefone do WhatsApp mais recente de cada cliente, para a busca e para a fila. Cliente anonimizado fica de fora.
+        var customerPhones = await _db.IdentityLinks
+            .AsNoTracking()
+            .Where(link => customerIds.Contains(link.CustomerId)
+                && link.Channel == Channels.Whatsapp
+                && link.Customer.AnonymizedAt == null)
+            .Select(link => new { link.CustomerId, link.Identifier, link.CreatedAt })
+            .ToListAsync(cancellationToken);
+
+        var phoneByCustomer = customerPhones
+            .GroupBy(link => link.CustomerId)
+            .ToDictionary(group => group.Key, group => group.OrderByDescending(link => link.CreatedAt).First().Identifier);
+
+        return journeySnapshots.Select(j =>
+        {
+            var currentChannel = currentChannelById.GetValueOrDefault(j.Id, j.OriginChannel);
+            var minutesSinceLastActivity = ElapsedWholeMinutes(now, j.UpdatedAt);
+            var classification = ClassifyAlert(j.Status, minutesSinceLastActivity);
+
+            return new OperationalJourney(
+                j.Id,
+                new ActiveJourneyCustomerDto(
+                    j.CustomerId,
+                    j.CustomerFullName,
+                    CpfMasking.Mask(j.CustomerCpf),
+                    j.CustomerAnonymizedAt is not null ? "Removido (LGPD)" : null,
+                    phoneByCustomer.GetValueOrDefault(j.CustomerId)),
+                j.Intent,
+                j.CurrentStep,
+                j.OriginChannel,
+                currentChannel,
+                j.CreatedAt,
+                j.UpdatedAt,
+                j.UpdatedAt,
+                ElapsedWholeMinutes(now, j.CreatedAt),
+                minutesSinceLastActivity,
+                classification.RequiresAttention,
+                classification.AlertLevel,
+                j.Status);
+        }).ToList();
+    }
+
+    /// <summary>
+    /// Mesma expiração reativa usada por Context e Handoff (IJourneyExpirationService), aplicada em lote. O FOR UPDATE
+    /// serializa as duas consultas que o painel dispara quase ao mesmo tempo, evitando duas transições journey_expired
+    /// para a mesma jornada.
+    /// </summary>
+    private async Task ExpireInactiveJourneysAsync(CancellationToken cancellationToken)
+    {
+        var expirationCutoff = DateTime.UtcNow.AddHours(-_cfeOptions.JourneyInactivityTtlHours);
+        await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
+
+        // A interpolação é parametrizada pelo EF Core/Npgsql; não há concatenação de SQL.
+        var candidates = await _db.JourneyContexts
+            .FromSqlInterpolated($"SELECT * FROM journey_contexts WHERE status = {JourneyStatus.Open} AND updated_at < {expirationCutoff} FOR UPDATE")
+            .ToListAsync(cancellationToken);
+
+        var expiredAny = false;
+        foreach (var journey in candidates)
+            expiredAny |= _expirationService.TryExpireIfInactive(journey);
+
+        if (expiredAny)
+            await _db.SaveChangesAsync(cancellationToken);
+
+        await transaction.CommitAsync(cancellationToken);
+    }
+
+    private AlertClassification ClassifyAlert(string status, int minutesSinceLastActivity)
+    {
+        if (status != JourneyStatus.Open)
+            return new AlertClassification(false, JourneyAlertLevel.Normal);
+
+        if (minutesSinceLastActivity >= _cfeOptions.JourneyCriticalThresholdMinutes)
+            return new AlertClassification(true, JourneyAlertLevel.Critical);
+
+        if (minutesSinceLastActivity >= _cfeOptions.JourneyAttentionThresholdMinutes)
+            return new AlertClassification(true, JourneyAlertLevel.Warning);
+
+        return new AlertClassification(false, JourneyAlertLevel.Normal);
+    }
+
+    /// <summary>
+    /// Com dígitos (e separadores comuns de telefone/CPF), filtra por CPF exato de 11 dígitos ou por telefone parcial.
+    /// Com letras, filtra por nome parcial. CPF de cliente anonimizado nunca casa, porque o CPF dele virou hash.
+    /// </summary>
+    private static IQueryable<JourneyContext> ApplyCustomerSearch(IQueryable<JourneyContext> journeys, string term)
+    {
+        if (IsNumericQuery(term))
+        {
+            var digits = new string(term.Where(char.IsDigit).ToArray());
+            var isCpf = digits.Length == CpfDigitsLength;
+
+            return journeys.Where(j =>
+                (isCpf && j.Customer.AnonymizedAt == null && j.Customer.Cpf == digits)
+                || j.Customer.IdentityLinks.Any(l => l.Channel == Channels.Whatsapp && l.Identifier.Contains(digits)));
+        }
+
+        var lowered = term.ToLowerInvariant();
+        return journeys.Where(j => j.Customer.FullName.ToLower().Contains(lowered));
+    }
+
+    private static bool IsNumericQuery(string term) =>
+        term.Any(char.IsDigit)
+        && term.All(c => char.IsDigit(c) || char.IsWhiteSpace(c) || c is '(' or ')' or '-' or '+' or '.');
+
+    private static DateTime LocalMidnightToUtc(DateOnly date, TimeZoneInfo timeZone) =>
+        TimeZoneInfo.ConvertTimeToUtc(date.ToDateTime(TimeOnly.MinValue), timeZone);
+
+    private static int ElapsedWholeMinutes(DateTime now, DateTime timestamp) =>
+        (int)Math.Min(int.MaxValue, Math.Max(0, Math.Floor((now - timestamp).TotalMinutes)));
+
+    private static ActiveJourneyDto ToActiveJourneyDto(OperationalJourney journey) => new(
+        journey.Id,
+        journey.Customer,
+        journey.Intent,
+        PanelLabels.Intent(journey.Intent),
+        journey.CurrentStep,
+        PanelLabels.CurrentStep(journey.CurrentStep),
+        journey.OriginChannel,
+        PanelLabels.Channel(journey.OriginChannel),
+        journey.CurrentChannel,
+        PanelLabels.Channel(journey.CurrentChannel),
+        journey.CreatedAt,
+        journey.UpdatedAt,
+        journey.LastActivityAt,
+        journey.MinutesSinceStart,
+        journey.MinutesSinceLastActivity,
+        journey.RequiresAttention,
+        journey.AlertLevel,
+        journey.Status);
+
+    private static ActiveAlertDto ToActiveAlertDto(OperationalJourney journey) => new(
+        journey.Id,
+        journey.Customer,
+        journey.Intent,
+        PanelLabels.Intent(journey.Intent),
+        journey.CurrentStep,
+        PanelLabels.CurrentStep(journey.CurrentStep),
+        journey.OriginChannel,
+        PanelLabels.Channel(journey.OriginChannel),
+        journey.CurrentChannel,
+        PanelLabels.Channel(journey.CurrentChannel),
+        journey.CreatedAt,
+        journey.UpdatedAt,
+        journey.LastActivityAt,
+        journey.MinutesSinceStart,
+        journey.MinutesSinceLastActivity,
+        journey.AlertLevel);
+
     private void EnsurePanelChannel()
     {
         if (_currentChannel.Channel != Channels.Panel)
@@ -254,4 +461,22 @@ public class PanelService : IPanelService
 
         return journey;
     }
+
+    private readonly record struct AlertClassification(bool RequiresAttention, string AlertLevel);
+
+    private sealed record OperationalJourney(
+        Guid Id,
+        ActiveJourneyCustomerDto Customer,
+        string Intent,
+        string CurrentStep,
+        string OriginChannel,
+        string CurrentChannel,
+        DateTime CreatedAt,
+        DateTime UpdatedAt,
+        DateTime LastActivityAt,
+        int MinutesSinceStart,
+        int MinutesSinceLastActivity,
+        bool RequiresAttention,
+        string AlertLevel,
+        string Status);
 }

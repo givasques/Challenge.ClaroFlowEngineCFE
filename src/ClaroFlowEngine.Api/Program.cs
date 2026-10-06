@@ -42,8 +42,16 @@ builder.Host.UseSerilog((context, config) => config
         path: "logs/cfe-.log",
         rollingInterval: RollingInterval.Day));
 
-// Configuration binding — TTLs, tokens de canal e URLs dos canais simulados.
-builder.Services.Configure<CfeOptions>(builder.Configuration.GetSection(CfeOptions.SectionName));
+// Configuration binding — TTLs, limites operacionais, tokens de canal e URLs dos canais simulados.
+builder.Services.AddOptions<CfeOptions>()
+    .Bind(builder.Configuration.GetSection(CfeOptions.SectionName))
+    .Validate(options => options.JourneyAttentionThresholdMinutes > 0,
+        "Cfe:JourneyAttentionThresholdMinutes deve ser maior que zero.")
+    .Validate(options => options.JourneyCriticalThresholdMinutes > options.JourneyAttentionThresholdMinutes,
+        "Cfe:JourneyCriticalThresholdMinutes deve ser maior que JourneyAttentionThresholdMinutes.")
+    .Validate(options => options.IsValidBusinessTimeZone(),
+        "Cfe:BusinessTimeZoneId não é um fuso horário válido neste sistema.")
+    .ValidateOnStart();
 builder.Services.Configure<ChannelsOptions>(builder.Configuration.GetSection(ChannelsOptions.SectionName));
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.SectionName));
 builder.Services.Configure<PanelAuthOptions>(builder.Configuration.GetSection(PanelAuthOptions.SectionName));

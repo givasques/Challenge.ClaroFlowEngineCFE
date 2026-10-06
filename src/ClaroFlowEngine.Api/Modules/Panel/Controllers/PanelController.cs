@@ -29,6 +29,31 @@ public class PanelController : ControllerBase
         return Ok(result);
     }
 
+    [HttpPost("journeys/active/search")]
+    [EndpointSummary("Buscar na fila de jornadas ativas")]
+    [EndpointDescription("Filtra a fila de jornadas abertas pelo cliente. Texto com letras: nome, busca parcial. Só dígitos (com ou sem máscara): CPF exato de 11 dígitos ou telefone parcial. O texto vai no corpo da requisição, nunca na URL. A resposta nunca traz CPF completo. Requer autenticação JWT do painel (Authorization: Bearer).")]
+    [ProducesResponseType(typeof(ActiveJourneysResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiError), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiError), StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> SearchActiveJourneys([FromBody] SearchActiveJourneysRequest request, CancellationToken cancellationToken)
+    {
+        var result = await _service.SearchActiveJourneysAsync(request.Query ?? string.Empty, cancellationToken);
+        return Ok(result);
+    }
+
+    [HttpGet("alerts/active")]
+    [Authorize(Policy = "ManagerOnly")]
+    [EndpointSummary("Alertas operacionais ativos")]
+    [EndpointDescription("Retorna somente as jornadas abertas acima do limite de atenção de inatividade (5 min por padrão), ordenadas por criticidade. Restrito ao perfil gestor. Requer autenticação JWT do painel (Authorization: Bearer).")]
+    [ProducesResponseType(typeof(ActiveAlertsResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiError), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiError), StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> GetActiveAlerts(CancellationToken cancellationToken)
+    {
+        var result = await _service.GetActiveAlertsAsync(cancellationToken);
+        return Ok(result);
+    }
+
     [HttpGet("metrics/summary")]
     [EndpointSummary("Métricas operacionais")]
     [EndpointDescription("Retorna 4 métricas agregadas (TMA mediano, jornadas hoje, taxa de conclusão, canal mais usado) para a tela \"Métricas\" do painel do atendente. TMA, taxa de conclusão e canal mais usado consideram os últimos 30 dias; jornadas hoje considera apenas o dia corrente. Campos individuais retornam null quando não há dados suficientes no período. Requer autenticação JWT do painel (Authorization: Bearer).")]

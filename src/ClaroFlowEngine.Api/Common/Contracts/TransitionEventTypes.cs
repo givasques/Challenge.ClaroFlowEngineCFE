@@ -34,4 +34,22 @@ public static class TransitionEventTypes
 
     /// <summary>Exportação de dados solicitada (LGPD Art. 18, V — FASE 4.3, item C.3) — transição órfã, sem journey_context_id.</summary>
     public const string DataPortabilityRequested = "data_portability_requested";
+
+    /// <summary>
+    /// Eventos que contam como atividade operacional da jornada (FASE 4.2). Usados para o canal atual e para a
+    /// inatividade. Eventos apenas observacionais, como <see cref="PanelAccessed"/>, ficam deliberadamente fora —
+    /// abrir o painel não deve mudar o canal da jornada nem zerar o alerta de inatividade.
+    /// </summary>
+    public static readonly string[] OperationalActivityTypes =
+    [
+        JourneyStarted,
+        JourneyReopenAttempted,
+        StepUpdated,
+        DeepLinkGenerated,
+        JourneyResumed,
+        JourneyClosed,
+        JourneyExpired,
+        JourneyConcludedByAgent,
+        JourneyEscalated,
+    ];
 }
