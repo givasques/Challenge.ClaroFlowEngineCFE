@@ -116,6 +116,43 @@ O contador "Jornadas hoje" usa o dia civil de Brasília (`Cfe:BusinessTimeZoneId
 
 ---
 
+## Resumo do cliente com IA
+
+Na Consulta de Jornada, o atendente pode gerar um **resumo do histórico do cliente**: um parágrafo, os pontos de atenção e uma sugestão de abordagem. O resumo é gerado sob demanda, pelo botão "Gerar resumo". Ao abrir a consulta, nada é enviado a nenhum serviço.
+
+O resumo sempre diz de onde veio: "Gerado por IA · modelo", "Resumo automático por regras" ou "IA indisponível no momento. Mostrando resumo automático por regras.". Conteúdo da IA traz um aviso fixo para conferir antes de agir.
+
+**Quais dados saem para o modelo.** Um retrato minimizado, montado com uma lista de permissão: intenção, status, canais por onde a jornada passou, etapa em que parou, desfecho, motivo da contestação, plano atual e planos escolhidos (nome e preço), faturas contestadas (mês e valor), oportunidades (categoria, urgência e status), contagens e tempos relativos ("há 3 dias"). O cliente aparece apenas como "o cliente".
+
+**O que nunca sai.** Nome, CPF (completo ou mascarado), telefone, conta do App, e-mail, identificadores internos, nome do atendente e texto livre digitado por cliente ou atendente (descrição da contestação e observações de conclusão ou escalação). Um teste automatizado confere isso no retrato e na requisição que sai pela rede.
+
+**Provedor por regras.** É o padrão, e não precisa de chave: o resumo é montado por regras a partir das contagens e dos rótulos da jornada. Também é o fallback. Se a IA falhar, demorar além do tempo configurado ou não estiver configurada, o painel mostra o resumo por regras e o motivo (`ai_error`, `ai_timeout`, `ai_invalid_response`, `ai_rate_limited` ou `ai_not_configured`). Falha da IA nunca vira erro para o atendente.
+
+**Cache.** Um resumo da IA fica guardado enquanto os dados do cliente não mudarem: nova jornada, nova transição ou nova oportunidade geram um resumo novo. Abrir a consulta não muda o cache. Resumos por regras não entram no cache, para que a próxima chamada tente a IA de novo. O botão "Gerar novamente" ignora o cache.
+
+**Limite de uso.** Cada atendente pode gerar até 6 resumos por minuto (`AiSummary__RequestsPerUserPerMinute`). Respostas do cache não contam. Cada geração fica registrada na auditoria, sem o texto do resumo.
+
+**Configuração de provedor.** As variáveis abaixo valem para a API. No modo full, o compose as repassa do ambiente de quem sobe, e nenhuma chave fica no repositório.
+
+| Variável | Compose (`docker-compose.full.yml`) | Padrão | O que faz |
+|---|---|---|---|
+| `AiSummary__Provider` | `AI_SUMMARY_PROVIDER` | `rules` | `rules` ou `openai_compatible` |
+| `AiSummary__BaseUrl` | `AI_SUMMARY_BASE_URL` | vazio | Endereço base da API compatível |
+| `AiSummary__Model` | `AI_SUMMARY_MODEL` | vazio | Nome do modelo |
+| `AiSummary__ApiKey` | `AI_SUMMARY_API_KEY` | vazio | Chave da API (nunca versionada) |
+| `AiSummary__TimeoutSeconds` | não repassada | `20` | Tempo máximo de espera pela IA |
+
+Sem o provedor completo, a API sobe normalmente, grava um aviso uma vez e usa o resumo por regras. Exemplos (os nomes de modelo mudam com o tempo; confira o catálogo de cada serviço):
+
+- **OpenAI:** `AI_SUMMARY_PROVIDER=openai_compatible`, `AI_SUMMARY_BASE_URL=https://api.openai.com/v1`, `AI_SUMMARY_MODEL=gpt-4o-mini`.
+- **Gemini (endpoint compatível com OpenAI):** `AI_SUMMARY_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai`, `AI_SUMMARY_MODEL=gemini-2.0-flash`.
+- **Groq:** `AI_SUMMARY_BASE_URL=https://api.groq.com/openai/v1`, `AI_SUMMARY_MODEL=llama-3.1-8b-instant`.
+- **Ollama local (sem chave):** `AI_SUMMARY_BASE_URL=http://host.docker.internal:11434/v1`, `AI_SUMMARY_MODEL=llama3.2`. Ollama dispensa a chave quando o endereço é local.
+
+**Limitações.** O resumo é apoio ao atendimento, não decisão: o atendente continua lendo a jornada. Texto livre fica de fora nesta versão, então o resumo não cita o que o cliente escreveu na descrição da contestação; isso pode ser tratado no futuro, com anonimização de texto. Quando o resumo depende de um serviço externo, a falha é absorvida pelo fallback, mas a qualidade do texto depende do modelo escolhido.
+
+---
+
 ## Setup detalhado
 
 ### Pré-requisitos
@@ -348,6 +385,16 @@ Os clientes deste cenário (Lucia, Rafael, Beatriz, Eduardo e Helena) vêm do se
 6. Saia e entre como Júlia (atendente): as abas da Central não aparecem, mas a consulta da mesma cliente mostra o cabeçalho de alerta.
 7. Conclua ou escale a jornada pelo painel: ela deixa de aparecer em "Requerem atenção" e em "Alertas".
 
+### Cenário 9: Resumo do cliente (painel) · ~3 min
+
+Os dados vêm do seed em banco recém-criado. O cliente Rodrigo Alves (CPF `491.005.281-02`) tem quatro jornadas dos últimos 30 dias: troca de plano abandonada no App, contestação escalada para o Financeiro, contestação concluída pela central telefônica e troca de plano concluída.
+
+1. Logado como Júlia, busque o CPF `49100528102`. A Consulta mostra o card "Resumo do cliente" abaixo dos dados, sem resumo ainda: nada é gerado ao abrir a consulta.
+2. Clique em "Gerar resumo". O card mostra a origem ("Resumo automático por regras" sem IA configurada), o resumo, os pontos de atenção e a sugestão: confirmar o andamento da escalação antes de oferecer qualquer nova opção.
+3. Confira os pontos com o histórico de jornadas logo abaixo: cada jornada aparece com seu início e seu encerramento, e a escalada continua sem desfecho.
+4. Troque para outro cliente e volte: o card volta ao estado inicial. Resumo por regras é recalculado a cada vez; resumo da IA volta do cache se os dados não tiverem mudado.
+5. Com um provedor configurado (ver a tabela acima), o selo passa a ser "Gerado por IA · modelo" e aparece o aviso para conferir antes de agir.
+
 ---
 
 ## Mapeamento de requisitos
@@ -371,6 +418,7 @@ A spec funcional deste projeto organiza os requisitos como casos de uso (UC01–
 | RNF004 | Login real do atendente no painel, com perfis | `POST /auth/login` (JWT, hash de senha, bloqueio por tentativas, rate limit por IP) + perfis `attendant`/`manager` |
 | N/A | Central Operacional e jornadas ativas em tempo real | Visão geral e fila sobre `GET /journeys/active`, com etapa, última atividade, inatividade e prioridade |
 | N/A | Alertas operacionais de inatividade | `GET /alerts/active`, derivado das jornadas `open` e dos limites configuráveis de atenção e crítico |
+| N/A | Resumo do cliente com IA, com fallback por regras | `POST /customers/{customerId}/ai-summary`, provedor `rules` ou compatível com OpenAI, cache por dados e limite por atendente |
 | N/A | Métricas operacionais (painel) | `GET /metrics/summary` (TMA mediano, jornadas hoje, taxa de conclusão, canal mais usado) |
 | RNF005 | Direito ao esquecimento, portabilidade (Art. 18 LGPD) e CPF mascarado | `POST /customers/{cpf}/right-to-be-forgotten`, `POST /customers/data-export`, `POST /customers/{id}/reveal-cpf` + telas correspondentes no App e no painel |
 | UC11 | Detectar oportunidades comerciais | `POST /opportunities/detect` (4 regras) + `GET /opportunities` + ciclo `new → contacted → converted/not_relevant`, aba "Oportunidades" no painel |
@@ -413,6 +461,7 @@ O protótipo evoluiu além do MVP inicial. Já foram entregues:
 - Fluxo completo de contestação de cobrança nos 3 canais.
 - Enriquecimento do painel do atendente com dados agregados, timeline contextualizada e histórico de jornadas anteriores.
 - Central Operacional do gestor: visão geral, fila filtrável, alertas de inatividade e acesso direto à jornada por IDs.
+- Resumo do cliente no painel, com provedor por regras, fallback automático e provedor compatível com OpenAI. A conexão com um modelo real depende de uma chave de API.
 - Integração com VLibras do Governo Federal e melhorias básicas de acessibilidade HTML.
 - Menu de acessibilidade no painel e no App, com seis ajustes (texto, contraste, cores para daltonismo, espaçamento, animações e foco), navegação completa por teclado e indicadores que não dependem só de cor.
 - Direito ao esquecimento (Art. 18 LGPD), exercível pelo cliente na área "Meus dados" do App ou pelo atendente no painel.
