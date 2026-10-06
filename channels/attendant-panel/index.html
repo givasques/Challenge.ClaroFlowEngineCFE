@@ -407,6 +407,29 @@
         </div>
       </section>
 
+      <!-- Resumo do cliente com IA ou por regras (FASE 4.4, Bloco C): gerado sob demanda, nunca ao abrir a consulta -->
+      <section id="ai-summary-block" class="panel-block ai-summary-block hidden" aria-labelledby="ai-summary-title" aria-busy="false">
+        <div class="section-heading-row">
+          <div>
+            <h2 id="ai-summary-title">Resumo do cliente</h2>
+            <p>Apoio para começar o atendimento. Não substitui a leitura da jornada.</p>
+          </div>
+        </div>
+        <div id="ai-summary-initial" class="ai-summary-initial">
+          <p class="ai-summary-hint">Gere um resumo do histórico deste cliente para começar o atendimento mais rápido.</p>
+          <button type="button" class="ai-summary-button" id="ai-summary-generate" data-ai-summary-action>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="15" height="15" aria-hidden="true"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"></path></svg>
+            Gerar resumo
+          </button>
+        </div>
+        <div id="ai-summary-loading" class="ai-summary-loading hidden" role="status">
+          <span class="ai-summary-spinner" aria-hidden="true"></span>
+          <span>Analisando o histórico…</span>
+        </div>
+        <div id="ai-summary-result" class="ai-summary-result hidden" aria-live="polite"></div>
+        <p id="ai-summary-error" class="inline-error hidden" role="alert"></p>
+      </section>
+
       <!-- Status da Jornada -->
       <section id="status-block" class="panel-block hidden" tabindex="-1" aria-labelledby="journey-status-title">
         <h2 id="journey-status-title">Jornada em andamento</h2>

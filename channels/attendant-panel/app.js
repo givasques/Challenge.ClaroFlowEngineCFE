@@ -146,6 +146,8 @@ function escalationAreaLabel(id) {
 
 const state = {
   customerId: null,
+  aiSummaryCustomerId: null,
+  aiSummaryRequestId: 0,
   journeyId: null,
   journeyPayload: null,
   currentJourney: null,
@@ -703,6 +705,8 @@ async function refreshTransitions() {
 
 function hideAllResultBlocks() {
   document.getElementById('customer-block').classList.add('hidden');
+  document.getElementById('ai-summary-block').classList.add('hidden');
+  resetAiSummary(null);
   document.getElementById('status-block').classList.add('hidden');
   document.getElementById('history-block').classList.add('hidden');
   document.getElementById('interactions-summary-block').classList.add('hidden');
@@ -722,8 +726,134 @@ function clearMessage() {
   document.getElementById('search-message').classList.add('hidden');
 }
 
+// ---------- Resumo do cliente com IA (FASE 4.4, Bloco C) ----------
+
+const AI_SUMMARY_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="13" height="13" aria-hidden="true"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"></path></svg>';
+
+/** Mostra o card para o cliente atual. Trocar de cliente volta o card ao estado inicial (nunca mostra resumo de outro). */
+function renderAiSummaryCustomer(customer) {
+  const block = document.getElementById('ai-summary-block');
+  if (!customer) {
+    block.classList.add('hidden');
+    resetAiSummary(null);
+    return;
+  }
+  if (state.aiSummaryCustomerId !== customer.id) resetAiSummary(customer.id);
+  block.classList.remove('hidden');
+}
+
+/** Volta ao estado inicial e invalida qualquer pedido em andamento (o id do pedido muda). */
+function resetAiSummary(customerId = null) {
+  state.aiSummaryCustomerId = customerId;
+  state.aiSummaryRequestId += 1;
+  const result = document.getElementById('ai-summary-result');
+  result.classList.add('hidden');
+  result.innerHTML = '';
+  document.getElementById('ai-summary-error').classList.add('hidden');
+  setAiSummaryLoading(false);
+}
+
+function setAiSummaryLoading(isLoading) {
+  const block = document.getElementById('ai-summary-block');
+  block.setAttribute('aria-busy', String(isLoading));
+  document.getElementById('ai-summary-result').setAttribute('aria-busy', String(isLoading));
+  const hasResult = !document.getElementById('ai-summary-result').classList.contains('hidden');
+  document.getElementById('ai-summary-loading').classList.toggle('hidden', !isLoading);
+  // Estado inicial só aparece sem resultado e sem carregamento.
+  document.getElementById('ai-summary-initial').classList.toggle('hidden', isLoading || hasResult);
+  document.getElementById('ai-summary-generate').disabled = isLoading;
+  document.querySelectorAll('[data-ai-summary-action]').forEach(button => { button.disabled = isLoading; });
+}
+
+async function fetchAiSummary({ forceRefresh = false } = {}) {
+  const customerId = state.aiSummaryCustomerId;
+  if (!customerId) return;
+
+  const requestId = ++state.aiSummaryRequestId;
+  document.getElementById('ai-summary-error').classList.add('hidden');
+  setAiSummaryLoading(true);
+
+  try {
+    const summary = await apiCall(`/customers/${encodeURIComponent(customerId)}/ai-summary`, {
+      method: 'POST',
+      body: { force_refresh: forceRefresh },
+    });
+    if (requestId !== state.aiSummaryRequestId) return;
+    renderAiSummary(summary);
+  } catch (err) {
+    if (requestId !== state.aiSummaryRequestId) return;
+    handleAiSummaryError(err);
+  } finally {
+    if (requestId === state.aiSummaryRequestId) setAiSummaryLoading(false);
+  }
+}
+
+function renderAiSummary(summary) {
+  const result = document.getElementById('ai-summary-result');
+  result.innerHTML = buildAiSummaryResult(summary);
+  result.classList.remove('hidden');
+  document.getElementById('ai-summary-initial').classList.add('hidden');
+}
+
+/** HTML do resultado. Todo texto vindo da API passa por escapeHtml. A origem aparece sempre, com ícone e texto. */
+function buildAiSummaryResult(summary) {
+  const isAi = summary.source === 'ai';
+  const isFallback = !isAi && Boolean(summary.fallback_reason);
+  const badgeClass = isAi ? 'ai-source-badge--ai' : (isFallback ? 'ai-source-badge--fallback' : 'ai-source-badge--rules');
+  let badgeText;
+  if (isAi) badgeText = `Gerado por IA${summary.model ? ` · ${summary.model}` : ''}`;
+  else if (isFallback) badgeText = 'IA indisponível no momento. Mostrando resumo automático por regras.';
+  else badgeText = 'Resumo automático por regras';
+
+  const points = (summary.attention_points || []).length
+    ? `<h3 class="ai-summary-subtitle">Pontos de atenção</h3><ul class="ai-summary-points">${summary.attention_points.map(point => `<li>${escapeHtml(point)}</li>`).join('')}</ul>`
+    : '';
+  const approach = summary.suggested_approach
+    ? `<h3 class="ai-summary-subtitle">Sugestão de abordagem</h3><p class="ai-summary-approach">${escapeHtml(summary.suggested_approach)}</p>`
+    : '';
+  const disclaimer = isAi
+    ? '<p class="ai-summary-disclaimer">Conteúdo gerado por IA a partir do histórico. Confira antes de agir.</p>'
+    : '';
+  const meta = `Gerado às ${formatAiSummaryTime(summary.generated_at)}${summary.cached ? ' (do cache)' : ''}`;
+
+  return `
+    <span class="ai-source-badge ${badgeClass}">${AI_SUMMARY_ICON}<span>${escapeHtml(badgeText)}</span></span>
+    <p class="ai-summary-text">${escapeHtml(summary.summary)}</p>
+    ${points}
+    ${approach}
+    ${disclaimer}
+    <div class="ai-summary-footer">
+      <span class="ai-summary-meta">${escapeHtml(meta)}</span>
+      <button type="button" class="ai-summary-button ai-summary-button--secondary" data-ai-summary-action>Gerar novamente</button>
+    </div>
+    <span class="sr-only">Resumo gerado</span>`;
+}
+
+function formatAiSummaryTime(isoText) {
+  const date = new Date(isoText);
+  if (Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+}
+
+function handleAiSummaryError(err) {
+  // 409: cliente anonimizado (direito ao esquecimento). O card some, sem mensagem.
+  if (err.status === 409) {
+    document.getElementById('ai-summary-block').classList.add('hidden');
+    resetAiSummary(null);
+    return;
+  }
+  if (err.status === 429) {
+    const el = document.getElementById('ai-summary-error');
+    el.textContent = 'Muitas solicitações. Aguarde um minuto.';
+    el.classList.remove('hidden');
+    return;
+  }
+  showToast('Não foi possível gerar o resumo agora. Tente novamente em instantes.', true);
+}
+
 function renderCustomerBlock(customer) {
   const block = document.getElementById('customer-block');
+  renderAiSummaryCustomer(customer);
   state.currentPlan = customer ? customer.current_plan || null : null;
 
   if (!customer) {
@@ -2613,6 +2743,10 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('change-password-form').addEventListener('submit', handleChangePasswordSubmit);
 
   document.getElementById('search-form').addEventListener('submit', handleSearch);
+  document.getElementById('ai-summary-generate').addEventListener('click', () => fetchAiSummary({ forceRefresh: false }));
+  document.getElementById('ai-summary-result').addEventListener('click', event => {
+    if (event.target.closest('[data-ai-summary-action]')) fetchAiSummary({ forceRefresh: true });
+  });
 
   document.querySelectorAll('.sidebar-nav-item').forEach(btn => {
     btn.addEventListener('click', () => switchView(btn.dataset.view, { focusTitle: true }));
