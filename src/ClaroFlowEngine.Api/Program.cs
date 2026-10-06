@@ -1,3 +1,4 @@
+using ClaroFlowEngine.Api.Modules.CustomerInsights;
 using ClaroFlowEngine.Api.Common.Contracts;
 using ClaroFlowEngine.Api.Common.Errors;
 using ClaroFlowEngine.Api.Common.Extensions;
@@ -55,6 +56,7 @@ builder.Services.AddOptions<CfeOptions>()
 builder.Services.Configure<ChannelsOptions>(builder.Configuration.GetSection(ChannelsOptions.SectionName));
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.SectionName));
 builder.Services.Configure<PanelAuthOptions>(builder.Configuration.GetSection(PanelAuthOptions.SectionName));
+builder.Services.Configure<AiSummaryOptions>(builder.Configuration.GetSection(AiSummaryOptions.SectionName));
 
 // Falha rápido se a chave de assinatura do JWT estiver ausente ou curta demais — melhor não subir
 // do que subir com segurança quebrada (FASE 4.1, item A.3).
@@ -119,6 +121,7 @@ builder.Services.AddPanelModule();
 builder.Services.AddLgpdModule();
 builder.Services.AddOpportunitiesModule();
 builder.Services.AddAuthModule();
+builder.Services.AddCustomerInsightsModule();
 
 // Autenticação JWT do painel (FASE 4.1, item A.3/A.6) — WhatsApp e App continuam com X-Channel-Token,
 // resolvido pelo ChannelAuthMiddleware; só o painel passa a usar este esquema.
@@ -207,6 +210,11 @@ builder.Services.AddCors(opt => opt.AddDefaultPolicy(policy => policy
     .AllowAnyMethod()));
 
 var app = builder.Build();
+
+// Sem chave, a API sobe e usa o resumo por regras; o aviso sai uma vez, na subida (FASE 4.4, A.2).
+var aiSummaryOptions = app.Services.GetRequiredService<Microsoft.Extensions.Options.IOptions<AiSummaryOptions>>().Value;
+if (aiSummaryOptions.Enabled && aiSummaryOptions.Provider != "rules" && !aiSummaryOptions.IsRemoteProviderConfigured())
+    app.Logger.LogWarning("IA não configurada; usando resumo por regras");
 
 // Aplica migrations pendentes e roda o seed automaticamente em dev/staging.
 using (var scope = app.Services.CreateScope())

@@ -35,6 +35,9 @@ public static class TransitionEventTypes
     /// <summary>Exportação de dados solicitada (LGPD Art. 18, V — FASE 4.3, item C.3) — transição órfã, sem journey_context_id.</summary>
     public const string DataPortabilityRequested = "data_portability_requested";
 
+    /// <summary>Resumo do cliente gerado por IA ou por regras (FASE 4.4, A.8) — transição órfã, sem o conteúdo do resumo.</summary>
+    public const string CustomerAiSummaryGenerated = "customer_ai_summary_generated";
+
     /// <summary>
     /// Eventos que contam como atividade operacional da jornada (FASE 4.2). Usados para o canal atual e para a
     /// inatividade. Eventos apenas observacionais, como <see cref="PanelAccessed"/>, ficam deliberadamente fora —

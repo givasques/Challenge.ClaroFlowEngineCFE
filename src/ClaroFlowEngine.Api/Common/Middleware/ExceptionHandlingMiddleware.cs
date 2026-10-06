@@ -33,6 +33,7 @@ public class ExceptionHandlingMiddleware
                 GoneException => StatusCodes.Status410Gone,
                 ValidationException => StatusCodes.Status400BadRequest,
                 UnauthorizedException => StatusCodes.Status401Unauthorized,
+                TooManyRequestsException => StatusCodes.Status429TooManyRequests,
                 AccountLockedException => 423, // Locked — sem constante dedicada em StatusCodes
                 _ => StatusCodes.Status500InternalServerError
             };

@@ -104,6 +104,12 @@ public class LgpdService : ILgpdService
 
         var journeyIds = journeys.Select(j => j.Id).ToList();
 
+        // Resumos do cliente gerados por IA (FASE 4.4, A.7): texto derivado de dado pessoal, apagado junto.
+        var aiSummaries = await _db.CustomerAiSummaries
+            .Where(s => s.CustomerId == customerId)
+            .ToListAsync(cancellationToken);
+        _db.CustomerAiSummaries.RemoveRange(aiSummaries);
+
         // handoff_tokens: qualquer token ainda ativo do cliente é invalidado, para não sobreviver à anonimização.
         var activeTokens = await _db.HandoffTokens
             .Where(t => journeyIds.Contains(t.JourneyContextId) && t.UsedAt == null)
@@ -126,7 +132,7 @@ public class LgpdService : ILgpdService
                 new
                 {
                     trigger = actingChannel,
-                    operations_performed = new[] { "customer_record", "identity_links", "journey_payloads", "handoff_tokens" },
+                    operations_performed = new[] { "customer_record", "identity_links", "journey_payloads", "handoff_tokens", "customer_ai_summaries" },
                 },
                 _currentPanelUser));
 
