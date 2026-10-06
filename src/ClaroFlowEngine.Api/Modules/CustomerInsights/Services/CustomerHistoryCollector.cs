@@ -52,7 +52,7 @@ public class CustomerHistoryCollector : ICustomerHistoryCollector
         var journeyIds = journeys.Select(j => j.Id).ToList();
         var transitions = await _db.JourneyTransitions.AsNoTracking()
             .Where(t => t.JourneyContextId != null && journeyIds.Contains(t.JourneyContextId.Value))
-            .Select(t => new JourneyEvent(t.JourneyContextId!.Value, t.Channel, t.OccurredAt))
+            .Select(t => new JourneyEvent(t.JourneyContextId!.Value, t.Channel, t.OccurredAt, t.EventType))
             .ToListAsync(cancellationToken);
         var eventsByJourney = transitions
             .GroupBy(e => e.JourneyId)
@@ -183,7 +183,10 @@ public class CustomerHistoryCollector : ICustomerHistoryCollector
         var sb = new StringBuilder();
         foreach (var journey in journeys.OrderBy(j => j.Id))
         {
-            var events = eventsByJourney.GetValueOrDefault(journey.Id) ?? [];
+            // panel_accessed é só o registro de quem abriu a consulta: não é dado novo do cliente, então não entra.
+            var events = (eventsByJourney.GetValueOrDefault(journey.Id) ?? [])
+                .Where(e => e.EventType != TransitionEventTypes.PanelAccessed)
+                .ToList();
             var lastEventTicks = events.Count == 0 ? 0 : events[^1].OccurredAt.Ticks;
             sb.Append("j|").Append(journey.Id).Append('|').Append(journey.Status).Append('|')
               .Append(journey.CurrentStep).Append('|').Append(journey.UpdatedAt.Ticks).Append('|')
@@ -245,4 +248,4 @@ public class CustomerHistoryCollector : ICustomerHistoryCollector
     }
 }
 
-internal readonly record struct JourneyEvent(Guid JourneyId, string Channel, DateTime OccurredAt);
+internal readonly record struct JourneyEvent(Guid JourneyId, string Channel, DateTime OccurredAt, string EventType);

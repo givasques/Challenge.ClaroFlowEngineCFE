@@ -175,7 +175,9 @@ public class AiProviderTests
         var cpf = TestCpfValue();
         var customerId = await TestData.CreateCustomerAsync(host, cpf, "Maria Teste Pereira");
         await TestData.AddJourneyAsync(host, customerId, Channels.Whatsapp, 30);
-        await AddIdentityLinksAsync(host, customerId, phone: "5511977776666", appAccount: "maria.teste.pereira");
+        var phone = "5511" + Random.Shared.NextInt64(100000000, 999999999);
+        var appAccount = "maria.teste." + Guid.NewGuid().ToString("N")[..8];
+        await AddIdentityLinksAsync(host, customerId, phone, appAccount);
 
         await GenerateAsync(host, customerId);
 
@@ -184,8 +186,8 @@ public class AiProviderTests
         Assert.DoesNotContain("Maria", body);
         Assert.DoesNotContain("Pereira", body);
         Assert.DoesNotContain(cpf, body);
-        Assert.DoesNotContain("5511977776666", body);
-        Assert.DoesNotContain("maria.teste.pereira", body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(phone, body);
+        Assert.DoesNotContain(appAccount, body, StringComparison.OrdinalIgnoreCase);
         Assert.False(GuidPattern.IsMatch(body), "a requisição contém um GUID");
         Assert.DoesNotContain(ApiKey, body);
         Assert.Equal($"Bearer {ApiKey}", request.Authorization);
