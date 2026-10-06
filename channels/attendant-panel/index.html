@@ -74,7 +74,7 @@
            com data-role="manager". A proteção real continua sendo a policy ManagerOnly no backend
            (B.3) — esconder o item é só experiência de uso, não segurança. -->
       <nav class="sidebar-nav" aria-label="Navegação principal">
-        <button type="button" class="sidebar-nav-item active" id="nav-visao-geral" data-view="visao-geral" aria-current="page">
+        <button type="button" class="sidebar-nav-item active" id="nav-visao-geral" data-view="visao-geral" data-role="manager" aria-current="page">
           <span class="sidebar-nav-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="17" height="17"><rect x="3" y="3" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.7"/><rect x="14" y="3" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.7"/><rect x="3" y="14" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.7"/><rect x="14" y="14" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.7"/></svg>
           </span>
@@ -93,7 +93,7 @@
           Jornadas ativas
           <span class="sidebar-nav-badge hidden" id="active-journeys-badge">0</span>
         </button>
-        <button type="button" class="sidebar-nav-item" id="nav-alertas" data-view="alertas">
+        <button type="button" class="sidebar-nav-item" id="nav-alertas" data-view="alertas" data-role="manager">
           <span class="sidebar-nav-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="17" height="17"><path d="M18 8a6 6 0 10-12 0c0 6.5-3 9-3 9h18s-3-2.5-3-9" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M13.8 21a2 2 0 01-3.6 0" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
           </span>
@@ -131,7 +131,7 @@
           <p class="main-subtitle" id="main-subtitle">Acompanhe a operação e priorize clientes que precisam de atenção</p>
         </div>
         <div class="main-header-tools">
-          <button type="button" class="notification-button" id="notification-button" aria-label="Abrir alertas operacionais" title="Alertas operacionais">
+          <button type="button" class="notification-button" id="notification-button" data-role="manager" aria-label="Abrir alertas operacionais" title="Alertas operacionais">
             <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="18" height="18" aria-hidden="true"><path d="M18 8a6 6 0 10-12 0c0 6.5-3 9-3 9h18s-3-2.5-3-9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M13.8 21a2 2 0 01-3.6 0" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
             <span class="notification-badge hidden" id="notification-badge" aria-hidden="true">0</span>
           </button>

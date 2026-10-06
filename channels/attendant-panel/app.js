@@ -1475,9 +1475,16 @@ async function startAuthenticatedSession() {
 
   // Pollings e buscas iniciais só começam com sessão ativa (FASE 4.1, item C.3) — antes do login,
   // nada no painel chama a API.
-  switchView('visao-geral');
-  fetchAlerts({ notify: false });
-  startAlertsPolling();
+  // Gestor: tela inicial é a Visão geral da Central (com alertas). Atendente: segue na Consulta, como antes da 4.2.
+  // Os alertas não são pedidos ao atendente: GET /alerts/active é só do gestor (403 para ele).
+  if (session.user.role === 'manager') {
+    switchView('visao-geral');
+    fetchAlerts({ notify: false });
+    startAlertsPolling();
+  } else {
+    switchView('consulta');
+    fetchActiveJourneys();
+  }
   fetchOpportunitiesBadge();
   updateHeaderClock();
   setInterval(updateHeaderClock, 60000);

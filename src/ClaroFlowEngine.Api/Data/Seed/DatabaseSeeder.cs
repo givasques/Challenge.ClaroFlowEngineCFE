@@ -19,6 +19,7 @@ public static class DatabaseSeeder
         await SeedCustomerPlansAsync(db, customers, plans, cancellationToken);
         await SeedInvoicesAsync(db, customers, plans, cancellationToken);
         await SeedPanelUsersAsync(db, cancellationToken);
+        await SeedOperationalCenterScenarioAsync(db, cancellationToken);
 
         await db.SaveChangesAsync(cancellationToken);
     }
@@ -266,4 +267,97 @@ public static class DatabaseSeeder
             db.PanelUsers.Add(user);
         }
     }
+
+    /// <summary>
+    /// Cenário da Central operacional (FASE 4.2, item C.2): clientes de demonstração com jornadas abertas em
+    /// vários níveis de inatividade, para a Visão geral e os alertas aparecerem num banco recém-criado.
+    /// Horários relativos ao momento do seed. Idempotente: se os clientes de demonstração já existem, não faz nada
+    /// (para atualizar os horários, recrie o banco). Não toca nos clientes e contas do App já existentes.
+    /// </summary>
+    private static async Task SeedOperationalCenterScenarioAsync(CfeDbContext db, CancellationToken ct)
+    {
+        var existingCpfs = await db.Customers.Select(c => c.Cpf).ToListAsync(ct);
+        if (existingCpfs.Contains(OperationalDemoScenarios[0].Cpf)) return;
+
+        var now = DateTime.UtcNow;
+
+        foreach (var scenario in OperationalDemoScenarios)
+        {
+            var customer = new Customer
+            {
+                Id = Guid.NewGuid(),
+                Cpf = scenario.Cpf,
+                FullName = scenario.FullName,
+                Segment = "Pessoa Física",
+                BillingDueDay = 10,
+            };
+            db.Customers.Add(customer);
+            db.IdentityLinks.Add(new IdentityLink { CustomerId = customer.Id, Channel = Channels.Cpf, Identifier = scenario.Cpf });
+            db.IdentityLinks.Add(new IdentityLink { CustomerId = customer.Id, Channel = Channels.Whatsapp, Identifier = scenario.Phone });
+
+            var journey = new JourneyContext
+            {
+                Id = Guid.NewGuid(),
+                CustomerId = customer.Id,
+                OriginChannel = scenario.OriginChannel,
+                Intent = scenario.Intent,
+                CurrentStep = scenario.CurrentStep,
+                Status = JourneyStatus.Open,
+                CreatedAt = now.AddMinutes(-scenario.OpenedMinutesAgo),
+                UpdatedAt = now.AddMinutes(-scenario.InactiveMinutes),
+            };
+            db.JourneyContexts.Add(journey);
+
+            db.JourneyTransitions.Add(new JourneyTransition
+            {
+                Id = Guid.NewGuid(),
+                JourneyContextId = journey.Id,
+                Channel = scenario.OriginChannel,
+                EventType = TransitionEventTypes.JourneyStarted,
+                Description = "Jornada iniciada.",
+                Metadata = new Dictionary<string, object> { ["intent"] = scenario.Intent },
+                OccurredAt = journey.CreatedAt,
+            });
+            db.JourneyTransitions.Add(new JourneyTransition
+            {
+                Id = Guid.NewGuid(),
+                JourneyContextId = journey.Id,
+                Channel = scenario.CurrentChannel,
+                EventType = TransitionEventTypes.StepUpdated,
+                Description = "Etapa atualizada.",
+                Metadata = new Dictionary<string, object> { ["current_step"] = scenario.CurrentStep },
+                OccurredAt = journey.UpdatedAt,
+            });
+        }
+
+        await db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>
+    /// Clientes fictícios com CPFs de teste (dígitos verificadores válidos). Nenhum deles tem conta do App vinculada,
+    /// então não interfere nos roteiros de handoff da 4.3.
+    /// </summary>
+    private static readonly OperationalDemoScenario[] OperationalDemoScenarios =
+    [
+        // Atenção: ~8 min sem atividade.
+        new("52601815906", "Lucia Ferreira", "5511988880001", Channels.Whatsapp, "change_plan", "plan_selected", Channels.Whatsapp, 8, 20),
+        new("08301661305", "Rafael Costa", "5511988880002", Channels.App, "dispute_charge", "dispute_reason_selected", Channels.App, 8, 30),
+        // Crítico: ~25 min sem atividade.
+        new("18609139034", "Beatriz Lima", "5511988880003", Channels.Call, "dispute_charge", "identity_resolved", Channels.Call, 25, 40),
+        // Crítico, com a jornada passada do WhatsApp para o App (canal atual diferente do de origem).
+        new("99603082430", "Eduardo Nunes", "5511988880004", Channels.Whatsapp, "change_plan", "plan_selected", Channels.App, 25, 60),
+        // Normal: atividade recente, só para a fila mostrar todas as prioridades.
+        new("62819482112", "Helena Martins", "5511988880005", Channels.App, "change_plan", "identity_resolved", Channels.App, 1, 5),
+    ];
+
+    private sealed record OperationalDemoScenario(
+        string Cpf,
+        string FullName,
+        string Phone,
+        string OriginChannel,
+        string Intent,
+        string CurrentStep,
+        string CurrentChannel,
+        int InactiveMinutes,
+        int OpenedMinutesAgo);
 }

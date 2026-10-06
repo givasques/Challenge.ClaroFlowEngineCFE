@@ -96,6 +96,8 @@ O projeto tem 2 formas de rodar via Docker Compose:
 
 **Modo full** (`docker-compose.full.yml`) sobe tudo (Postgres, API e canais servidos pela API). Ideal para demonstração ou teste ponta a ponta com um único comando.
 
+**Cenário da Central operacional:** o seed cria 5 clientes de demonstração com jornadas abertas em níveis diferentes de inatividade (2 de atenção, 2 críticas e 1 normal). Os horários são relativos ao momento em que o banco é criado: com o tempo, os níveis mudam (por exemplo, uma jornada de 8 min vira crítica depois de cerca de 15 min). Para ver o cenário com os horários de agora, recrie o banco com `docker compose -f docker-compose.full.yml -p claroflowengine-full down -v` seguido de `up -d --build`. Reiniciar só a API não recria o cenário: o seed é idempotente e não duplica nada.
+
 Os dois modos são isolados (nomes de projeto e portas de Postgres diferentes) e podem coexistir sem conflito. Os comandos exatos de cada modo estão em [Setup detalhado](#setup-detalhado) logo abaixo.
 
 ---
