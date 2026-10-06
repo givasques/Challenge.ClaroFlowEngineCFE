@@ -82,7 +82,7 @@ Este repositório contém um **protótipo funcional**, não um produto de produ�
 - **Context**: mantém o ciclo de vida da jornada (abertura, atualização, expiração, encerramento) e o histórico de transições.
 - **Handoff**: gera e resolve os tokens de deep link que transferem uma jornada entre canais.
 - **Invoices**: expõe as faturas do cliente (com itens de linha), consumidas pelo fluxo de contestação de cobrança.
-- **Panel**: dados agregados para o menu lateral do painel do atendente, cobrindo jornadas ativas em tempo real e métricas operacionais (TMA, taxa de conclusão, canal mais usado).
+- **Panel**: central operacional do painel, com visão geral e fila de jornadas, alertas de inatividade, métricas (TMA, taxa de conclusão, canal mais usado) e oportunidades.
 
 Os cinco módulos rodam num único processo (monolito modular); ver [Decisões arquiteturais](#decisões-arquiteturais).
 
@@ -99,6 +99,20 @@ O projeto tem 2 formas de rodar via Docker Compose:
 **Cenário da Central operacional:** o seed cria 5 clientes de demonstração com jornadas abertas em níveis diferentes de inatividade (2 de atenção, 2 críticas e 1 normal). Os horários são relativos ao momento em que o banco é criado: com o tempo, os níveis mudam (por exemplo, uma jornada de 8 min vira crítica depois de cerca de 15 min). Para ver o cenário com os horários de agora, recrie o banco com `docker compose -f docker-compose.full.yml -p claroflowengine-full down -v` seguido de `up -d --build`. Reiniciar só a API não recria o cenário: o seed é idempotente e não duplica nada.
 
 Os dois modos são isolados (nomes de projeto e portas de Postgres diferentes) e podem coexistir sem conflito. Os comandos exatos de cada modo estão em [Setup detalhado](#setup-detalhado) logo abaixo.
+
+---
+
+## Central Operacional do atendente
+
+O painel em `channels/attendant-panel` abre para o gestor na **Visão geral**, com KPIs reais, as jornadas que requerem atenção e uma fila operacional com pesquisa, filtros e ordenação. A aba **Alertas** lista as jornadas paradas, críticas primeiro. Essas telas são exclusivas do gestor. O atendente continua na Consulta de Jornada, que mostra o cabeçalho de alerta da jornada aberta para os dois perfis.
+
+Alertas são calculados em tempo real apenas para jornadas `open`, usando `JourneyContext.UpdatedAt` como última atividade: menos de 5 minutos é normal, de 5 a menos de 15 é atenção (`warning`) e a partir de 15 é crítico (`critical`). Os limites são configuráveis por `Cfe:JourneyAttentionThresholdMinutes` e `Cfe:JourneyCriticalThresholdMinutes`, validados na subida da API. Nenhuma tabela ou migration adicional é necessária.
+
+A última atividade considera a abertura de um link de continuação (handoff resolvido pela dona da jornada) e a reabertura de uma jornada já ativa. Tentativas recusadas (outra conta, conta sem vínculo, link cancelado) não contam. Consultas do painel continuam auditadas por `panel_accessed`, mas não alteram `UpdatedAt` nem zeram a inatividade.
+
+`GET /alerts/active` retorna somente alertas ativos, priorizando críticos e maior tempo sem atividade, e responde 403 ao perfil atendente. `GET /journeys/active` informa etapa atual, última atividade, tempo sem atividade, necessidade de atenção e nível do alerta. `POST /journeys/active/search` filtra a fila no servidor: nome e telefone por correspondência parcial, CPF somente com os 11 dígitos completos. O texto vai no corpo da requisição, nunca na URL. Jornadas Ativas, Alertas e Fila abrem a consulta correta usando `customer_id` e `journey_id`, sem CPF, telefone ou nome na URL.
+
+O contador "Jornadas hoje" usa o dia civil de Brasília (`Cfe:BusinessTimeZoneId`, padrão `America/Sao_Paulo`).
 
 ---
 
@@ -322,6 +336,18 @@ Os três clientes de teste já vêm no seed automático. Com a stack rodando, ab
 7. Ainda no App, logada como `ana.silva`, abra "Meus dados" e clique "Baixar meus dados": o JSON baixado traz o CPF completo, as identidades de canal (WhatsApp, App, CPF) e o histórico de jornadas, mostrando a identidade unificada da Ana.
 8. No painel, com a Ana ainda na tela, clique "Exportar dados (LGPD)" e confirme: outro arquivo é baixado, e a auditoria da exportação fica registrada com o nome da Júlia.
 
+### Cenário 8: Central Operacional e alertas de inatividade (painel) · ~3 min
+
+Os clientes deste cenário (Lucia, Rafael, Beatriz, Eduardo e Helena) vêm do seed em banco recém-criado. Os horários são relativos ao momento em que o banco foi criado: se passarem alguns minutos, os níveis mudam. Para o cenário original, recrie o banco (ver [Modo full](#modo-full-docker-compose-completo)).
+
+1. Logado como Ricardo (gestor), o painel abre na Visão geral: cartões de jornadas em andamento, requerem atenção, alertas críticos, escaladas e jornadas de hoje.
+2. Em "Requerem atenção", as jornadas paradas aparecem por prioridade. Os cartões são botões: use Tab até um deles e Enter para abrir a consulta.
+3. Na fila, filtre a prioridade por "Crítico" e depois pesquise `Beatriz`: só a cliente crítica aparece.
+4. Abra a aba "Alertas": críticos e de atenção, com o tempo sem atividade de cada jornada.
+5. Clique numa jornada crítica: a Consulta abre com o cabeçalho de alerta e o cliente certo.
+6. Saia e entre como Júlia (atendente): as abas da Central não aparecem, mas a consulta da mesma cliente mostra o cabeçalho de alerta.
+7. Conclua ou escale a jornada pelo painel: ela deixa de aparecer em "Requerem atenção" e em "Alertas".
+
 ---
 
 ## Mapeamento de requisitos
@@ -343,7 +369,8 @@ A spec funcional deste projeto organiza os requisitos como casos de uso (UC01–
 | UC10 | Contestar cobrança indevida | `GET /invoices/customer/{id}` + `GET /invoices/{id}` + fluxo dedicado nos 3 canais, `intent: dispute_charge` |
 | RNF003 | Operação em modo degradado quando o CFE está indisponível | Timeout + retry + banner de indisponibilidade nos 3 canais |
 | RNF004 | Login real do atendente no painel, com perfis | `POST /auth/login` (JWT, hash de senha, bloqueio por tentativas, rate limit por IP) + perfis `attendant`/`manager` |
-| N/A | Jornadas ativas em tempo real (painel) | `GET /journeys/active` |
+| N/A | Central Operacional e jornadas ativas em tempo real | Visão geral e fila sobre `GET /journeys/active`, com etapa, última atividade, inatividade e prioridade |
+| N/A | Alertas operacionais de inatividade | `GET /alerts/active`, derivado das jornadas `open` e dos limites configuráveis de atenção e crítico |
 | N/A | Métricas operacionais (painel) | `GET /metrics/summary` (TMA mediano, jornadas hoje, taxa de conclusão, canal mais usado) |
 | RNF005 | Direito ao esquecimento, portabilidade (Art. 18 LGPD) e CPF mascarado | `POST /customers/{cpf}/right-to-be-forgotten`, `POST /customers/data-export`, `POST /customers/{id}/reveal-cpf` + telas correspondentes no App e no painel |
 | UC11 | Detectar oportunidades comerciais | `POST /opportunities/detect` (4 regras) + `GET /opportunities` + ciclo `new → contacted → converted/not_relevant`, aba "Oportunidades" no painel |
@@ -385,7 +412,7 @@ O protótipo evoluiu além do MVP inicial. Já foram entregues:
 - Interatividade do bot (botões e listas no chat WhatsApp).
 - Fluxo completo de contestação de cobrança nos 3 canais.
 - Enriquecimento do painel do atendente com dados agregados, timeline contextualizada e histórico de jornadas anteriores.
-- Menu lateral do painel conectado a dados reais (jornadas ativas e métricas operacionais).
+- Central Operacional do gestor: visão geral, fila filtrável, alertas de inatividade e acesso direto à jornada por IDs.
 - Integração com VLibras do Governo Federal e melhorias básicas de acessibilidade HTML.
 - Menu de acessibilidade no painel e no App, com seis ajustes (texto, contraste, cores para daltonismo, espaçamento, animações e foco), navegação completa por teclado e indicadores que não dependem só de cor.
 - Direito ao esquecimento (Art. 18 LGPD), exercível pelo cliente na área "Meus dados" do App ou pelo atendente no painel.
