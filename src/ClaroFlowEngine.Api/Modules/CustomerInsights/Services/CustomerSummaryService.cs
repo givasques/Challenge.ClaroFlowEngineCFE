@@ -79,7 +79,7 @@ public class CustomerSummaryService : ICustomerSummaryService
             {
                 // Resposta do cache não consome o limite do atendente (A.6).
                 Audit(cached.Source, cached.Model, cached: true, fallbackReason: null);
-                LogGeneration(customerId, panelUserId, cached.Source, cached.Model, cached: true, started, fallbackReason: null, inputTokens: null, outputTokens: null);
+                LogGeneration(customerId, panelUserId, cached.Source, cached.Model, cached: true, started, fallbackReason: null, inputTokens: null, outputTokens: null, reasoningTokens: null);
                 return ToResponse(cached.Content, cached.Source, cached.Model, cached.GeneratedAt, cached: true, fallbackReason: null);
             }
         }
@@ -97,7 +97,7 @@ public class CustomerSummaryService : ICustomerSummaryService
         Audit(result.Source, result.Model, cached: false, fallbackReason);
         await _db.SaveChangesAsync(cancellationToken);
 
-        LogGeneration(customerId, panelUserId, result.Source, result.Model, cached: false, started, fallbackReason, result.InputTokens, result.OutputTokens);
+        LogGeneration(customerId, panelUserId, result.Source, result.Model, cached: false, started, fallbackReason, result.InputTokens, result.OutputTokens, result.ReasoningTokens);
         return ToResponse(result.Content, result.Source, result.Model, generatedAt, cached: false, fallbackReason);
     }
 
@@ -122,7 +122,8 @@ public class CustomerSummaryService : ICustomerSummaryService
         }
         catch (AiProviderException ex)
         {
-            _logger.LogWarning("Resumo com IA indisponível ({FallbackReason}); usando resumo por regras", ex.Reason);
+            // ex.Message traz só o motivo da falha (ex.: campo ausente, padrão de telefone), nunca o conteúdo da resposta.
+            _logger.LogWarning("Resumo com IA indisponível ({FallbackReason}): {FailureDetail}", ex.Reason, ex.Message);
             return (await rules.GenerateAsync(portrait, cancellationToken), ex.Reason);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
@@ -187,12 +188,12 @@ public class CustomerSummaryService : ICustomerSummaryService
     /// <summary>Log estruturado sem chave, prompt nem resposta do modelo (A.8).</summary>
     private void LogGeneration(
         Guid customerId, Guid panelUserId, string source, string? model, bool cached, long started,
-        string? fallbackReason, int? inputTokens, int? outputTokens)
+        string? fallbackReason, int? inputTokens, int? outputTokens, int? reasoningTokens)
     {
         var latencyMs = Stopwatch.GetElapsedTime(started).TotalMilliseconds;
         _logger.LogInformation(
-            "Resumo do cliente {CustomerId} para o atendente {PanelUserId}: origem {Source}, modelo {Model}, cache {Cached}, latência {LatencyMs} ms, tokens entrada {InputTokens} saída {OutputTokens}, fallback {FallbackReason}",
-            customerId, panelUserId, source, model ?? "-", cached, Math.Round(latencyMs), inputTokens ?? 0, outputTokens ?? 0, fallbackReason ?? "-");
+            "Resumo do cliente {CustomerId} para o atendente {PanelUserId}: origem {Source}, modelo {Model}, cache {Cached}, latência {LatencyMs} ms, tokens entrada {InputTokens} saída {OutputTokens} raciocínio {ReasoningTokens}, fallback {FallbackReason}",
+            customerId, panelUserId, source, model ?? "-", cached, Math.Round(latencyMs), inputTokens ?? 0, outputTokens ?? 0, reasoningTokens ?? 0, fallbackReason ?? "-");
     }
 
     private static CustomerSummaryResponse ToResponse(
