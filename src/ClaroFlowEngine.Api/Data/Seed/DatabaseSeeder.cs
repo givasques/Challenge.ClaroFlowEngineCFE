@@ -278,7 +278,11 @@ public static class DatabaseSeeder
     private static async Task SeedOperationalCenterScenarioAsync(CfeDbContext db, CancellationToken ct)
     {
         var existingCpfs = await db.Customers.Select(c => c.Cpf).ToListAsync(ct);
-        if (existingCpfs.Contains(OperationalDemoScenarios[0].Cpf)) return;
+        if (existingCpfs.Contains(OperationalDemoScenarios[0].Cpf))
+        {
+            await BackfillScenarioDisputeReasonsAsync(db, ct);
+            return;
+        }
 
         var now = DateTime.UtcNow;
 
@@ -307,6 +311,8 @@ public static class DatabaseSeeder
                 CreatedAt = now.AddMinutes(-scenario.OpenedMinutesAgo),
                 UpdatedAt = now.AddMinutes(-scenario.InactiveMinutes),
             };
+            if (scenario.DisputeReason is not null)
+                journey.Payload["dispute_reason"] = scenario.DisputeReason;
             db.JourneyContexts.Add(journey);
 
             db.JourneyTransitions.Add(new JourneyTransition
@@ -342,7 +348,7 @@ public static class DatabaseSeeder
     [
         // Atenção: ~8 min sem atividade.
         new("52601815906", "Lucia Ferreira", "5511988880001", Channels.Whatsapp, "change_plan", "plan_selected", Channels.Whatsapp, 8, 20),
-        new("08301661305", "Rafael Costa", "5511988880002", Channels.App, "dispute_charge", "dispute_reason_selected", Channels.App, 8, 30),
+        new("08301661305", "Rafael Costa", "5511988880002", Channels.App, "dispute_charge", "dispute_reason_selected", Channels.App, 8, 30, "higher_than_expected"),
         // Crítico: ~25 min sem atividade.
         new("18609139034", "Beatriz Lima", "5511988880003", Channels.Call, "dispute_charge", "identity_resolved", Channels.Call, 25, 40),
         // Crítico, com a jornada passada do WhatsApp para o App (canal atual diferente do de origem).
@@ -499,5 +505,24 @@ public static class DatabaseSeeder
         string CurrentStep,
         string CurrentChannel,
         int InactiveMinutes,
-        int OpenedMinutesAgo);
+        int OpenedMinutesAgo,
+        string? DisputeReason = null);
+
+    /// <summary>
+    /// Bases já semeadas antes do motivo existir: preenche o motivo nas jornadas de contestação abertas que não o têm.
+    /// Só mexe no que faltou; não altera motivo que já está gravado.
+    /// </summary>
+    private static async Task BackfillScenarioDisputeReasonsAsync(CfeDbContext db, CancellationToken ct)
+    {
+        foreach (var scenario in OperationalDemoScenarios.Where(s => s.DisputeReason is not null))
+        {
+            var journeys = await db.JourneyContexts
+                .Where(j => j.Customer.Cpf == scenario.Cpf && j.Intent == scenario.Intent && j.Status == JourneyStatus.Open)
+                .ToListAsync(ct);
+            foreach (var journey in journeys.Where(j => !j.Payload.ContainsKey("dispute_reason")))
+                journey.Payload["dispute_reason"] = scenario.DisputeReason!;
+        }
+
+        await db.SaveChangesAsync(ct);
+    }
 }
