@@ -90,6 +90,8 @@ public sealed class OpenAiCompatibleSummaryProvider : ICustomerSummaryProvider
         };
         if (useResponseFormat)
             body["response_format"] = new { type = "json_object" };
+        if (!string.IsNullOrWhiteSpace(_options.ReasoningEffort))
+            body["reasoning_effort"] = _options.ReasoningEffort;
 
         using var request = new HttpRequestMessage(HttpMethod.Post, $"{_options.BaseUrl.TrimEnd('/')}/chat/completions")
         {
@@ -117,6 +119,7 @@ public sealed class OpenAiCompatibleSummaryProvider : ICustomerSummaryProvider
         string content;
         int? inputTokens = null;
         int? outputTokens = null;
+        int? reasoningTokens = null;
         try
         {
             using var document = JsonDocument.Parse(responseBody);
@@ -128,6 +131,10 @@ public sealed class OpenAiCompatibleSummaryProvider : ICustomerSummaryProvider
             {
                 if (usage.TryGetProperty("prompt_tokens", out var prompt) && prompt.TryGetInt32(out var p)) inputTokens = p;
                 if (usage.TryGetProperty("completion_tokens", out var completion) && completion.TryGetInt32(out var c)) outputTokens = c;
+                // Raciocínio conta dentro de completion_tokens; o detalhamento, quando o provedor informa, vem separado.
+                if (usage.TryGetProperty("completion_tokens_details", out var details)
+                    && details.TryGetProperty("reasoning_tokens", out var reasoning) && reasoning.TryGetInt32(out var r))
+                    reasoningTokens = r;
             }
         }
         catch (Exception ex) when (ex is JsonException or KeyNotFoundException or InvalidOperationException or IndexOutOfRangeException)
@@ -136,6 +143,6 @@ public sealed class OpenAiCompatibleSummaryProvider : ICustomerSummaryProvider
         }
 
         var parsed = SummaryResponseValidator.Parse(content);
-        return new CustomerSummaryResult(parsed, "ai", _options.Model, inputTokens, outputTokens);
+        return new CustomerSummaryResult(parsed, "ai", _options.Model, inputTokens, outputTokens, reasoningTokens);
     }
 }

@@ -22,7 +22,8 @@ public sealed record CustomerSummaryResult(
     string Source,
     string? Model,
     int? InputTokens = null,
-    int? OutputTokens = null);
+    int? OutputTokens = null,
+    int? ReasoningTokens = null);
 
 /// <summary>
 /// Falha previsível de um provedor externo. <see cref="Reason"/> é o <c>fallback_reason</c> da resposta

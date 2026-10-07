@@ -23,6 +23,12 @@ public class AiSummaryOptions
     public int MaxOutputTokens { get; set; } = 600;
     public double Temperature { get; set; } = 0.2;
 
+    /// <summary>
+    /// Esforço de raciocínio enviado ao provedor (parâmetro reasoning_effort, ex.: "none", "low"). Opcional:
+    /// vazio ou nulo não envia o campo e o provedor usa o padrão dele.
+    /// </summary>
+    public string? ReasoningEffort { get; set; }
+
     /// <summary>Jornadas mais recentes enviadas ao provedor.</summary>
     public int MaxJourneys { get; set; } = 20;
 

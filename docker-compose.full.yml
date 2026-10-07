@@ -60,6 +60,8 @@ services:
       AiSummary__BaseUrl: "${AI_SUMMARY_BASE_URL:-}"
       AiSummary__Model: "${AI_SUMMARY_MODEL:-}"
       AiSummary__ApiKey: "${AI_SUMMARY_API_KEY:-}"
+      AiSummary__ReasoningEffort: "${AI_SUMMARY_REASONING_EFFORT:-}"
+      AiSummary__MaxOutputTokens: "${AI_SUMMARY_MAX_OUTPUT_TOKENS:-600}"
     ports:
       # 5104 no host — mesma porta usada em dev (config.js dos canais já aponta para ela, sem precisar de ajuste.
       - "5104:8080"
