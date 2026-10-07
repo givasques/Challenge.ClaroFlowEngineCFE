@@ -6,7 +6,8 @@ namespace ClaroFlowEngine.Api.Modules.CustomerInsights.Providers;
 /// </summary>
 public static class CustomerSummaryPrompt
 {
-    public const string Version = "1";
+    /// <summary>1: texto inicial. 2: status das jornadas exatamente como nos dados e sem pedir o que a etapa já mostra.</summary>
+    public const string Version = "2";
 
     public const string System =
         "Você é um assistente que resume o histórico de atendimento de um cliente para um atendente da Claro, " +
@@ -18,6 +19,8 @@ public static class CustomerSummaryPrompt
         "\"summary\" (texto de até 400 caracteres), " +
         "\"attention_points\" (lista de até 4 textos, cada um de até 160 caracteres; lista vazia se não houver) e " +
         "\"suggested_approach\" (texto de até 250 caracteres).\n" +
+        "Ao citar uma jornada, use o status exatamente como vem nos dados (aberta, concluída, escalada, abandonada ou expirada). Não deduza nem troque o status.\n" +
+        "Não peça uma informação que a etapa atual mostra que já foi obtida. Por exemplo, se a etapa é \"motivo informado\", o motivo já existe.\n" +
         "Não inclua nome, CPF, telefone, e-mail nem qualquer identificador na resposta.";
 
     /// <summary>Rótulo da mensagem de usuário: os dados chegam como JSON do retrato minimizado.</summary>
