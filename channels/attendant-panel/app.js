@@ -528,6 +528,7 @@ async function handleSearch(event) {
     return;
   }
 
+  document.getElementById('search-input').value = '';
   await loadCustomerJourney(customerId);
 }
 
