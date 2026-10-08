@@ -802,7 +802,7 @@ function buildAiSummaryResult(summary) {
   const isFallback = !isAi && Boolean(summary.fallback_reason);
   const badgeClass = isAi ? 'ai-source-badge--ai' : (isFallback ? 'ai-source-badge--fallback' : 'ai-source-badge--rules');
   let badgeText;
-  if (isAi) badgeText = `Gerado por IA${summary.model ? ` · ${summary.model}` : ''}`;
+  if (isAi) badgeText = 'Gerado por IA';
   else if (isFallback) badgeText = 'IA indisponível no momento. Mostrando resumo automático por regras.';
   else badgeText = 'Resumo automático por regras';
 
