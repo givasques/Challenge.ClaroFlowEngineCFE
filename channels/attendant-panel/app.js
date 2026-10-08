@@ -1661,6 +1661,21 @@ function endAuthenticatedSession() {
   state.metrics = null;
   state.metricsLoaded = false;
   state.queueSearch = null;
+
+  // Troca de usuário na mesma aba não pode mostrar o cliente da sessão anterior na Consulta.
+  state.customerLoadVersion += 1;
+  state.customerId = null;
+  state.journeyId = null;
+  state.journeyPayload = null;
+  state.currentJourney = null;
+  state.currentPlan = null;
+  if (state.cpfRevealHideHandle) {
+    clearTimeout(state.cpfRevealHideHandle);
+    state.cpfRevealHideHandle = null;
+  }
+  hideAllResultBlocks();
+  document.getElementById('search-input').value = '';
+  document.getElementById('empty-state').classList.remove('hidden');
 }
 
 function handleSessionExpired() {
