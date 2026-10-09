@@ -177,30 +177,24 @@
       });
     }
 
+    // A versão atual do script oficial do VLibras (carregado de vlibras.gov.br) não usa mais o
+    // <div vw-access-button> estático desta página: ela cria seu próprio botão dentro de uma Shadow
+    // DOM, anexada ao <body> como #vlibras-access-wrapper. document.querySelector não atravessa Shadow
+    // DOM, por isso é preciso buscar explicitamente dentro do shadowRoot.
+    function findVlibrasButton() {
+      var wrapper = document.getElementById('vlibras-access-wrapper');
+      return (wrapper && wrapper.shadowRoot) ? wrapper.shadowRoot.querySelector('#vlibras-button') : null;
+    }
+
     var vlibras = document.getElementById('a11y-vlibras-button');
     if (vlibras) {
       vlibras.addEventListener('click', function () {
-        // O widget do VLibras não abre por código de forma confiável neste ambiente (ver relatório do Bloco B):
-        // o botão leva o foco ao ícone do tradutor e explica como abri-lo.
-        var icon = document.querySelector('[vw-access-button]');
-        if (icon) {
-          icon.focus();
-          announce('Foco no ícone do VLibras, no canto da tela. Pressione Enter para abrir o tradutor.');
+        var button = findVlibrasButton();
+        if (button) {
+          button.click();
+          announce('Tradutor VLibras aberto.');
         } else {
-          announce('Tradutor VLibras indisponível neste momento.');
-        }
-      });
-    }
-
-    var access = document.querySelector('[vw-access-button]');
-    if (access) {
-      access.setAttribute('tabindex', '0');
-      access.setAttribute('role', 'button');
-      access.setAttribute('aria-label', 'Abrir tradutor VLibras');
-      access.addEventListener('keydown', function (event) {
-        if (event.key === 'Enter' || event.key === ' ') {
-          event.preventDefault();
-          access.click();
+          announce('O tradutor VLibras ainda está carregando. Tente novamente em alguns segundos.');
         }
       });
     }
