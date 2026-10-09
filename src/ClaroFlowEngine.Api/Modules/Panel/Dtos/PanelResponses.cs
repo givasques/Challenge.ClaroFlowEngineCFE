@@ -1,6 +1,6 @@
 namespace ClaroFlowEngine.Api.Modules.Panel.Dtos;
 
-/// <summary>Resposta de GET /journeys/active — jornadas com status 'open', mais recentes primeiro.</summary>
+/// <summary>Resposta de GET /journeys/active e POST /journeys/active/search — jornadas abertas, mais recentes primeiro.</summary>
 public record ActiveJourneysResponse(List<ActiveJourneyDto> Journeys, int Total);
 
 public record ActiveJourneyDto(
@@ -8,17 +8,60 @@ public record ActiveJourneyDto(
     ActiveJourneyCustomerDto Customer,
     string Intent,
     string IntentLabel,
+    string CurrentStep,
+    string CurrentStepLabel,
     string OriginChannel,
     string OriginChannelLabel,
     string CurrentChannel,
     string CurrentChannelLabel,
     DateTime CreatedAt,
     DateTime UpdatedAt,
+    DateTime LastActivityAt,
     int MinutesSinceStart,
+    int MinutesSinceLastActivity,
+    bool RequiresAttention,
+    string AlertLevel,
     // Sempre 'open' hoje; só varia quando ?include_escalated=true é usado (FASE 3.5, item A.8).
     string Status);
 
-public record ActiveJourneyCustomerDto(Guid Id, string FullName, string Cpf);
+/// <summary>
+/// Cliente exibido nas telas do painel. O CPF nunca vai completo: só a forma mascarada e o rótulo de LGPD (FASE 4.3).
+/// O telefone também sai mascarado ((11) *****-8888); a busca compara com o número completo guardado no servidor.
+/// </summary>
+public record ActiveJourneyCustomerDto(Guid Id, string FullName, string? CpfMasked, string? CpfLabel = null, string? PhoneMasked = null);
+
+/// <summary>Resposta de GET /alerts/active — somente jornadas abertas acima do limite de atenção (FASE 4.2).</summary>
+public record ActiveAlertsResponse(
+    List<ActiveAlertDto> Alerts,
+    int Total,
+    int Warning,
+    int Critical,
+    int AttentionThresholdMinutes,
+    int CriticalThresholdMinutes);
+
+public record ActiveAlertDto(
+    Guid JourneyId,
+    ActiveJourneyCustomerDto Customer,
+    string Intent,
+    string IntentLabel,
+    string CurrentStep,
+    string CurrentStepLabel,
+    string OriginChannel,
+    string OriginChannelLabel,
+    string CurrentChannel,
+    string CurrentChannelLabel,
+    DateTime CreatedAt,
+    DateTime UpdatedAt,
+    DateTime LastActivityAt,
+    int MinutesSinceStart,
+    int MinutesSinceLastActivity,
+    string AlertLevel);
+
+/// <summary>
+/// Requisição de POST /journeys/active/search. Nome: busca parcial. Telefone: busca parcial pelos dígitos.
+/// CPF: só com os 11 dígitos completos. O texto vai no corpo, nunca na URL, para não cair no log de requisições.
+/// </summary>
+public record SearchActiveJourneysRequest(string? Query);
 
 /// <summary>Resposta de GET /metrics/summary — indicadores agregados dos últimos 30 dias (exceto "jornadas hoje").</summary>
 public record MetricsSummaryResponse(

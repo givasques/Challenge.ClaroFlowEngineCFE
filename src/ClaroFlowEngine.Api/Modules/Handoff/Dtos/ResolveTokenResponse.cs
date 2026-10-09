@@ -15,8 +15,11 @@ public record ResolvedJourneyDto(
     Dictionary<string, object> Payload,
     string Status);
 
-/// <summary>Cópia local e enxuta do cliente — evita acoplar o módulo Handoff a Identity/Context.</summary>
-public record HandoffCustomerDto(string FullName, string Cpf);
+/// <summary>
+/// Cópia local e enxuta do cliente — evita acoplar o módulo Handoff a Identity/Context.
+/// CpfMasked é null quando o cliente já foi anonimizado (Art. 18 LGPD) — nesse caso CpfLabel traz o rótulo (FASE 4.3, item A.2).
+/// </summary>
+public record HandoffCustomerDto(string FullName, string? CpfMasked, string? CpfLabel = null);
 
 public record PlanDetailsDto(PlanInfoDto? CurrentPlan, PlanInfoDto? SelectedPlan);
 

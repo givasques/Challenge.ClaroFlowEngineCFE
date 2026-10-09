@@ -36,7 +36,7 @@ Este repositório contém um **protótipo funcional**, não um produto de produ�
 
 | Nome | RM | GitHub | LinkedIn |
 |---|---|---|---|
-| Caua Fernandes | 551765 | [CauaFernandess](https://github.com/CauaFernandess) | [LinkedIn](https://www.linkedin.com/in/caua-fernandes-02a877293/) |
+| Cauã Fernandes | 551765 | [CauaFernandess](https://github.com/CauaFernandess) | [LinkedIn](https://www.linkedin.com/in/caua-fernandes-02a877293/) |
 | Gabriel Dias Santiago | 551406 | [Gabriel-Dias-Santiago](https://github.com/Gabriel-Dias-Santiago) | [LinkedIn](https://www.linkedin.com/in/gabriel-dias-santiago-/) |
 | Giovanna Vasques Alexandre | 99884 | [givasques](https://github.com/givasques) | [LinkedIn](https://www.linkedin.com/in/giovanna-vasques-718b3a1a3/) |
 | Rick Alves Domingues | 552438 | [riqinho](https://github.com/riqinho) | [LinkedIn](https://www.linkedin.com/in/rickalvesdomingues/) |
@@ -82,7 +82,7 @@ Este repositório contém um **protótipo funcional**, não um produto de produ�
 - **Context**: mantém o ciclo de vida da jornada (abertura, atualização, expiração, encerramento) e o histórico de transições.
 - **Handoff**: gera e resolve os tokens de deep link que transferem uma jornada entre canais.
 - **Invoices**: expõe as faturas do cliente (com itens de linha), consumidas pelo fluxo de contestação de cobrança.
-- **Panel**: dados agregados para o menu lateral do painel do atendente, cobrindo jornadas ativas em tempo real e métricas operacionais (TMA, taxa de conclusão, canal mais usado).
+- **Panel**: central operacional do painel, com visão geral e fila de jornadas, alertas de inatividade, métricas (TMA, taxa de conclusão, canal mais usado) e oportunidades.
 
 Os cinco módulos rodam num único processo (monolito modular); ver [Decisões arquiteturais](#decisões-arquiteturais).
 
@@ -96,7 +96,62 @@ O projeto tem 2 formas de rodar via Docker Compose:
 
 **Modo full** (`docker-compose.full.yml`) sobe tudo (Postgres, API e canais servidos pela API). Ideal para demonstração ou teste ponta a ponta com um único comando.
 
+**Cenário da Central operacional:** o seed cria 5 clientes de demonstração com jornadas abertas em níveis diferentes de inatividade (2 de atenção, 2 críticas e 1 normal). Os horários são relativos ao momento em que o banco é criado: com o tempo, os níveis mudam (por exemplo, uma jornada de 8 min vira crítica depois de cerca de 15 min). Para ver o cenário com os horários de agora, recrie o banco com `docker compose -f docker-compose.full.yml -p claroflowengine-full down -v` seguido de `up -d --build`. Reiniciar só a API não recria o cenário: o seed é idempotente e não duplica nada.
+
 Os dois modos são isolados (nomes de projeto e portas de Postgres diferentes) e podem coexistir sem conflito. Os comandos exatos de cada modo estão em [Setup detalhado](#setup-detalhado) logo abaixo.
+
+---
+
+## Central Operacional do atendente
+
+O painel em `channels/attendant-panel` abre para o gestor na **Visão geral**, com KPIs reais, as jornadas que requerem atenção e uma fila operacional com pesquisa, filtros e ordenação. A aba **Alertas** lista as jornadas paradas, críticas primeiro. Essas telas são exclusivas do gestor. O atendente continua na Consulta de Jornada, que mostra o cabeçalho de alerta da jornada aberta para os dois perfis.
+
+Alertas são calculados em tempo real apenas para jornadas `open`, usando `JourneyContext.UpdatedAt` como última atividade: menos de 5 minutos é normal, de 5 a menos de 15 é atenção (`warning`) e a partir de 15 é crítico (`critical`). Os limites são configuráveis por `Cfe:JourneyAttentionThresholdMinutes` e `Cfe:JourneyCriticalThresholdMinutes`, validados na subida da API. Nenhuma tabela ou migration adicional é necessária.
+
+A última atividade considera a abertura de um link de continuação (handoff resolvido pela dona da jornada) e a reabertura de uma jornada já ativa. Tentativas recusadas (outra conta, conta sem vínculo, link cancelado) não contam. Consultas do painel continuam auditadas por `panel_accessed`, mas não alteram `UpdatedAt` nem zeram a inatividade.
+
+`GET /alerts/active` retorna somente alertas ativos, priorizando críticos e maior tempo sem atividade, e responde 403 ao perfil atendente. `GET /journeys/active` informa etapa atual, última atividade, tempo sem atividade, necessidade de atenção e nível do alerta. `POST /journeys/active/search` filtra a fila no servidor: nome e telefone por correspondência parcial, CPF somente com os 11 dígitos completos. O texto vai no corpo da requisição, nunca na URL. Jornadas Ativas, Alertas e Fila abrem a consulta correta usando `customer_id` e `journey_id`, sem CPF, telefone ou nome na URL.
+
+O contador "Jornadas hoje" usa o dia civil de Brasília (`Cfe:BusinessTimeZoneId`, padrão `America/Sao_Paulo`).
+
+---
+
+## Resumo do cliente com IA
+
+Na Consulta de Jornada, o atendente pode gerar um **resumo do histórico do cliente**: um parágrafo, os pontos de atenção e uma sugestão de abordagem. O resumo é gerado sob demanda, pelo botão "Gerar resumo". Ao abrir a consulta, nada é enviado a nenhum serviço.
+
+O resumo sempre diz de onde veio: "Gerado por IA", "Resumo automático por regras" ou "IA indisponível no momento. Mostrando resumo automático por regras.". Conteúdo da IA traz um aviso fixo para conferir antes de agir.
+
+**Quais dados saem para o modelo.** Um retrato minimizado, montado com uma lista de permissão: intenção, status, canais por onde a jornada passou, etapa em que parou, desfecho, motivo da contestação, plano atual e planos escolhidos (nome e preço), faturas contestadas (mês e valor), oportunidades (categoria, urgência e status), contagens e tempos relativos ("há 3 dias"). O cliente aparece apenas como "o cliente".
+
+**O que nunca sai.** Nome, CPF (completo ou mascarado), telefone, conta do App, e-mail, identificadores internos, nome do atendente e texto livre digitado por cliente ou atendente (descrição da contestação e observações de conclusão ou escalação). Um teste automatizado confere isso no retrato e na requisição que sai pela rede.
+
+**Provedor por regras.** É o padrão, e não precisa de chave: o resumo é montado por regras a partir das contagens e dos rótulos da jornada. Também é o fallback. Se a IA falhar, demorar além do tempo configurado ou não estiver configurada, o painel mostra o resumo por regras e o motivo (`ai_error`, `ai_timeout`, `ai_invalid_response`, `ai_rate_limited` ou `ai_not_configured`). Falha da IA nunca vira erro para o atendente.
+
+**Cache.** Um resumo da IA fica guardado enquanto os dados do cliente não mudarem: nova jornada, nova transição ou nova oportunidade geram um resumo novo. Abrir a consulta não muda o cache. Resumos por regras não entram no cache, para que a próxima chamada tente a IA de novo. O botão "Gerar novamente" ignora o cache.
+
+**Limite de uso.** Cada atendente pode gerar até 6 resumos por minuto (`AiSummary__RequestsPerUserPerMinute`). Respostas do cache não contam. Cada geração fica registrada na auditoria, sem o texto do resumo.
+
+**Configuração de provedor.** As variáveis abaixo valem para a API. No modo full, o compose as repassa do ambiente de quem sobe, e nenhuma chave fica no repositório.
+
+| Variável | Compose (`docker-compose.full.yml`) | Padrão | O que faz |
+|---|---|---|---|
+| `AiSummary__Provider` | `AI_SUMMARY_PROVIDER` | `rules` | `rules` ou `openai_compatible` |
+| `AiSummary__BaseUrl` | `AI_SUMMARY_BASE_URL` | vazio | Endereço base da API compatível |
+| `AiSummary__Model` | `AI_SUMMARY_MODEL` | vazio | Nome do modelo |
+| `AiSummary__ApiKey` | `AI_SUMMARY_API_KEY` | vazio | Chave da API (nunca versionada) |
+| `AiSummary__ReasoningEffort` | `AI_SUMMARY_REASONING_EFFORT` | vazio | Esforço de raciocínio (`none`, `low` etc.), para modelos que aceitam o parâmetro; vazio não envia o campo |
+| `AiSummary__MaxOutputTokens` | `AI_SUMMARY_MAX_OUTPUT_TOKENS` | `600` | Limite de tokens de saída; aumente se a resposta vier cortada |
+| `AiSummary__TimeoutSeconds` | não repassada | `20` | Tempo máximo de espera pela IA |
+
+Sem o provedor completo, a API sobe normalmente, grava um aviso uma vez e usa o resumo por regras. Exemplos (os nomes de modelo mudam com o tempo; confira o catálogo de cada serviço):
+
+- **Groq:** `AI_SUMMARY_BASE_URL=https://api.groq.com/openai/v1`, `AI_SUMMARY_MODEL=openai/gpt-oss-120b`, `AI_SUMMARY_REASONING_EFFORT=low` (o modelo raciocina por padrão; sem isso a resposta pode vir cortada ou demorar).
+- **OpenAI:** `AI_SUMMARY_PROVIDER=openai_compatible`, `AI_SUMMARY_BASE_URL=https://api.openai.com/v1`, `AI_SUMMARY_MODEL=gpt-4o-mini`.
+- **Gemini (endpoint compatível com OpenAI):** `AI_SUMMARY_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai`, `AI_SUMMARY_MODEL=gemini-2.0-flash`.
+- **Ollama local (sem chave):** `AI_SUMMARY_BASE_URL=http://host.docker.internal:11434/v1`, `AI_SUMMARY_MODEL=llama3.2`. Ollama dispensa a chave quando o endereço é local.
+
+**Limitações.** O resumo é apoio ao atendimento, não decisão: o atendente continua lendo a jornada. Texto livre fica de fora nesta versão, então o resumo não cita o que o cliente escreveu na descrição da contestação; isso pode ser tratado no futuro, com anonimização de texto. Quando o resumo depende de um serviço externo, a falha é absorvida pelo fallback, mas a qualidade do texto depende do modelo escolhido.
 
 ---
 
@@ -150,9 +205,44 @@ docker compose -f docker-compose.full.yml down -v
 
 Os dois arquivos declaram nomes de projeto Docker Compose explícitos (`claroflowengine-dev` e `claroflowengine-full`) e usam portas de Postgres distintas (5433 e 5434): os dois modos podem coexistir sem risco de um substituir containers do outro.
 
+### Deploy em nuvem (Render + Neon)
+
+O mesmo `Dockerfile` usado no modo full serve para publicar a aplicação: a API e os três canais simulados sobem como **um único serviço** (a API já serve `/channels/*` como estático), conectado a um Postgres gerenciado.
+
+**Neon (banco):** criar um projeto Postgres e usar a connection string na variável `ConnectionStrings__Postgres` (formato chave=valor do Npgsql: `Host`, `Port`, `Database`, `Username`, `Password`, `Ssl Mode`). Migrations e seed rodam automaticamente na subida, com a conexão direta (sem pooler), que é a própria recomendação da Neon para ferramentas de migration.
+
+**Render (aplicação):** Web Service em modo Docker, apontando para `src/ClaroFlowEngine.Api/Dockerfile`. Variáveis de ambiente a configurar no painel do serviço (sem nenhum valor versionado no repositório):
+
+| Variável | Natureza | Para que serve |
+|---|---|---|
+| `ASPNETCORE_ENVIRONMENT` | Configuração | `Staging`, mesmo gatilho do modo full para migration/seed automáticos, sem expor o Swagger |
+| `ConnectionStrings__Postgres` | Segredo | Connection string do Neon |
+| `Jwt__SigningKey` | Segredo | Chave de assinatura do JWT do painel (32+ caracteres) |
+| `AiSummary__ApiKey` | Segredo | Chave do provedor de IA, se configurado |
+| `Channels__AttendantPanelBaseUrl` | Configuração | URL pública do painel (CORS) |
+| `Channels__AppSimBaseUrl` | Configuração | URL pública do App (CORS + link de handoff) |
+| `Channels__WhatsappSimBaseUrl` | Configuração | URL pública do WhatsApp simulado (CORS) |
+| `Cfe__AllowedChannelTokens__0`, `__1` | Configuração | Tokens de canal (os mesmos já fixos no JS público do WhatsApp/App simulados, não são segredo) |
+| `AiSummary__Provider`, `AiSummary__BaseUrl`, `AiSummary__Model` | Configuração | Mesmas variáveis da tabela de [Resumo do cliente com IA](#resumo-do-cliente-com-ia), se for usar um provedor real |
+| `PORT` | Configuração | Porta onde a API escuta (já fixa em `8080` na imagem) |
+
+### Variáveis de ambiente (login do painel)
+
+| Variável | Obrigatória | Padrão | Observação |
+|---|---|---|---|
+| `Jwt__SigningKey` | Sim | nenhum | A API não sobe sem ela (precisa ter 32+ caracteres). Nunca versionada: vem de `appsettings.Development.json` (gitignored) em dev, ou de variável de ambiente real em qualquer outro ambiente. No modo full, `docker-compose.full.yml` já define um valor de demonstração local, comentado como tal. |
+| `Jwt__ExpirationHours` | Não | `8` | Duração do token (um turno de atendimento). |
+| `PanelAuth__MaxFailedAttempts` | Não | `5` | Tentativas erradas seguidas até bloquear a conta. |
+| `PanelAuth__LockoutMinutes` | Não | `15` | Duração do bloqueio por tentativas. |
+| `PanelAuth__LoginRateLimitPerMinute` | Não | `10` | Limite de tentativas de login por IP, por minuto. |
+
 ### Testes
 
-O projeto não tem suíte de testes automatizados. Testes manuais estruturados (caminho feliz + caminhos de erro) foram executados a cada fase de desenvolvimento.
+```bash
+dotnet test tests/ClaroFlowEngine.Api.Tests/ClaroFlowEngine.Api.Tests.csproj
+```
+
+Suíte automatizada (xUnit) cobrindo o resumo do cliente com IA (cache, fallback, validação de resposta, limite por atendente) e o histórico do cliente, sem nenhuma chamada real a provedor de IA: tudo simulado. Testes manuais estruturados (caminho feliz + caminhos de erro) seguem sendo usados para o restante dos fluxos, a cada fase de desenvolvimento.
 
 ### Estrutura do repositório
 
@@ -176,9 +266,71 @@ Challenge.ClaroFlowEngineCFE/
 
 ---
 
+## Acesso ao Painel do Atendente
+
+O painel exige login real (e-mail e senha, com JWT), criado automaticamente pelo seed em qualquer ambiente novo. Duas credenciais de demonstração, com perfis diferentes:
+
+| Nome | E-mail | Senha | Perfil |
+|---|---|---|---|
+| Júlia Souza | `julia.souza@cfe.demo` | `Atendente@2026` | Atendente |
+| Ricardo Almeida | `ricardo.almeida@cfe.demo` | `Gestor@2026` | Gestor |
+
+A Central Operacional (Visão geral e Alertas) é exclusiva do perfil gestor, restrita também no backend, não só escondida na interface; o atendente continua na Consulta de Jornada. As demais telas são iguais para os dois perfis.
+
+Essas credenciais são intencionalmente públicas e fracas, aceitável só por este ser um ambiente acadêmico de demonstração. Num sistema real, não existiriam credenciais documentadas publicamente: cada atendente teria sua própria conta, criada por um processo de onboarding interno.
+
+**Proteção de dados pessoais no painel:** o CPF do cliente aparece sempre mascarado (`***.456.789-**`). Na Consulta de Jornada, o botão "Mostrar CPF completo" revela o número por 30 segundos, mediante motivo obrigatório (confirmação de identidade, pedido do próprio cliente, exigência de escalação ou outro); a consulta fica registrada no histórico com o nome do atendente. O card do cliente também tem um botão "Exportar dados (LGPD)", que gera um arquivo com todos os dados pessoais e o histórico de atendimento do cliente (portabilidade, Art. 18, V), igualmente auditado.
+
+---
+
+## Contas do App Minha Claro (demonstração)
+
+O App confia na própria autenticação (como aconteceria com o app real da Claro numa implantação em produção): o CFE não reconfere a senha, só identifica a qual cliente a conta pertence. Por isso o seed já vincula uma conta a cada cliente de demonstração:
+
+| Cliente | Usuário do App | Senha |
+|---|---|---|
+| Ana Silva | `ana.silva` | qualquer valor com 6+ caracteres (não verificada) |
+| Carlos Mendes | `carlos.mendes` | qualquer valor com 6+ caracteres (não verificada) |
+| Mariana Souza | `mariana.souza` | qualquer valor com 6+ caracteres (não verificada) |
+
+**Regra de dono do link:** abrir o deep link do WhatsApp e logar no App só funciona com a conta vinculada ao cliente que iniciou o atendimento. Logar com outra conta mostra "Não foi possível abrir este atendimento", sem revelar nenhum dado da jornada; depois de 3 tentativas com conta errada, o link é cancelado para todos, inclusive para a dona. Clientes criados durante a própria demonstração (CPF novo digitado no chat) não têm conta do App vinculada, ver [Limitações conhecidas](#limitações-conhecidas).
+
+Na tela "Meus dados" do App, um cliente logado pode baixar uma cópia dos próprios dados (portabilidade, Art. 18, V) com o botão "Baixar meus dados".
+
+---
+
+## Acessibilidade
+
+O painel do atendente e o App Minha Claro têm um menu de acessibilidade. O botão "Acessibilidade" fica no cabeçalho (e na tela de login do painel), e o atalho **Alt + Shift + A** abre e fecha o menu nos dois canais. No App, o menu aparece como folha inferior dentro do frame do celular.
+
+O menu tem seis ajustes, que valem na hora e ficam gravados no navegador:
+
+| Ajuste | Opções |
+|---|---|
+| Tamanho do texto | Padrão, Grande, Maior, Muito grande (100%, 115%, 130% e 150%) |
+| Alto contraste | Texto preto ou quase preto sobre branco, bordas de 2px e links sublinhados. Texto com razão de contraste de pelo menos 7:1 |
+| Cores para daltonismo | Paleta Okabe-Ito nos indicadores de status (azul, laranja, vermelho-alaranjado e azul-céu) |
+| Espaçamento de texto | Entrelinha de 1,8 e mais espaço entre letras, palavras e parágrafos |
+| Reduzir animações | Remove transições e animações |
+| Destacar foco do teclado | Contorno de foco mais grosso, com fundo destacado |
+
+Também há um botão para abrir o tradutor VLibras, que localiza e aciona o botão do próprio widget (carregado de um script externo do Governo Federal), e um botão "Restaurar padrão".
+
+Sem nenhuma preferência gravada, o menu segue as preferências do sistema operacional, como redução de movimento e contraste.
+
+Outras melhorias que valem para todos, com ou sem o menu:
+
+- **Indicadores que não dependem só de cor:** a prioridade das Jornadas Ativas, o nível de urgência das Oportunidades, os avisos (toasts) e as mensagens de erro têm ícone e texto. Uma tela em escala de cinza continua mostrando cada estado.
+- **Navegação por teclado completa:** link "Pular para o conteúdo" como primeiro elemento da página; linhas da tabela de Jornadas Ativas operáveis com Enter; modais com foco preso, Esc para fechar e retorno do foco ao elemento que os abriu.
+- **Leitores de tela:** avisos com função de status ou de alerta, cabeçalhos de tabela com escopo, ícones decorativos ocultos e foco no título ao trocar de tela.
+
+**Fora do escopo:** o canal WhatsApp simulado. Numa implantação real, o WhatsApp é um aplicativo de terceiros, com a acessibilidade que o próprio fornecedor oferece. O CFE não controla essa parte.
+
+---
+
 ## Roteiros de demonstração
 
-Os três clientes de teste já vêm no seed automático. Com a stack rodando, abra o chat, o App e o painel em abas separadas.
+Os clientes de demonstração já vêm no seed automático. Com a stack rodando, abra o chat, o App e o painel em abas separadas.
 
 ### Cenário 1: Caminho feliz (Ana Silva, CPF `11144477735`) · ~2 min
 
@@ -186,15 +338,15 @@ Os três clientes de teste já vêm no seed automático. Com a stack rodando, ab
 2. Informe o CPF `11144477735` quando pedido.
 3. Escolha um plano (ex: "60GB") quando o bot listar as opções.
 4. Clique no botão "Continuar no App" do card que aparece.
-5. No App, faça login com qualquer usuário/senha e confirme a troca.
+5. No App, faça login com o usuário `ana.silva` (qualquer senha com 6+ caracteres; é a conta vinculada a este CPF, ver [Contas do App Minha Claro](#contas-do-app-minha-claro-demonstração)) e confirme a troca.
 6. Verifique no painel (buscando `11144477735`) que a jornada aparece como "Concluída".
 
 ### Cenário 2: Escalada humana (Carlos Mendes, CPF `22255588846`) · ~3 min
 
 1. Repita os passos 1-3 do cenário 1 com o CPF `22255588846`.
 2. **Não** clique no link do card.
-3. Abra o painel em outra aba e busque `22255588846`: deve aparecer "Em andamento".
-4. Volte ao chat, clique no link, abra o App, mas não confirme ainda.
+3. Abra o painel em outra aba, faça login com `julia.souza@cfe.demo` / `Atendente@2026` (ver [Acesso ao Painel do Atendente](#acesso-ao-painel-do-atendente)) e busque `22255588846`: deve aparecer "Em andamento".
+4. Volte ao chat, clique no link, faça login no App com o usuário `carlos.mendes` (conta vinculada a este CPF), mas não confirme ainda.
 5. Volte ao painel **sem recarregar a página**: em até 4 segundos, o histórico deve mostrar "Jornada retomada em outro canal" sozinho (polling).
 
 ### Cenário 3: Abandono e expiração (Mariana Souza, CPF `33366699957`) · ~2 min
@@ -224,23 +376,57 @@ Os três clientes de teste já vêm no seed automático. Com a stack rodando, ab
 3. Escolha uma das 3 últimas faturas mostradas na lista.
 4. Descreva o problema livremente (ex: "tem um serviço que eu não contratei").
 5. Clique no botão "Continuar no App" do card que aparece.
-6. No App, faça login com qualquer usuário/senha: a fatura detalhada e sua descrição já aparecem preenchidas.
+6. No App, faça login com o usuário `ana.silva` (qualquer senha com 6+ caracteres): a fatura detalhada e sua descrição já aparecem preenchidas.
 7. Marque pelo menos um item da fatura e clique "Formalizar contestação".
 8. Confira o número de protocolo exibido na tela final.
 9. Verifique no painel (buscando `11144477735`) que a intenção aparece como "Contestação de cobrança" e a descrição do cliente fica em destaque.
 
 ### Cenário 6: Jornadas ativas e métricas em tempo real (painel) · ~2 min
 
-1. Repita os passos 1-3 do cenário 1 com qualquer CPF do seed, mas não conclua.
-2. No painel, clique em "Jornadas ativas" no menu lateral: a jornada recém-aberta deve aparecer na tabela, com badge de canal/intenção e tempo decorrido.
-3. Clique em "Métricas": os 4 cards devem mostrar valores calculados a partir do banco (não mais dados fictícios).
-4. Volte para "Jornadas ativas" e aguarde ~30s: a tabela deve se atualizar sozinha (visível na aba Network do navegador).
+1. Abra o painel e faça login com `julia.souza@cfe.demo` / `Atendente@2026` (ver [Acesso ao Painel do Atendente](#acesso-ao-painel-do-atendente)).
+2. Repita os passos 1-3 do cenário 1 com qualquer CPF do seed, mas não conclua.
+3. No painel, clique em "Jornadas ativas" no menu lateral: a jornada recém-aberta deve aparecer na tabela, com badge de canal/intenção e tempo decorrido.
+4. Clique em "Métricas": os 4 cards devem mostrar valores calculados a partir do banco (não mais dados fictícios).
+5. Volte para "Jornadas ativas" e aguarde ~30s: a tabela deve se atualizar sozinha (visível na aba Network do navegador).
+
+### Cenário 7: Proteção de dados pessoais: CPF, dono do link e portabilidade (Ana Silva, CPF `11144477735`) · ~4 min
+
+1. No painel, logado como Júlia, busque `11144477735`: o CPF aparece mascarado (`***.444.777-**`).
+2. Clique em "Mostrar CPF completo", escolha um motivo e confirme: o CPF completo aparece por 30 segundos e some sozinho; o histórico da jornada (se houver) não é afetado.
+3. No chat, inicie uma troca de plano com o CPF `11144477735` e clique no link gerado ("Continuar no App").
+4. No App, tente logar com o usuário `carlos.mendes`: a tela "Não foi possível abrir este atendimento" aparece, sem nenhum dado da Ana.
+5. Ainda no App, clique "Entrar com outra conta" e logue com `ana.silva`: a jornada é retomada normalmente.
+6. No painel, busque `11144477735` de novo: o histórico mostra a tentativa bloqueada do Carlos.
+7. Ainda no App, logada como `ana.silva`, abra "Meus dados" e clique "Baixar meus dados": o JSON baixado traz o CPF completo, as identidades de canal (WhatsApp, App, CPF) e o histórico de jornadas, mostrando a identidade unificada da Ana.
+8. No painel, com a Ana ainda na tela, clique "Exportar dados (LGPD)" e confirme: outro arquivo é baixado, e a auditoria da exportação fica registrada com o nome da Júlia.
+
+### Cenário 8: Central Operacional e alertas de inatividade (painel) · ~3 min
+
+Os clientes deste cenário (Lucia, Rafael, Beatriz, Eduardo e Helena) vêm do seed em banco recém-criado. Os horários são relativos ao momento em que o banco foi criado: se passarem alguns minutos, os níveis mudam. Para o cenário original, recrie o banco (ver [Modo full](#modo-full-docker-compose-completo)).
+
+1. Logado como Ricardo (gestor), o painel abre na Visão geral: cartões de jornadas em andamento, requerem atenção, alertas críticos, escaladas e jornadas de hoje.
+2. Em "Requerem atenção", as jornadas paradas aparecem por prioridade. Os cartões são botões: use Tab até um deles e Enter para abrir a consulta.
+3. Na fila, filtre a prioridade por "Crítico" e depois pesquise `Beatriz`: só a cliente crítica aparece.
+4. Abra a aba "Alertas": críticos e de atenção, com o tempo sem atividade de cada jornada.
+5. Clique numa jornada crítica: a Consulta abre com o cabeçalho de alerta e o cliente certo.
+6. Saia e entre como Júlia (atendente): as abas da Central não aparecem, mas a consulta da mesma cliente mostra o cabeçalho de alerta.
+7. Conclua ou escale a jornada pelo painel: ela deixa de aparecer em "Requerem atenção" e em "Alertas".
+
+### Cenário 9: Resumo do cliente (painel) · ~3 min
+
+Os dados vêm do seed em banco recém-criado. O cliente Rodrigo Alves (CPF `491.005.281-02`) tem quatro jornadas dos últimos 30 dias: troca de plano abandonada no App, contestação escalada para o Financeiro, contestação concluída pela central telefônica e troca de plano concluída.
+
+1. Logado como Júlia, busque o CPF `49100528102`. A Consulta mostra o card "Resumo do cliente" abaixo dos dados, sem resumo ainda: nada é gerado ao abrir a consulta.
+2. Clique em "Gerar resumo". O card mostra a origem ("Resumo automático por regras" sem IA configurada), o resumo, os pontos de atenção e a sugestão: confirmar o andamento da escalação antes de oferecer qualquer nova opção.
+3. Confira os pontos com o histórico de jornadas logo abaixo: cada jornada aparece com seu início e seu encerramento, e a escalada continua sem desfecho.
+4. Troque para outro cliente e volte: o card volta ao estado inicial. Resumo por regras é recalculado a cada vez; resumo da IA volta do cache se os dados não tiverem mudado.
+5. Com um provedor configurado (ver a tabela acima), o selo passa a ser "Gerado por IA" e aparece o aviso para conferir antes de agir.
 
 ---
 
 ## Mapeamento de requisitos
 
-A spec funcional deste projeto organiza os requisitos como casos de uso (UC01–UC10), não como uma lista numerada de RF/RNF; a tabela abaixo segue essa mesma estrutura.
+A spec funcional deste projeto organiza os requisitos como casos de uso (UC01 a UC10), não como uma lista numerada de RF/RNF; a tabela abaixo segue essa mesma estrutura.
 
 | Caso de uso | Descrição | Implementação |
 |---|---|---|
@@ -249,15 +435,19 @@ A spec funcional deste projeto organiza os requisitos como casos de uso (UC01–
 | UC03 | Registrar novo cliente | `POST /identity/resolve` com `full_name_hint` |
 | UC04 | Atualizar contexto de jornada | `PATCH /context/{id}` |
 | UC05 | Gerar deep link para handoff | `POST /handoff/generate` |
-| UC06 | Retomar jornada em outro canal | `GET /context/resolve?token=` |
+| UC06 | Retomar jornada em outro canal | `GET /context/resolve?token=&identifier=` (identifier obrigatório, verifica se a conta logada é a dona da jornada; bloqueia e revoga o link após tentativas erradas) |
 | UC07 | Encerrar jornada | `POST /context/{id}/close`; painel também pode concluir com categoria padronizada (`POST /journeys/{id}/conclude`) ou escalar para outra área sem fechar (`POST /journeys/{id}/escalate`, status `escalated`) |
 | UC08 | Expirar jornada por inatividade | Verificação reativa em todo acesso a uma jornada aberta (`IJourneyExpirationService`) |
 | UC09 | Consultar histórico de jornada (painel) | `GET /context/customer/{id}` + `GET /context/{id}/transitions`, com polling |
 | UC10 | Contestar cobrança indevida | `GET /invoices/customer/{id}` + `GET /invoices/{id}` + fluxo dedicado nos 3 canais, `intent: dispute_charge` |
 | RNF003 | Operação em modo degradado quando o CFE está indisponível | Timeout + retry + banner de indisponibilidade nos 3 canais |
-| N/A | Jornadas ativas em tempo real (painel) | `GET /journeys/active` |
+| RNF004 | Login real do atendente no painel, com perfis | `POST /auth/login` (JWT, hash de senha, bloqueio por tentativas, rate limit por IP) + perfis `attendant`/`manager` |
+| N/A | Central Operacional e jornadas ativas em tempo real | Visão geral e fila sobre `GET /journeys/active`, com etapa, última atividade, inatividade e prioridade |
+| N/A | Alertas operacionais de inatividade | `GET /alerts/active`, derivado das jornadas `open` e dos limites configuráveis de atenção e crítico |
+| N/A | Resumo do cliente com IA, com fallback por regras | `POST /customers/{customerId}/ai-summary`, provedor `rules` ou compatível com OpenAI, cache por dados e limite por atendente |
 | N/A | Métricas operacionais (painel) | `GET /metrics/summary` (TMA mediano, jornadas hoje, taxa de conclusão, canal mais usado) |
-| RNF005 | Direito ao esquecimento (Art. 18 LGPD) | `POST /customers/{cpf}/right-to-be-forgotten` + tela "Meus dados" no App |
+| N/A | Acessibilidade | Menu de acessibilidade no painel e no App (texto, contraste, daltonismo, espaçamento, animações e foco), VLibras e teclado completo nos modais |
+| RNF005 | Direito ao esquecimento, portabilidade (Art. 18 LGPD) e CPF mascarado | `POST /customers/{cpf}/right-to-be-forgotten`, `POST /customers/data-export`, `POST /customers/{id}/reveal-cpf` + telas correspondentes no App e no painel |
 | UC11 | Detectar oportunidades comerciais | `POST /opportunities/detect` (4 regras) + `GET /opportunities` + ciclo `new → contacted → converted/not_relevant`, aba "Oportunidades" no painel |
 
 ---
@@ -277,12 +467,15 @@ A spec funcional deste projeto organiza os requisitos como casos de uso (UC01–
 ## Limitações conhecidas
 
 - O bot do chat reconhece intenção por heurística de palavras-chave, não por NLP real.
-- A autenticação por canal (`X-Channel-Token`) é mockada via header, não é autenticação real (JWT, OAuth2 etc.), documentado como tal no próprio código.
-- O login do App é mock: aceita qualquer credencial que atenda a um formato mínimo, sem verificação contra base real.
-- Não há cobertura de testes automatizados; a validação é manual e estruturada, uma fase por vez.
+- A autenticação do WhatsApp simulado e do App (`X-Channel-Token`) é mockada via header, não é autenticação real (JWT, OAuth2 etc.), documentado como tal no próprio código. O painel do atendente já tem login real (ver [Acesso ao Painel do Atendente](#acesso-ao-painel-do-atendente)).
+- O login do App é mock: aceita qualquer credencial que atenda a um formato mínimo, sem verificação contra base real. Premissa: numa implantação real na Claro, o App Minha Claro já teria autenticação própria e confiável, e o CFE só precisaria identificar a qual cliente a conta pertence (o que já faz, via identidade unificada).
+- Clientes criados durante a própria demonstração (CPF novo digitado no chat, sem conta de App pré-vinculada) não conseguem abrir o deep link pelo App. Só os 3 clientes de demonstração (Ana, Carlos, Mariana) têm essa conta pré-cadastrada pelo seed, simulando um cadastro Claro que já existiria antes do atendimento.
+- A suíte automatizada cobre o resumo do cliente com IA e o histórico do cliente; o restante dos fluxos segue validado manualmente, de forma estruturada, a cada fase de desenvolvimento.
+- As preferências de acessibilidade ficam no navegador: não acompanham o usuário entre dispositivos.
+- A validação de acessibilidade usou varredura automática (axe-core) e navegador Chrome. Não houve teste com leitor de tela real, nem em outros navegadores.
+- O widget do VLibras carrega de um serviço externo do Governo Federal. Quando ele não está disponível, o restante do painel e do App continua funcionando.
 - A regra de expiração de jornada é reativa (verificada no momento do acesso), não um job agendado em background.
 - Campos do painel do atendente como "segmento" e "vencimento" são colunas reais no banco, mas preenchidas com dado mockado via seed, sem refletir um sistema de billing real.
-- A tela "Configurações" do painel é mockada (campos desabilitados): não há sistema de usuários/autenticação de atendente no CFE ainda.
 - Os três canais simulados não têm build step nem framework de frontend: HTML/CSS/JS puro, sem testes de UI automatizados.
 
 ---
@@ -294,23 +487,30 @@ O protótipo evoluiu além do MVP inicial. Já foram entregues:
 - Interatividade do bot (botões e listas no chat WhatsApp).
 - Fluxo completo de contestação de cobrança nos 3 canais.
 - Enriquecimento do painel do atendente com dados agregados, timeline contextualizada e histórico de jornadas anteriores.
-- Menu lateral do painel conectado a dados reais (jornadas ativas e métricas operacionais).
+- Central Operacional do gestor: visão geral, fila filtrável, alertas de inatividade e acesso direto à jornada por IDs.
+- Resumo do cliente no painel, com provedor por regras, fallback automático e provedor compatível com OpenAI. A conexão com um modelo real depende de uma chave de API.
 - Integração com VLibras do Governo Federal e melhorias básicas de acessibilidade HTML.
+- Menu de acessibilidade no painel e no App, com seis ajustes (texto, contraste, cores para daltonismo, espaçamento, animações e foco), navegação completa por teclado e indicadores que não dependem só de cor.
 - Direito ao esquecimento (Art. 18 LGPD), exercível pelo cliente na área "Meus dados" do App ou pelo atendente no painel.
 - Fechamento categorizado e escalação de jornadas pelo painel, com novo status `escalated` para casos transferidos a outras áreas (Financeiro, Retenção, Suporte técnico, Vendas, Ouvidoria) sem expirar automaticamente.
 - Painel de Oportunidades: detecção automática de leads comerciais a partir de jornadas históricas (troca de plano abandonada, contestação abandonada, cliente engajado, cliente inativo), com priorização por urgência e ciclo de vida controlado (novo → abordado → convertido/não relevante).
+- Login real do atendente no painel (e-mail/senha, JWT, bloqueio por tentativas, rate limit), com dois perfis (atendente e gestor) e auditoria por usuário em cada ação registrada.
+- CPF mascarado em toda a API, nas telas e nos logs, com revelação auditada no painel (motivo obrigatório, expira em 30s).
+- Verificação de dono no handoff: o App só retoma a jornada com a conta vinculada ao cliente que a iniciou; tentativas com outra conta são bloqueadas e registradas, com o link cancelado após 3 tentativas erradas.
+- Portabilidade dos dados (Art. 18, V da LGPD): exportação em JSON pelo próprio cliente no App ou pelo atendente no painel, com auditoria.
 
 O [histórico de commits e PRs](https://github.com/givasques/Challenge.ClaroFlowEngineCFE/pulls?q=is%3Apr) documenta cada entrega.
 
 ### Atendimento aos RNFs do Sprint 1
 
 - **RNF003 (disponibilidade e notificação técnica)**: Serilog e Health Checks implementados; base pronta para integração com ferramentas de monitoring (Sentry, Datadog) em produção.
-- **RNF005 (LGPD)**: auditabilidade completa (toda transição de jornada registrada com origem, canal e timestamp), TTL em tokens de handoff e jornadas inativas, e logs estruturados via Serilog. Direito ao esquecimento (Art. 18 LGPD) implementado: `POST /customers/{cpf}/right-to-be-forgotten` anonimiza nome, CPF e identificadores de canal mantendo o histórico operacional (jornadas, transições) íntegro para auditoria, executável pelo cliente na área "Meus dados" do App ou pelo atendente no painel. Ampliação prevista: rotina automática de anonimização por política de retenção, e outros direitos do titular (portabilidade, correção, revogação de consentimento).
-- **Acessibilidade**: VLibras e ajustes básicos de HTML semântico entregues. Cobertura completa de WCAG 2.1 AA prevista para iteração futura.
+- **RNF005 (LGPD)**: auditabilidade completa (toda transição de jornada registrada com origem, canal e timestamp), TTL em tokens de handoff e jornadas inativas, e logs estruturados via Serilog. Direito ao esquecimento (Art. 18 LGPD) implementado: `POST /customers/{cpf}/right-to-be-forgotten` anonimiza nome, CPF e identificadores de canal mantendo o histórico operacional (jornadas, transições) íntegro para auditoria, executável pelo cliente na área "Meus dados" do App ou pelo atendente no painel. CPF deixou de circular completo pela API, pelas telas e pelos logs: aparece sempre mascarado, com revelação pontual e auditada no painel (motivo obrigatório, expira em 30s). Direito à portabilidade (Art. 18, V) implementado: `POST /customers/data-export` gera uma cópia completa dos dados do cliente em JSON, pelo próprio cliente no App ou pelo atendente no painel, também auditado. Ampliação prevista: rotina automática de anonimização por política de retenção, e outros direitos do titular (correção, revogação de consentimento).
+- **Acessibilidade**: VLibras, menu de acessibilidade com seis ajustes salvos por canal, navegação completa por teclado nos modais e formulários, e indicadores com ícone e texto além da cor. A varredura automática com axe-core não encontra violações além do próprio widget do VLibras nas telas principais. Cobertura completa de WCAG 2.1 AA, incluindo validação com leitores de tela reais, prevista para iteração futura.
 
 ### Decisões de escopo do MVP
 
-- **Autenticação real (RNF004)**: fora do escopo. Em produção seria provida pelos canais Claro existentes (login do App Minha Claro, WhatsApp Business). O `X-Channel-Token` é identificação simplificada entre serviços do protótipo.
+- **Autenticação real (RNF004)**: implementada para o painel do atendente (login com e-mail/senha, JWT, perfis). WhatsApp e App continuam com `X-Channel-Token`, identificação simplificada entre serviços do protótipo; em produção seriam providos pelos canais Claro existentes (login do App Minha Claro, WhatsApp Business).
+- **Premissa de confiança do App**: o CFE confia em quem o App diz que está logado (como numa implantação real na Claro, em que o App já teria autenticação própria) e usa a identidade unificada só para saber a qual cliente aquela conta pertence. Por isso o handoff recusa continuar quando a conta logada não é a mesma que iniciou o atendimento, mesmo sem reconferir a senha.
 - **Stack do painel**: HTML/CSS/JS puro em vez de React (previsto no Sprint 1), o que simplificou o deployment e reduziu o tempo de MVP. Reescrita em framework moderno pode ser priorizada se o volume de funcionalidades justificar.
 
 ### Evoluções futuras possíveis
@@ -320,7 +520,7 @@ Sem compromisso de prazo; dependem de uma eventual evolução do protótipo para
 - Novos canais (Alexa, RCS, SMS, USSD, totem).
 - Novas intenções (2ª via, portabilidade, cancelamento, agendamento técnico).
 - Extração dos módulos internos para microsserviços independentes, se a escala justificar.
-- Sistema de usuários/autenticação para atendentes, habilitando a tela de Configurações do painel a deixar de ser mockada.
+- Preferências de acessibilidade salvas no perfil do usuário do painel, para acompanhar o atendente entre dispositivos.
 - Integração real com WhatsApp Business API.
 
 ---

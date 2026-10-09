@@ -10,13 +10,11 @@ namespace ClaroFlowEngine.Api.Common.Middleware;
 // Este middleware simula a intenção arquitetural (autenticação por canal) sem custo de setup de auth real.
 public class ChannelAuthMiddleware
 {
-    // Mapeamento token -> canal. Fica aqui (não em appsettings) porque AllowedChannelTokens é documentado
-    // na spec técnica como uma allowlist simples; esta é uma extensão interna para resolver ICurrentChannelAccessor.
+    // fake-panel-token removido (FASE 4.1, item B.1) — painel só autentica via JWT a partir desta fase.
     private static readonly Dictionary<string, string> TokenChannelMap = new()
     {
         ["fake-whatsapp-token"] = Channels.Whatsapp,
         ["fake-app-token"] = Channels.App,
-        ["fake-panel-token"] = Channels.Panel,
     };
 
     private readonly RequestDelegate _next;
@@ -32,6 +30,15 @@ public class ChannelAuthMiddleware
     {
         if (IsPublicRoute(context.Request.Path))
         {
+            await _next(context);
+            return;
+        }
+
+        // JWT válido (painel, FASE 4.1 — Bloco B.1) dispensa X-Channel-Token: UseAuthentication() já
+        // rodou antes deste middleware, então context.User já reflete o token, se houver um válido.
+        if (context.User.Identity?.IsAuthenticated == true)
+        {
+            currentChannel.Channel = Channels.Panel;
             await _next(context);
             return;
         }
@@ -57,7 +64,11 @@ public class ChannelAuthMiddleware
         path.StartsWithSegments("/plans") ||
         // Canais simulados (HTML/CSS/JS) servidos pela própria API no modo "full" (ver docker-compose.full.yml).
         // Arquivos estáticos não fazem sentido exigir X-Channel-Token — são as próprias páginas dos canais.
-        path.StartsWithSegments("/channels");
+        path.StartsWithSegments("/channels") ||
+        // Módulo de autenticação do painel (FASE 4.1) — proteção é inteiramente via [Authorize]/JWT,
+        // não via X-Channel-Token; sem isso, uma chamada sem token nenhum seria rejeitada por este
+        // middleware com invalid_channel_token em vez do invalid_or_expired_session esperado (A.5).
+        path.StartsWithSegments("/auth");
 }
 
 public static class ChannelAuthMiddlewareExtensions

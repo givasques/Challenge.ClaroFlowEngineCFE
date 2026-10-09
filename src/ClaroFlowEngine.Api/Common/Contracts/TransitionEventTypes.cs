@@ -22,4 +22,37 @@ public static class TransitionEventTypes
 
     /// <summary>Jornada escalada para outra área via painel (FASE 3.5) — jornada permanece registrada, sem fechar.</summary>
     public const string JourneyEscalated = "journey_escalated";
+
+    /// <summary>CPF completo revelado pelo atendente no painel (FASE 4.3, item A.4) — transição órfã, sem journey_context_id.</summary>
+    public const string CustomerCpfRevealed = "customer_cpf_revealed";
+
+    /// <summary>Tentativa de abrir o link de continuação com conta que não é a dona da jornada, bloqueada (FASE 4.3, item B.4).</summary>
+    public const string HandoffOwnerMismatch = "handoff_owner_mismatch";
+
+    /// <summary>Token de handoff revogado após atingir o limite de tentativas de outra conta (FASE 4.3, item B.4).</summary>
+    public const string HandoffTokenRevoked = "handoff_token_revoked";
+
+    /// <summary>Exportação de dados solicitada (LGPD Art. 18, V — FASE 4.3, item C.3) — transição órfã, sem journey_context_id.</summary>
+    public const string DataPortabilityRequested = "data_portability_requested";
+
+    /// <summary>Resumo do cliente gerado por IA ou por regras (FASE 4.4, A.8) — transição órfã, sem o conteúdo do resumo.</summary>
+    public const string CustomerAiSummaryGenerated = "customer_ai_summary_generated";
+
+    /// <summary>
+    /// Eventos que contam como atividade operacional da jornada (FASE 4.2). Usados para o canal atual e para a
+    /// inatividade. Eventos apenas observacionais, como <see cref="PanelAccessed"/>, ficam deliberadamente fora —
+    /// abrir o painel não deve mudar o canal da jornada nem zerar o alerta de inatividade.
+    /// </summary>
+    public static readonly string[] OperationalActivityTypes =
+    [
+        JourneyStarted,
+        JourneyReopenAttempted,
+        StepUpdated,
+        DeepLinkGenerated,
+        JourneyResumed,
+        JourneyClosed,
+        JourneyExpired,
+        JourneyConcludedByAgent,
+        JourneyEscalated,
+    ];
 }

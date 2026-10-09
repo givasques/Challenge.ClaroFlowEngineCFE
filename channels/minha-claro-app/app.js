@@ -74,22 +74,57 @@ async function apiCall(path, { method = 'GET', body } = {}) {
   }
 }
 
+// ---------- Sessão do App (FASE 4.3, item B.5) ----------
+// Guarda a conta logada depois que o backend confirma que ela é a dona da jornada (resolve bem-sucedido) —
+// usada pela portabilidade de dados (Bloco C) pra exportar sem depender de identificador digitado.
+// Não havia mecanismo de sessão no App antes desta fase (confirmado no Bloco P); sessionStorage, não
+// localStorage, pelo mesmo motivo do painel: fechar a aba encerra a sessão.
+
+const APP_SESSION_STORAGE_KEY = 'cfe_app_session';
+
+function setAppSession(identifier) {
+  try {
+    sessionStorage.setItem(APP_SESSION_STORAGE_KEY, JSON.stringify({ identifier }));
+  } catch {
+    // sessionStorage indisponível (ex: modo privado) — a sessão simplesmente não persiste.
+  }
+}
+
+function getAppSession() {
+  try {
+    const raw = sessionStorage.getItem(APP_SESSION_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
 // ---------- Navegação entre telas ----------
+
+let screenShownOnce = false;
 
 function showScreen(name) {
   document.querySelectorAll('.screen').forEach(el => el.classList.add('hidden'));
-  document.getElementById(`screen-${name}`).classList.remove('hidden');
+  const screen = document.getElementById(`screen-${name}`);
+  screen.classList.remove('hidden');
   state.currentScreen = name;
+
+  // FASE 4.5, C.2: a troca de tela leva o foco ao título da tela nova. A primeira tela da página não
+  // recebe foco, para que Tab comece no link "Pular para o conteúdo".
+  if (screenShownOnce) {
+    const title = screen.querySelector('h1');
+    if (title) {
+      title.setAttribute('tabindex', '-1');
+      title.focus();
+    }
+  }
+  screenShownOnce = true;
 }
 
 // ---------- Formatação ----------
 
 function formatCents(cents) {
   return (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-}
-
-function formatCpf(cpf) {
-  return cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
 }
 
 function formatDateShort(isoDate) {
@@ -159,6 +194,7 @@ async function attemptResolve() {
     );
     state.journeyId = data.journey_context.id;
     state.intent = data.journey_context.intent;
+    setAppSession(state.identifier);
 
     if (state.intent === 'dispute_charge') {
       renderDisputeConfirmation(data);
@@ -173,16 +209,34 @@ async function attemptResolve() {
       showScreen('unavailable');
       return;
     }
+    // FASE 4.3, item B.5: conta logada não é a dona da jornada — link continua válido, nenhum dado
+    // da jornada aparece; o cliente pode tentar de novo com outra conta (volta ao login, token na URL).
+    if (err.status === 403) {
+      renderWrongAccount(err);
+      showScreen('wrong-account');
+      return;
+    }
     renderSessionExpired(err);
     showScreen('session-expired');
   }
+}
+
+function renderWrongAccount(err) {
+  document.getElementById('wrong-account-message').textContent = err.message;
+}
+
+function handleEnterWithAnotherAccount() {
+  document.getElementById('login-username').value = '';
+  document.getElementById('login-password').value = '';
+  document.getElementById('login-error').classList.add('hidden');
+  showScreen('login');
 }
 
 function renderConfirmation(data) {
   const { customer, plan_details: planDetails } = data;
 
   document.getElementById('customer-name').textContent = customer.full_name;
-  document.getElementById('customer-cpf').textContent = formatCpf(customer.cpf);
+  document.getElementById('customer-cpf').textContent = customer.cpf_label || customer.cpf_masked || 'Não informado';
 
   const current = planDetails && planDetails.current_plan;
   const selected = planDetails && planDetails.selected_plan;
@@ -203,7 +257,7 @@ function renderDisputeConfirmation(data) {
   const payload = journeyContext.payload || {};
 
   document.getElementById('dispute-customer-name').textContent = customer.full_name;
-  document.getElementById('dispute-customer-cpf').textContent = formatCpf(customer.cpf);
+  document.getElementById('dispute-customer-cpf').textContent = customer.cpf_label || customer.cpf_masked || 'Não informado';
 
   document.getElementById('dispute-invoice-label').textContent = invoiceDetails ? invoiceDetails.reference_label : 'Não informado';
   document.getElementById('dispute-invoice-due').textContent = invoiceDetails ? formatDateShort(invoiceDetails.due_date) : '—';
@@ -332,6 +386,11 @@ function renderSessionExpired(err) {
       title: 'Solicitação finalizada',
       message: 'Esta solicitação já foi finalizada. Se precisar de algo, é só nos chamar novamente.',
     },
+    // FASE 4.3, item B.4 — token cancelado após várias tentativas de login com a conta errada.
+    token_revoked: {
+      title: 'Link cancelado',
+      message: 'Este link foi cancelado por segurança após várias tentativas com a conta incorreta. Inicie um novo atendimento.',
+    },
   };
   const fallback = { title: 'Sessão expirada', message: 'Não foi possível recuperar sua sessão.' };
   const { title, message } = byErrorCode[err.errorCode] || fallback;
@@ -371,7 +430,70 @@ function openMyDataScreen() {
   state.screenBeforeMyData = state.currentScreen;
   document.getElementById('my-data-cpf-input').value = '';
   document.getElementById('my-data-submit-button').disabled = true;
+  renderMyDataExportBlock();
   showScreen('my-data');
+}
+
+// ---------- Portabilidade dos dados — Art. 18, V da LGPD (FASE 4.3, item C.4) ----------
+
+/** Mostra "Baixar meus dados" com cliente logado (sessão do App, FASE 4.3 item B.5), ou o botão
+ * desabilitado "Entre na sua conta..." sem sessão — a tela "Meus dados" abre independente de login. */
+function renderMyDataExportBlock() {
+  const session = getAppSession();
+  document.getElementById('my-data-export-button').classList.toggle('hidden', !session);
+  document.getElementById('my-data-export-logged-out-button').classList.toggle('hidden', Boolean(session));
+}
+
+/** Padrão de download dos 3 canais a partir desta fase (FASE 4.3, item C.6): fetch com o header de
+ * autenticação do canal, blob + createObjectURL + <a download>, nome vindo do Content-Disposition. */
+async function downloadJsonFile(path, body) {
+  const res = await fetch(`${CFE_CONFIG.apiBaseUrl}${path}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Channel-Token': CFE_CONFIG.channelToken,
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const data = await res.json().catch(() => null);
+    const err = new Error((data && data.message) || `HTTP ${res.status}`);
+    err.isApiError = true;
+    err.status = res.status;
+    err.errorCode = data && data.error_code;
+    throw err;
+  }
+
+  const disposition = res.headers.get('Content-Disposition') || '';
+  const match = disposition.match(/filename="?([^"]+)"?/);
+  const fileName = match ? match[1] : 'dados-cliente.json';
+
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+async function handleExportMyData() {
+  const session = getAppSession();
+  if (!session) return;
+
+  const button = document.getElementById('my-data-export-button');
+  button.disabled = true;
+
+  try {
+    await downloadJsonFile('/customers/data-export', { app_account: session.identifier });
+  } catch (err) {
+    alert(`Não foi possível baixar seus dados: ${err.message}`);
+  } finally {
+    button.disabled = false;
+  }
 }
 
 function closeMyDataScreen() {
@@ -465,6 +587,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   document.getElementById('my-data-cancel-modal-button').addEventListener('click', closeConfirmModal);
   document.getElementById('my-data-confirm-button').addEventListener('click', exerciseRightToBeForgotten);
+  document.getElementById('my-data-export-button').addEventListener('click', handleExportMyData);
 
   const params = new URLSearchParams(window.location.search);
   state.token = params.get('token');
@@ -483,4 +606,5 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('cancel-dispute-button').addEventListener('click', () => closeJourney('abandoned'));
   document.getElementById('retry-button').addEventListener('click', () => state.lastFailedAction && state.lastFailedAction());
   document.getElementById('forgot-password-link').addEventListener('click', event => event.preventDefault()); // link visual, sem ação real (login é mockado)
+  document.getElementById('wrong-account-retry-button').addEventListener('click', handleEnterWithAnotherAccount);
 });

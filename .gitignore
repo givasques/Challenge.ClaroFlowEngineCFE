@@ -34,3 +34,6 @@ node_modules/
 
 # Specs — material pessoal/interno, não sobe para o repositório remoto
 specs/
+
+# Notas locais de sessao (nao versionadas)
+CLAUDE.local.md

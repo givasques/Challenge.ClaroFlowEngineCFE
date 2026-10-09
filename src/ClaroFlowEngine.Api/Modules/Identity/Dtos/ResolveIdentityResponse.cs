@@ -11,7 +11,7 @@ public record ResolveIdentityResponse(
 /// CurrentPlan é usado pelo bot do WhatsApp para informar o plano atual do cliente antes de mostrar
 /// a lista de troca de plano (FASE 3, item B.1) — null quando o cliente não tem plano ativo.
 /// </summary>
-public record CustomerSummaryDto(Guid Id, string FullName, string Cpf, PlanInfoDto? CurrentPlan = null);
+public record CustomerSummaryDto(Guid Id, string FullName, string? CpfMasked, PlanInfoDto? CurrentPlan = null, string? CpfLabel = null);
 
 public record PlanInfoDto(string Code, string Name, int MonthlyPriceCents);
 

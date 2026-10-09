@@ -36,14 +36,15 @@ public record JourneyDetailResponse(
 public record CustomerSummaryDto(
     Guid Id,
     string FullName,
-    string Cpf,
+    string? CpfMasked,
     string? Phone,
     PlanInfoDto? CurrentPlan,
     DateTime CustomerSince,
     string? PreferredChannel,
     JourneyCountsDto JourneyCounts,
     int? BillingDueDay,
-    string? Segment);
+    string? Segment,
+    string? CpfLabel = null);
 
 public record PlanInfoDto(string Code, string Name, int MonthlyPriceCents);
 

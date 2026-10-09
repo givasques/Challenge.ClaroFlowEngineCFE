@@ -22,10 +22,11 @@ public record OpportunityDto(
     string SuggestedAction,
     DateTime? ContactedAt,
     string? ContactedBy,
+    string? ContactedByName,
     DateTime? ResolvedAt,
     string? ResolutionNotes);
 
-public record OpportunityCustomerDto(Guid Id, string FullName, string Cpf, string? Phone);
+public record OpportunityCustomerDto(Guid Id, string FullName, string? CpfMasked, string? Phone, string? CpfLabel = null);
 
 public record OpportunityTriggeringJourneyDto(Guid Id, string Intent, string? AbandonedAtStep);
 

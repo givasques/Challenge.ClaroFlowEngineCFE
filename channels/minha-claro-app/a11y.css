@@ -1,0 +1,339 @@
+/* Preferências de acessibilidade (FASE 4.5). Atributos em <html> definidos por a11y.js. */
+
+/* ---------- Tamanho do texto (A.2): a escala vem de html, todo o CSS usa rem ---------- */
+html[data-a11y-text="115"] { font-size: 115%; }
+html[data-a11y-text="130"] { font-size: 130%; }
+html[data-a11y-text="150"] { font-size: 150%; }
+
+/* ---------- Espaçamento de texto (A.2, WCAG 1.4.12) ---------- */
+html[data-a11y-spacing="wide"] body,
+html[data-a11y-spacing="wide"] body * {
+  line-height: 1.8 !important;
+  letter-spacing: 0.12em !important;
+  word-spacing: 0.16em !important;
+}
+html[data-a11y-spacing="wide"] p,
+html[data-a11y-spacing="wide"] li {
+  margin-bottom: 2em !important;
+}
+
+/* ---------- Redução de animações (A.2) ---------- */
+html[data-a11y-motion="reduce"] *,
+html[data-a11y-motion="reduce"] *::before,
+html[data-a11y-motion="reduce"] *::after {
+  animation: none !important;
+  transition: none !important;
+  scroll-behavior: auto !important;
+}
+
+/* ---------- Foco reforçado (A.2) ---------- */
+html[data-a11y-focus="strong"] *:focus-visible {
+  outline: 4px solid #000 !important;
+  outline-offset: 3px !important;
+  background-color: #fff3a0 !important;
+}
+
+/* ---------- Alto contraste (A.4) ---------- */
+html[data-a11y-contrast="high"] {
+  --app-bg: #ffffff;
+  --page-bg: #ffffff;
+  --surface-muted: #ffffff;
+  --surface-elevated: #ffffff;
+  --text-primary: #000000;
+  --text-secondary: #111111;
+  --text-muted: #3f4652;
+  --border-subtle: #333333;
+  --border-input: #000000;
+  --claro-red: #8b0410;
+  --claro-red-dark: #6b030c;
+  --claro-red-hover: #6b030c;
+  --claro-red-light: #8b0410;
+  --warning-text: #6b3000;
+  --warning: #7a4f00;
+  --error: #971717;
+  --success: #105f2d;
+  --neutral: #3f4652;
+  --cfe-banner-text: #2e2a94;
+  --cfe-banner-icon: #3730a3;
+}
+html[data-a11y-contrast="high"] :is(input, select, textarea, button, .plan-box, .error-message, .card, .dispute-items-view) {
+  border-width: 2px;
+  border-style: solid;
+  border-color: #000000;
+}
+html[data-a11y-contrast="high"] a {
+  text-decoration: underline;
+}
+
+/* ---------- Cores para daltonismo (A.5): Okabe-Ito nos indicadores de estado ---------- */
+html[data-a11y-color="colorblind"] {
+  --success: #0072b2;
+  --warning: #7a4f00;
+  --error: #8f3300;
+  --neutral: #6b7280;
+}
+
+/* ---------- Menu de acessibilidade e elementos de apoio (FASE 4.5, B.1 e B.2) ---------- */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 8px;
+  z-index: 100;
+  background: #000;
+  color: #fff;
+  padding: 10px 16px;
+  border-radius: 6px;
+  font-weight: 700;
+  text-decoration: none;
+}
+.skip-link:focus {
+  left: 16px;
+}
+
+#main:focus, #main-title:focus {
+  outline: none;
+}
+
+.main-header-tools {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.a11y-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.a11y-toggle:hover {
+  background: var(--surface-muted);
+}
+.a11y-toggle--login {
+  width: 100%;
+  justify-content: center;
+  margin-top: 8px;
+}
+
+.a11y-menu {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(400px, 100vw);
+  overflow-y: auto;
+  background: var(--surface);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-lg);
+  padding: 20px 22px 28px;
+  z-index: 90;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.a11y-menu.hidden {
+  display: none;
+}
+.a11y-menu-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.a11y-menu-title {
+  font-size: 1.125rem;
+  font-weight: 700;
+  margin: 0;
+}
+.a11y-menu-close {
+  padding: 6px 12px;
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-primary);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.a11y-group {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.a11y-group-title {
+  font-size: 0.875rem;
+  font-weight: 700;
+  margin: 0;
+}
+.a11y-help {
+  margin: 2px 0 0;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.a11y-size-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.a11y-size-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-size: 0.8125rem;
+}
+.a11y-size-option:has(input:checked) {
+  border-color: var(--claro-red);
+  box-shadow: 0 0 0 1px var(--claro-red) inset;
+}
+.a11y-size-option input {
+  accent-color: var(--claro-red);
+}
+.a11y-size-preview {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.a11y-size-preview--100 { font-size: 0.875rem; }
+.a11y-size-preview--115 { font-size: 1rem; }
+.a11y-size-preview--130 { font-size: 1.125rem; }
+.a11y-size-preview--150 { font-size: 1.25rem; }
+
+.a11y-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.a11y-row-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.a11y-switch {
+  position: relative;
+  flex-shrink: 0;
+  width: 44px;
+  height: 24px;
+  border-radius: 999px;
+  border: 2px solid #000;
+  background: #fff;
+  cursor: pointer;
+  padding: 0;
+}
+.a11y-switch[aria-checked="true"] {
+  background: var(--claro-red-dark);
+  border-color: var(--claro-red-dark);
+}
+.a11y-switch-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #000;
+  transition: transform 0.15s ease;
+}
+.a11y-switch[aria-checked="true"] .a11y-switch-knob {
+  transform: translateX(20px);
+  background: #fff;
+}
+
+.a11y-shortcuts {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 0.8125rem;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+kbd {
+  font-family: inherit;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 1px 6px;
+  border: 1px solid var(--border-medium);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: var(--surface-muted);
+}
+
+.a11y-button {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.a11y-button:hover {
+  background: var(--surface-muted);
+}
+
+/* ---------- App: menu como folha inferior dentro do frame do celular (FASE 4.5, C.1) ---------- */
+.phone .a11y-menu {
+  background: #ffffff;
+  color: var(--text-primary);
+  z-index: 90;
+  position: absolute;
+  top: auto;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: auto;
+  max-height: 85%;
+  border-radius: 16px 16px 0 0;
+  padding: 18px 18px 24px;
+}
+
+.a11y-toggle--icon {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.18);
+  border: 0;
+  color: #fff;
+  flex-shrink: 0;
+}
+.a11y-toggle--icon:hover {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+h1[tabindex="-1"]:focus {
+  outline: none;
+}
+
+#app-main:focus {
+  outline: none;
+}

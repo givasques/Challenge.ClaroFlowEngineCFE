@@ -7,6 +7,8 @@ public static class CommonServiceExtensions
         services.AddScoped<ITransitionRecorder, TransitionRecorder>();
         services.AddScoped<IJourneyExpirationService, JourneyExpirationService>();
         services.AddScoped<ICurrentChannelAccessor, CurrentChannelAccessor>();
+        services.AddHttpContextAccessor();
+        services.AddScoped<ICurrentPanelUserAccessor, CurrentPanelUserAccessor>();
         return services;
     }
 }
