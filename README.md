@@ -36,7 +36,7 @@ Este repositório contém um **protótipo funcional**, não um produto de produ�
 
 | Nome | RM | GitHub | LinkedIn |
 |---|---|---|---|
-| Caua Fernandes | 551765 | [CauaFernandess](https://github.com/CauaFernandess) | [LinkedIn](https://www.linkedin.com/in/caua-fernandes-02a877293/) |
+| Cauã Fernandes | 551765 | [CauaFernandess](https://github.com/CauaFernandess) | [LinkedIn](https://www.linkedin.com/in/caua-fernandes-02a877293/) |
 | Gabriel Dias Santiago | 551406 | [Gabriel-Dias-Santiago](https://github.com/Gabriel-Dias-Santiago) | [LinkedIn](https://www.linkedin.com/in/gabriel-dias-santiago-/) |
 | Giovanna Vasques Alexandre | 99884 | [givasques](https://github.com/givasques) | [LinkedIn](https://www.linkedin.com/in/giovanna-vasques-718b3a1a3/) |
 | Rick Alves Domingues | 552438 | [riqinho](https://github.com/riqinho) | [LinkedIn](https://www.linkedin.com/in/rickalvesdomingues/) |
@@ -120,7 +120,7 @@ O contador "Jornadas hoje" usa o dia civil de Brasília (`Cfe:BusinessTimeZoneId
 
 Na Consulta de Jornada, o atendente pode gerar um **resumo do histórico do cliente**: um parágrafo, os pontos de atenção e uma sugestão de abordagem. O resumo é gerado sob demanda, pelo botão "Gerar resumo". Ao abrir a consulta, nada é enviado a nenhum serviço.
 
-O resumo sempre diz de onde veio: "Gerado por IA · modelo", "Resumo automático por regras" ou "IA indisponível no momento. Mostrando resumo automático por regras.". Conteúdo da IA traz um aviso fixo para conferir antes de agir.
+O resumo sempre diz de onde veio: "Gerado por IA", "Resumo automático por regras" ou "IA indisponível no momento. Mostrando resumo automático por regras.". Conteúdo da IA traz um aviso fixo para conferir antes de agir.
 
 **Quais dados saem para o modelo.** Um retrato minimizado, montado com uma lista de permissão: intenção, status, canais por onde a jornada passou, etapa em que parou, desfecho, motivo da contestação, plano atual e planos escolhidos (nome e preço), faturas contestadas (mês e valor), oportunidades (categoria, urgência e status), contagens e tempos relativos ("há 3 dias"). O cliente aparece apenas como "o cliente".
 
@@ -209,20 +209,20 @@ Os dois arquivos declaram nomes de projeto Docker Compose explícitos (`claroflo
 
 O mesmo `Dockerfile` usado no modo full serve para publicar a aplicação: a API e os três canais simulados sobem como **um único serviço** (a API já serve `/channels/*` como estático), conectado a um Postgres gerenciado.
 
-**Neon (banco):** criar um projeto Postgres e usar a connection string na variável `ConnectionStrings__Postgres` (formato chave=valor do Npgsql: `Host`, `Port`, `Database`, `Username`, `Password`, `Ssl Mode`). Migrations e seed rodam automaticamente na subida, com a conexão direta (sem pooler) — é a própria recomendação da Neon para ferramentas de migration.
+**Neon (banco):** criar um projeto Postgres e usar a connection string na variável `ConnectionStrings__Postgres` (formato chave=valor do Npgsql: `Host`, `Port`, `Database`, `Username`, `Password`, `Ssl Mode`). Migrations e seed rodam automaticamente na subida, com a conexão direta (sem pooler), que é a própria recomendação da Neon para ferramentas de migration.
 
 **Render (aplicação):** Web Service em modo Docker, apontando para `src/ClaroFlowEngine.Api/Dockerfile`. Variáveis de ambiente a configurar no painel do serviço (sem nenhum valor versionado no repositório):
 
 | Variável | Natureza | Para que serve |
 |---|---|---|
-| `ASPNETCORE_ENVIRONMENT` | Configuração | `Staging` — mesmo gatilho do modo full para migration/seed automáticos, sem expor o Swagger |
+| `ASPNETCORE_ENVIRONMENT` | Configuração | `Staging`, mesmo gatilho do modo full para migration/seed automáticos, sem expor o Swagger |
 | `ConnectionStrings__Postgres` | Segredo | Connection string do Neon |
 | `Jwt__SigningKey` | Segredo | Chave de assinatura do JWT do painel (32+ caracteres) |
 | `AiSummary__ApiKey` | Segredo | Chave do provedor de IA, se configurado |
 | `Channels__AttendantPanelBaseUrl` | Configuração | URL pública do painel (CORS) |
 | `Channels__AppSimBaseUrl` | Configuração | URL pública do App (CORS + link de handoff) |
 | `Channels__WhatsappSimBaseUrl` | Configuração | URL pública do WhatsApp simulado (CORS) |
-| `Cfe__AllowedChannelTokens__0`, `__1` | Configuração | Tokens de canal (os mesmos já fixos no JS público do WhatsApp/App simulados — não são segredo) |
+| `Cfe__AllowedChannelTokens__0`, `__1` | Configuração | Tokens de canal (os mesmos já fixos no JS público do WhatsApp/App simulados, não são segredo) |
 | `AiSummary__Provider`, `AiSummary__BaseUrl`, `AiSummary__Model` | Configuração | Mesmas variáveis da tabela de [Resumo do cliente com IA](#resumo-do-cliente-com-ia), se for usar um provedor real |
 | `PORT` | Configuração | Porta onde a API escuta (já fixa em `8080` na imagem) |
 
@@ -242,7 +242,7 @@ O mesmo `Dockerfile` usado no modo full serve para publicar a aplicação: a API
 dotnet test tests/ClaroFlowEngine.Api.Tests/ClaroFlowEngine.Api.Tests.csproj
 ```
 
-Suíte automatizada (xUnit) cobrindo o resumo do cliente com IA (cache, fallback, validação de resposta, limite por atendente) e o histórico do cliente, sem nenhuma chamada real a provedor de IA — tudo simulado. Testes manuais estruturados (caminho feliz + caminhos de erro) seguem sendo usados para o restante dos fluxos, a cada fase de desenvolvimento.
+Suíte automatizada (xUnit) cobrindo o resumo do cliente com IA (cache, fallback, validação de resposta, limite por atendente) e o histórico do cliente, sem nenhuma chamada real a provedor de IA: tudo simulado. Testes manuais estruturados (caminho feliz + caminhos de erro) seguem sendo usados para o restante dos fluxos, a cada fase de desenvolvimento.
 
 ### Estrutura do repositório
 
@@ -275,7 +275,7 @@ O painel exige login real (e-mail e senha, com JWT), criado automaticamente pelo
 | Júlia Souza | `julia.souza@cfe.demo` | `Atendente@2026` | Atendente |
 | Ricardo Almeida | `ricardo.almeida@cfe.demo` | `Gestor@2026` | Gestor |
 
-Hoje os dois perfis (atendente e gestor) têm acesso às mesmas telas; a distinção existe para suportar uma "Visão do Gestor" prevista para uma próxima entrega, restrita por perfil também no backend (não só escondida na interface).
+A Central Operacional (Visão geral e Alertas) é exclusiva do perfil gestor, restrita também no backend, não só escondida na interface; o atendente continua na Consulta de Jornada. As demais telas são iguais para os dois perfis.
 
 Essas credenciais são intencionalmente públicas e fracas, aceitável só por este ser um ambiente acadêmico de demonstração. Num sistema real, não existiriam credenciais documentadas publicamente: cada atendente teria sua própria conta, criada por um processo de onboarding interno.
 
@@ -320,7 +320,7 @@ Sem nenhuma preferência gravada, o menu segue as preferências do sistema opera
 
 Outras melhorias que valem para todos, com ou sem o menu:
 
-- **Indicadores que não dependem só de cor:** o tempo das Jornadas Ativas, o nível de urgência das Oportunidades, os avisos (toasts) e as mensagens de erro têm ícone e texto. Uma tela em escala de cinza continua mostrando cada estado.
+- **Indicadores que não dependem só de cor:** a prioridade das Jornadas Ativas, o nível de urgência das Oportunidades, os avisos (toasts) e as mensagens de erro têm ícone e texto. Uma tela em escala de cinza continua mostrando cada estado.
 - **Navegação por teclado completa:** link "Pular para o conteúdo" como primeiro elemento da página; linhas da tabela de Jornadas Ativas operáveis com Enter; modais com foco preso, Esc para fechar e retorno do foco ao elemento que os abriu.
 - **Leitores de tela:** avisos com função de status ou de alerta, cabeçalhos de tabela com escopo, ícones decorativos ocultos e foco no título ao trocar de tela.
 
@@ -330,7 +330,7 @@ Outras melhorias que valem para todos, com ou sem o menu:
 
 ## Roteiros de demonstração
 
-Os três clientes de teste já vêm no seed automático. Com a stack rodando, abra o chat, o App e o painel em abas separadas.
+Os clientes de demonstração já vêm no seed automático. Com a stack rodando, abra o chat, o App e o painel em abas separadas.
 
 ### Cenário 1: Caminho feliz (Ana Silva, CPF `11144477735`) · ~2 min
 
@@ -420,13 +420,13 @@ Os dados vêm do seed em banco recém-criado. O cliente Rodrigo Alves (CPF `491.
 2. Clique em "Gerar resumo". O card mostra a origem ("Resumo automático por regras" sem IA configurada), o resumo, os pontos de atenção e a sugestão: confirmar o andamento da escalação antes de oferecer qualquer nova opção.
 3. Confira os pontos com o histórico de jornadas logo abaixo: cada jornada aparece com seu início e seu encerramento, e a escalada continua sem desfecho.
 4. Troque para outro cliente e volte: o card volta ao estado inicial. Resumo por regras é recalculado a cada vez; resumo da IA volta do cache se os dados não tiverem mudado.
-5. Com um provedor configurado (ver a tabela acima), o selo passa a ser "Gerado por IA · modelo" e aparece o aviso para conferir antes de agir.
+5. Com um provedor configurado (ver a tabela acima), o selo passa a ser "Gerado por IA" e aparece o aviso para conferir antes de agir.
 
 ---
 
 ## Mapeamento de requisitos
 
-A spec funcional deste projeto organiza os requisitos como casos de uso (UC01–UC10), não como uma lista numerada de RF/RNF; a tabela abaixo segue essa mesma estrutura.
+A spec funcional deste projeto organiza os requisitos como casos de uso (UC01 a UC10), não como uma lista numerada de RF/RNF; a tabela abaixo segue essa mesma estrutura.
 
 | Caso de uso | Descrição | Implementação |
 |---|---|---|
@@ -435,7 +435,6 @@ A spec funcional deste projeto organiza os requisitos como casos de uso (UC01–
 | UC03 | Registrar novo cliente | `POST /identity/resolve` com `full_name_hint` |
 | UC04 | Atualizar contexto de jornada | `PATCH /context/{id}` |
 | UC05 | Gerar deep link para handoff | `POST /handoff/generate` |
-| Acessibilidade (feedback dos professores) | Interfaces personalizadas, navegação por teclado e indicadores que não dependem só de cor | Menu de acessibilidade no painel e no App (texto, contraste, daltonismo, espaçamento, animações e foco), VLibras e teclado completo nos modais |
 | UC06 | Retomar jornada em outro canal | `GET /context/resolve?token=&identifier=` (identifier obrigatório, verifica se a conta logada é a dona da jornada; bloqueia e revoga o link após tentativas erradas) |
 | UC07 | Encerrar jornada | `POST /context/{id}/close`; painel também pode concluir com categoria padronizada (`POST /journeys/{id}/conclude`) ou escalar para outra área sem fechar (`POST /journeys/{id}/escalate`, status `escalated`) |
 | UC08 | Expirar jornada por inatividade | Verificação reativa em todo acesso a uma jornada aberta (`IJourneyExpirationService`) |
@@ -447,6 +446,7 @@ A spec funcional deste projeto organiza os requisitos como casos de uso (UC01–
 | N/A | Alertas operacionais de inatividade | `GET /alerts/active`, derivado das jornadas `open` e dos limites configuráveis de atenção e crítico |
 | N/A | Resumo do cliente com IA, com fallback por regras | `POST /customers/{customerId}/ai-summary`, provedor `rules` ou compatível com OpenAI, cache por dados e limite por atendente |
 | N/A | Métricas operacionais (painel) | `GET /metrics/summary` (TMA mediano, jornadas hoje, taxa de conclusão, canal mais usado) |
+| N/A | Acessibilidade | Menu de acessibilidade no painel e no App (texto, contraste, daltonismo, espaçamento, animações e foco), VLibras e teclado completo nos modais |
 | RNF005 | Direito ao esquecimento, portabilidade (Art. 18 LGPD) e CPF mascarado | `POST /customers/{cpf}/right-to-be-forgotten`, `POST /customers/data-export`, `POST /customers/{id}/reveal-cpf` + telas correspondentes no App e no painel |
 | UC11 | Detectar oportunidades comerciais | `POST /opportunities/detect` (4 regras) + `GET /opportunities` + ciclo `new → contacted → converted/not_relevant`, aba "Oportunidades" no painel |
 
@@ -520,7 +520,6 @@ Sem compromisso de prazo; dependem de uma eventual evolução do protótipo para
 - Novos canais (Alexa, RCS, SMS, USSD, totem).
 - Novas intenções (2ª via, portabilidade, cancelamento, agendamento técnico).
 - Extração dos módulos internos para microsserviços independentes, se a escala justificar.
-- Visão exclusiva do gestor no painel, usando a mesma distinção de perfil já existente no login.
 - Preferências de acessibilidade salvas no perfil do usuário do painel, para acompanhar o atendente entre dispositivos.
 - Integração real com WhatsApp Business API.
 
