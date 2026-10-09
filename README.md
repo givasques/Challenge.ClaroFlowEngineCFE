@@ -140,13 +140,15 @@ O resumo sempre diz de onde veio: "Gerado por IA · modelo", "Resumo automático
 | `AiSummary__BaseUrl` | `AI_SUMMARY_BASE_URL` | vazio | Endereço base da API compatível |
 | `AiSummary__Model` | `AI_SUMMARY_MODEL` | vazio | Nome do modelo |
 | `AiSummary__ApiKey` | `AI_SUMMARY_API_KEY` | vazio | Chave da API (nunca versionada) |
+| `AiSummary__ReasoningEffort` | `AI_SUMMARY_REASONING_EFFORT` | vazio | Esforço de raciocínio (`none`, `low` etc.), para modelos que aceitam o parâmetro; vazio não envia o campo |
+| `AiSummary__MaxOutputTokens` | `AI_SUMMARY_MAX_OUTPUT_TOKENS` | `600` | Limite de tokens de saída; aumente se a resposta vier cortada |
 | `AiSummary__TimeoutSeconds` | não repassada | `20` | Tempo máximo de espera pela IA |
 
 Sem o provedor completo, a API sobe normalmente, grava um aviso uma vez e usa o resumo por regras. Exemplos (os nomes de modelo mudam com o tempo; confira o catálogo de cada serviço):
 
+- **Groq:** `AI_SUMMARY_BASE_URL=https://api.groq.com/openai/v1`, `AI_SUMMARY_MODEL=openai/gpt-oss-120b`, `AI_SUMMARY_REASONING_EFFORT=low` (o modelo raciocina por padrão; sem isso a resposta pode vir cortada ou demorar).
 - **OpenAI:** `AI_SUMMARY_PROVIDER=openai_compatible`, `AI_SUMMARY_BASE_URL=https://api.openai.com/v1`, `AI_SUMMARY_MODEL=gpt-4o-mini`.
 - **Gemini (endpoint compatível com OpenAI):** `AI_SUMMARY_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai`, `AI_SUMMARY_MODEL=gemini-2.0-flash`.
-- **Groq:** `AI_SUMMARY_BASE_URL=https://api.groq.com/openai/v1`, `AI_SUMMARY_MODEL=llama-3.1-8b-instant`.
 - **Ollama local (sem chave):** `AI_SUMMARY_BASE_URL=http://host.docker.internal:11434/v1`, `AI_SUMMARY_MODEL=llama3.2`. Ollama dispensa a chave quando o endereço é local.
 
 **Limitações.** O resumo é apoio ao atendimento, não decisão: o atendente continua lendo a jornada. Texto livre fica de fora nesta versão, então o resumo não cita o que o cliente escreveu na descrição da contestação; isso pode ser tratado no futuro, com anonimização de texto. Quando o resumo depende de um serviço externo, a falha é absorvida pelo fallback, mas a qualidade do texto depende do modelo escolhido.
@@ -203,6 +205,27 @@ docker compose -f docker-compose.full.yml down -v
 
 Os dois arquivos declaram nomes de projeto Docker Compose explícitos (`claroflowengine-dev` e `claroflowengine-full`) e usam portas de Postgres distintas (5433 e 5434): os dois modos podem coexistir sem risco de um substituir containers do outro.
 
+### Deploy em nuvem (Render + Neon)
+
+O mesmo `Dockerfile` usado no modo full serve para publicar a aplicação: a API e os três canais simulados sobem como **um único serviço** (a API já serve `/channels/*` como estático), conectado a um Postgres gerenciado.
+
+**Neon (banco):** criar um projeto Postgres e usar a connection string na variável `ConnectionStrings__Postgres` (formato chave=valor do Npgsql: `Host`, `Port`, `Database`, `Username`, `Password`, `Ssl Mode`). Migrations e seed rodam automaticamente na subida, com a conexão direta (sem pooler) — é a própria recomendação da Neon para ferramentas de migration.
+
+**Render (aplicação):** Web Service em modo Docker, apontando para `src/ClaroFlowEngine.Api/Dockerfile`. Variáveis de ambiente a configurar no painel do serviço (sem nenhum valor versionado no repositório):
+
+| Variável | Natureza | Para que serve |
+|---|---|---|
+| `ASPNETCORE_ENVIRONMENT` | Configuração | `Staging` — mesmo gatilho do modo full para migration/seed automáticos, sem expor o Swagger |
+| `ConnectionStrings__Postgres` | Segredo | Connection string do Neon |
+| `Jwt__SigningKey` | Segredo | Chave de assinatura do JWT do painel (32+ caracteres) |
+| `AiSummary__ApiKey` | Segredo | Chave do provedor de IA, se configurado |
+| `Channels__AttendantPanelBaseUrl` | Configuração | URL pública do painel (CORS) |
+| `Channels__AppSimBaseUrl` | Configuração | URL pública do App (CORS + link de handoff) |
+| `Channels__WhatsappSimBaseUrl` | Configuração | URL pública do WhatsApp simulado (CORS) |
+| `Cfe__AllowedChannelTokens__0`, `__1` | Configuração | Tokens de canal (os mesmos já fixos no JS público do WhatsApp/App simulados — não são segredo) |
+| `AiSummary__Provider`, `AiSummary__BaseUrl`, `AiSummary__Model` | Configuração | Mesmas variáveis da tabela de [Resumo do cliente com IA](#resumo-do-cliente-com-ia), se for usar um provedor real |
+| `PORT` | Configuração | Porta onde a API escuta (já fixa em `8080` na imagem) |
+
 ### Variáveis de ambiente (login do painel)
 
 | Variável | Obrigatória | Padrão | Observação |
@@ -215,7 +238,11 @@ Os dois arquivos declaram nomes de projeto Docker Compose explícitos (`claroflo
 
 ### Testes
 
-O projeto não tem suíte de testes automatizados. Testes manuais estruturados (caminho feliz + caminhos de erro) foram executados a cada fase de desenvolvimento.
+```bash
+dotnet test tests/ClaroFlowEngine.Api.Tests/ClaroFlowEngine.Api.Tests.csproj
+```
+
+Suíte automatizada (xUnit) cobrindo o resumo do cliente com IA (cache, fallback, validação de resposta, limite por atendente) e o histórico do cliente, sem nenhuma chamada real a provedor de IA — tudo simulado. Testes manuais estruturados (caminho feliz + caminhos de erro) seguem sendo usados para o restante dos fluxos, a cada fase de desenvolvimento.
 
 ### Estrutura do repositório
 
@@ -287,7 +314,7 @@ O menu tem seis ajustes, que valem na hora e ficam gravados no navegador:
 | Reduzir animações | Remove transições e animações |
 | Destacar foco do teclado | Contorno de foco mais grosso, com fundo destacado |
 
-Também há um botão para abrir o tradutor VLibras, que leva o foco ao ícone do VLibras no canto da tela (o widget não abre sozinho a partir do menu), e um botão "Restaurar padrão".
+Também há um botão para abrir o tradutor VLibras, que localiza e aciona o botão do próprio widget (carregado de um script externo do Governo Federal), e um botão "Restaurar padrão".
 
 Sem nenhuma preferência gravada, o menu segue as preferências do sistema operacional, como redução de movimento e contraste.
 
@@ -443,7 +470,7 @@ A spec funcional deste projeto organiza os requisitos como casos de uso (UC01–
 - A autenticação do WhatsApp simulado e do App (`X-Channel-Token`) é mockada via header, não é autenticação real (JWT, OAuth2 etc.), documentado como tal no próprio código. O painel do atendente já tem login real (ver [Acesso ao Painel do Atendente](#acesso-ao-painel-do-atendente)).
 - O login do App é mock: aceita qualquer credencial que atenda a um formato mínimo, sem verificação contra base real. Premissa: numa implantação real na Claro, o App Minha Claro já teria autenticação própria e confiável, e o CFE só precisaria identificar a qual cliente a conta pertence (o que já faz, via identidade unificada).
 - Clientes criados durante a própria demonstração (CPF novo digitado no chat, sem conta de App pré-vinculada) não conseguem abrir o deep link pelo App. Só os 3 clientes de demonstração (Ana, Carlos, Mariana) têm essa conta pré-cadastrada pelo seed, simulando um cadastro Claro que já existiria antes do atendimento.
-- Não há cobertura de testes automatizados; a validação é manual e estruturada, uma fase por vez.
+- A suíte automatizada cobre o resumo do cliente com IA e o histórico do cliente; o restante dos fluxos segue validado manualmente, de forma estruturada, a cada fase de desenvolvimento.
 - As preferências de acessibilidade ficam no navegador: não acompanham o usuário entre dispositivos.
 - A validação de acessibilidade usou varredura automática (axe-core) e navegador Chrome. Não houve teste com leitor de tela real, nem em outros navegadores.
 - O widget do VLibras carrega de um serviço externo do Governo Federal. Quando ele não está disponível, o restante do painel e do App continua funcionando.
